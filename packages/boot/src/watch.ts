@@ -1,9 +1,13 @@
 import type { EventEmitter } from 'node:events';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { HotPayload, ViteDevServer } from 'vite';
 import { ignoredSuffixes } from './ignored.js';
 import type { RestartScheduler } from './scheduler.js';
 import { getAstroHotEnv } from './vite-env.js';
+
+const RESTART_HTML = readFileSync(fileURLToPath(new URL('./restart-page.html', import.meta.url)), 'utf8');
 
 export function setupBootWatch(server: ViteDevServer, entry: string, scheduler: RestartScheduler): void {
   const bootFilePath = path.resolve(server.config.root, entry);
@@ -79,19 +83,75 @@ export function setupBootWatch(server: ViteDevServer, entry: string, scheduler: 
       scheduler.scheduleFullReload(server, triggeredBy);
     });
   }
+}
 
-  // hold incoming requests while a restart is running so they don't hit
-  // half-initialized boot state. dev-internal paths bypass to keep HMR flowing.
-  server.middlewares.use(async (req, _res, next) => {
-    if (isDevInternalPath(req.url)) {
+const READINESS_PATH = '/__astroscope_boot_ready';
+
+/**
+ * Gate requests: show 503 holding page during restart, readiness probe for the reload.
+ */
+export function installBootGate(
+  server: Pick<ViteDevServer, 'middlewares'>,
+  scheduler: Pick<RestartScheduler, 'waitForRestart' | 'isRestartPending' | 'getLastFailure'>,
+): void {
+  const middlewares = server.middlewares as unknown as {
+    stack: { route: string; handle: unknown }[];
+  };
+
+  // must be `stack.unshift`ed to land before astro's handler
+  middlewares.stack.unshift({
+    route: '',
+    handle: (async (
+      req: { url?: string },
+      res: {
+        writeHead: (status: number, headers: Record<string, string>) => void;
+        end: (body?: string) => void;
+        headersSent?: boolean;
+      },
+      next: (err?: unknown) => void,
+    ) => {
+      // readiness probe: holding page polls this. blocks until no restart is in
+      // flight, then 204 on success / 503 + JSON error if last attempt failed.
+      if (req.url === READINESS_PATH) {
+        await scheduler.waitForRestart();
+
+        if (res.headersSent) return;
+
+        const failure = scheduler.getLastFailure();
+
+        if (failure) {
+          res.writeHead(503, { 'cache-control': 'no-store', 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: failure.message }));
+
+          return;
+        }
+
+        res.writeHead(204, { 'cache-control': 'no-store' });
+        res.end();
+
+        return;
+      }
+
+      if (isDevInternalPath(req.url)) {
+        next();
+
+        return;
+      }
+
+      // respond now; awaiting the restart would let vite destroy the socket mid-response.
+      if (scheduler.isRestartPending()) {
+        res.writeHead(503, {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+          'retry-after': '1',
+        });
+        res.end(RESTART_HTML);
+
+        return;
+      }
+
       next();
-
-      return;
-    }
-
-    await scheduler.waitForRestart();
-
-    next();
+    }) as never,
   });
 }
 

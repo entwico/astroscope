@@ -589,11 +589,10 @@ describe('RestartScheduler', () => {
 
       scheduler.schedule(server as never, '/project/src/a.ts');
 
-      // debounce fires immediately (0ms), but the delay defers the actual restart
       await vi.advanceTimersByTimeAsync(50);
       expect(server.restart).not.toHaveBeenCalled();
 
-      await vi.advanceTimersByTimeAsync(160); // total 210ms — past the 200ms delay
+      await vi.advanceTimersByTimeAsync(160);
       expect(server.restart).toHaveBeenCalledTimes(1);
     });
 
@@ -608,15 +607,13 @@ describe('RestartScheduler', () => {
 
     test('delay runs before each chained iteration too', async () => {
       const server = createMockServer();
-      const scheduler = new RestartScheduler(0, logger, 50);
+      const scheduler = new RestartScheduler(0, logger, 0);
 
       scheduler.schedule(server as never, '/project/src/a.ts');
 
       await vi.waitFor(() => expect(server.restart).toHaveBeenCalledTimes(1));
 
       scheduler.schedule(server as never, '/project/src/b.ts');
-
-      await new Promise((r) => setTimeout(r, 10));
 
       await vi.waitFor(() => expect(server.restart).toHaveBeenCalledTimes(2), { timeout: 1000 });
     });

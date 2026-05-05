@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "@astroscope/boot": "workspace:^",
-    "astro": "^6.1.8",
+    "astro": "^6.2.2",
     "health-probes": "^1.1.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"

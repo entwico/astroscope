@@ -15,6 +15,7 @@ vi.mock('./lifecycle.js', () => ({
 
 vi.mock('./watch.js', () => ({
   setupBootWatch: vi.fn(),
+  installBootGate: vi.fn(),
 }));
 
 const boot = (await import('./index')).default;

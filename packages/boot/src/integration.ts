@@ -18,7 +18,7 @@ import {
   collectWarmupSpecifiers,
   generateWarmupCode,
 } from './warmup.js';
-import { setupBootWatch } from './watch.js';
+import { installBootGate, setupBootWatch } from './watch.js';
 
 export interface BootOptions {
   /**
@@ -114,7 +114,7 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
   // run by the next configureServer before its startup so resources (ports,
   // sockets, locks) from the previous module are released first. idempotent.
   let priorShutdown: (() => Promise<void>) | undefined;
-  // shared across restart-induced reruns so chain coordination survives.
+  // shared across restart-induced configureServer reruns
   let scheduler: RestartScheduler | undefined;
 
   return {
@@ -125,6 +125,10 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
       },
       'astro:config:setup': ({ command, updateConfig, logger, config }) => {
         astroConfig = config;
+
+        if (command === 'dev' && watch) {
+          scheduler = new RestartScheduler(100, logger, 300);
+        }
 
         updateConfig({
           vite: {
@@ -249,6 +253,23 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
                 },
               },
 
+              // gate plugin: enforce 'post' + returned-function so our `stack.unshift`
+              // (in installBootGate) lands at connect position 0, ahead of astro's handler.
+              {
+                name: '@astroscope/boot/gate',
+                enforce: 'post',
+
+                configureServer(server) {
+                  if (!scheduler) return;
+
+                  const s = scheduler;
+
+                  return () => {
+                    installBootGate(server, s);
+                  };
+                },
+              },
+
               // startup plugin: runs after all other configureServer hooks
               {
                 name: '@astroscope/boot/startup',
@@ -282,8 +303,12 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
                       }
                     }
 
-                    // restart failure: re-throw so vite keeps the previous server alive.
+                    // restart failure: the gate can keep the holding
+                    // page up with an error message instead of dropping users onto a
+                    // half-broken old server.
                     if (hasStartupSucceededOnce) {
+                      scheduler?.recordFailure(serializeError(error));
+
                       throw error;
                     }
 
@@ -292,6 +317,7 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
                   }
 
                   hasStartupSucceededOnce = true;
+                  scheduler?.clearFailure();
 
                   // capture so shutdown sees the same instance that started.
                   const startedModule = bootModule;
@@ -316,8 +342,7 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
                     void shutdown();
                   });
 
-                  if (watch) {
-                    scheduler ??= new RestartScheduler(100, logger, 300);
+                  if (scheduler) {
                     setupBootWatch(server, entry, scheduler);
                   }
                 },

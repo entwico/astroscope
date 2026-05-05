@@ -55,8 +55,8 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/core": "^2.7.0",
-    "astro": "^6.1.8",
+    "@opentelemetry/core": "^2.7.1",
+    "astro": "^6.2.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },

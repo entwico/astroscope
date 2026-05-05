@@ -21,15 +21,35 @@ export class RestartScheduler {
   private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private _pendingBootDeps = new Set<string>();
   private _pendingFullReloads = new Set<string>();
-  // set while a restart chain is running; the gating middleware awaits this
-  // so requests arriving mid-restart wait for the new server to be healthy.
+  // set while a restart chain is running. the gate probes it (`isRestartPending`)
+  // to short-circuit requests, and awaits it (`waitForRestart`) on readiness.
   private _runPromise: Promise<void> | undefined;
+  // set when a restart attempt fails
+  private _lastFailure: { message: string } | undefined;
 
   constructor(
     private readonly debounceMs: number,
     private readonly logger: Logger,
     private readonly restartDelayMs: number = 0,
   ) {}
+
+  // true from the moment a change is queued until the restart completes — covers
+  // the debounce window too, so requests don't slip past the gate before _run starts.
+  isRestartPending(): boolean {
+    return !!this._runPromise || !!this._debounceTimer || !!this._lastFailure;
+  }
+
+  getLastFailure(): { message: string } | undefined {
+    return this._lastFailure;
+  }
+
+  recordFailure(message: string): void {
+    this._lastFailure = { message };
+  }
+
+  clearFailure(): void {
+    this._lastFailure = undefined;
+  }
 
   schedule(server: ViteDevServer, changedPath: string): void {
     this._pendingBootDeps.add(changedPath);
@@ -96,8 +116,9 @@ export class RestartScheduler {
         }
 
         if (this.restartDelayMs > 0) {
-          // reduces amount of errors logged during restarts
-          await new Promise<void>((resolve) => setTimeout(resolve, this.restartDelayMs));
+          // reduces error logs
+          // await new Promise<void>((resolve) => setTimeout(resolve, this.restartDelayMs));
+          // resolve();
         }
 
         try {

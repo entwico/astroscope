@@ -1,12 +1,15 @@
 import EventEmitter from 'node:events';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { RestartScheduler } from './scheduler';
-import { setupBootWatch } from './watch';
+import { installBootGate, setupBootWatch } from './watch';
 
 function createMockScheduler() {
   return {
     schedule: vi.fn(),
     scheduleFullReload: vi.fn(),
+    isRestartPending: vi.fn(() => false),
+    waitForRestart: vi.fn(async () => {}),
+    getLastFailure: vi.fn(() => undefined as { message: string } | undefined),
   };
 }
 
@@ -565,107 +568,200 @@ describe('setupBootWatch', () => {
     });
   });
 
-  describe('request gating middleware', () => {
-    function createServerWithMiddleware() {
-      const middlewares: ((req: unknown, res: unknown, next: () => void) => unknown)[] = [];
-      const watcher = new EventEmitter();
-      const ssrOutsideEmitter = new EventEmitter();
-      const httpServer = new EventEmitter();
-      const bootMod = { file: '/project/src/boot.ts', importedModules: new Set() };
-
-      return {
-        config: { root: '/project' },
-        watcher,
-        httpServer,
-        environments: {
-          ssr: {
-            runner: { import: vi.fn() },
-            moduleGraph: {
-              getModulesByFile: vi.fn((file: string) =>
-                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined,
-              ),
-            },
-            hot: { api: { outsideEmitter: ssrOutsideEmitter } },
+  test('does not register a request middleware (gating is installed by installBootGate)', () => {
+    const middlewares: unknown[] = [];
+    const watcher = new EventEmitter();
+    const ssrOutsideEmitter = new EventEmitter();
+    const httpServer = new EventEmitter();
+    const bootMod = { file: '/project/src/boot.ts', importedModules: new Set() };
+    const server = {
+      config: { root: '/project' },
+      watcher,
+      httpServer,
+      environments: {
+        ssr: {
+          runner: { import: vi.fn() },
+          moduleGraph: {
+            getModulesByFile: vi.fn((file: string) =>
+              file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined,
+            ),
           },
+          hot: { api: { outsideEmitter: ssrOutsideEmitter } },
         },
-        middlewares: { use: (fn: (typeof middlewares)[number]) => middlewares.push(fn) },
-        _middlewares: middlewares,
+      },
+      middlewares: { use: (fn: unknown) => middlewares.push(fn) },
+    };
+    const scheduler = createMockScheduler() as unknown as RestartScheduler;
+
+    setupBootWatch(server as never, 'src/boot.ts', scheduler);
+
+    expect(middlewares.length).toBe(0);
+  });
+});
+
+describe('installBootGate', () => {
+  type Layer = { route: string; handle: (req: unknown, res: unknown, next: (err?: unknown) => void) => unknown };
+
+  function createServerWithStack() {
+    const stack: Layer[] = [];
+    const middlewares = ((req: unknown, res: unknown) => {
+      let i = 0;
+      const next = (): void => {
+        const layer = stack[i++];
+
+        if (!layer) return;
+
+        layer.handle(req, res, next);
       };
+
+      next();
+    }) as unknown as { stack: Layer[] };
+
+    middlewares.stack = stack;
+
+    return {
+      middlewares,
+      _stack: stack,
+    };
+  }
+
+  function createMockResponse() {
+    let writtenStatus: number | undefined;
+    let writtenHeaders: Record<string, string> | undefined;
+    let writtenBody = '';
+
+    return {
+      headersSent: false,
+      writeHead: vi.fn((status: number, headers: Record<string, string>) => {
+        writtenStatus = status;
+        writtenHeaders = headers;
+      }),
+      end: vi.fn((body?: string) => {
+        if (body) writtenBody = body;
+      }),
+      _getStatus: () => writtenStatus,
+      _getHeaders: () => writtenHeaders,
+      _getBody: () => writtenBody,
+    };
+  }
+
+  test('unshifts a single layer at the front of the connect stack', () => {
+    const server = createServerWithStack();
+
+    server._stack.push({ route: '', handle: vi.fn() }); // pre-existing layer
+
+    const scheduler = createMockScheduler() as unknown as RestartScheduler;
+
+    installBootGate(server as never, scheduler);
+
+    expect(server._stack.length).toBe(2);
+    expect(server._stack[0]!.route).toBe('');
+    expect(typeof server._stack[0]!.handle).toBe('function');
+  });
+
+  test('passes through to next() when no restart is in flight', async () => {
+    const server = createServerWithStack();
+    const scheduler = createMockScheduler();
+
+    scheduler.isRestartPending.mockReturnValue(false);
+
+    installBootGate(server as never, scheduler as never);
+
+    const handle = server._stack[0]!.handle;
+    const res = createMockResponse();
+    const next = vi.fn();
+
+    await handle({ url: '/' }, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.writeHead).not.toHaveBeenCalled();
+  });
+
+  test('serves the holding page immediately when a restart is pending', async () => {
+    const server = createServerWithStack();
+    const scheduler = createMockScheduler();
+
+    scheduler.isRestartPending.mockReturnValue(true);
+
+    installBootGate(server as never, scheduler as never);
+
+    const handle = server._stack[0]!.handle;
+    const res = createMockResponse();
+    const next = vi.fn();
+
+    await handle({ url: '/' }, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res._getStatus()).toBe(503);
+    expect(res._getHeaders()?.['content-type']).toContain('text/html');
+    expect(res._getBody()).toContain('Reloading');
+  });
+
+  test('readiness probe returns 503 + JSON error when last restart failed', async () => {
+    const server = createServerWithStack();
+    const scheduler = createMockScheduler();
+
+    scheduler.getLastFailure.mockReturnValue({ message: 'i18n.configure() threw' });
+
+    installBootGate(server as never, scheduler as never);
+
+    const handle = server._stack[0]!.handle;
+    const res = createMockResponse();
+    const next = vi.fn();
+
+    await handle({ url: '/__astroscope_boot_ready' }, res, next);
+
+    expect(res._getStatus()).toBe(503);
+    expect(res._getHeaders()?.['content-type']).toContain('application/json');
+    expect(JSON.parse(res._getBody()).error).toContain('i18n.configure');
+  });
+
+  test('readiness probe waits for restart and then 204s', async () => {
+    vi.useRealTimers();
+
+    const server = createServerWithStack();
+    const scheduler = createMockScheduler();
+    const gate = createDeferred();
+
+    scheduler.waitForRestart.mockImplementation(() => gate.promise);
+
+    installBootGate(server as never, scheduler as never);
+
+    const handle = server._stack[0]!.handle;
+    const res = createMockResponse();
+    const next = vi.fn();
+    const pending = handle({ url: '/__astroscope_boot_ready' }, res, next) as Promise<void>;
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(res.writeHead).not.toHaveBeenCalled();
+
+    gate.resolve();
+    await pending;
+
+    expect(res._getStatus()).toBe(204);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('dev-internal paths bypass the gate even during a restart', async () => {
+    const server = createServerWithStack();
+    const scheduler = createMockScheduler();
+
+    scheduler.isRestartPending.mockReturnValue(true);
+
+    installBootGate(server as never, scheduler as never);
+
+    const handle = server._stack[0]!.handle;
+
+    for (const url of ['/@vite/client', '/@id/x', '/__vite_ping', '/node_modules/foo/bar.js']) {
+      const res = createMockResponse();
+      const next = vi.fn();
+
+      await handle({ url }, res, next);
+
+      expect(next, `expected ${url} to bypass`).toHaveBeenCalledTimes(1);
+      expect(res.writeHead).not.toHaveBeenCalled();
     }
-
-    test('registers a middleware', () => {
-      const server = createServerWithMiddleware();
-      const scheduler = createMockScheduler() as unknown as RestartScheduler;
-
-      setupBootWatch(server as never, 'src/boot.ts', scheduler);
-
-      expect(server._middlewares.length).toBe(1);
-    });
-
-    test('passes through immediately when no restart is in flight', async () => {
-      const server = createServerWithMiddleware();
-      const scheduler = { ...createMockScheduler(), waitForRestart: vi.fn(async () => {}) };
-
-      setupBootWatch(server as never, 'src/boot.ts', scheduler as never);
-
-      const middleware = server._middlewares[0]!;
-      const next = vi.fn();
-
-      await middleware({ url: '/' }, {}, next);
-
-      expect(scheduler.waitForRestart).toHaveBeenCalledTimes(1);
-      expect(next).toHaveBeenCalledTimes(1);
-    });
-
-    test('waits for the scheduler before calling next() when a restart is in flight', async () => {
-      vi.useRealTimers();
-
-      const server = createServerWithMiddleware();
-      const gate = createDeferred();
-      const scheduler = {
-        ...createMockScheduler(),
-        waitForRestart: vi.fn(() => gate.promise),
-      };
-
-      setupBootWatch(server as never, 'src/boot.ts', scheduler as never);
-
-      const middleware = server._middlewares[0]!;
-      const next = vi.fn();
-      const pending = middleware({ url: '/' }, {}, next);
-
-      await new Promise((r) => setTimeout(r, 20));
-      expect(next).not.toHaveBeenCalled();
-
-      gate.resolve();
-      await pending;
-
-      expect(next).toHaveBeenCalledTimes(1);
-    });
-
-    test('dev-internal paths bypass the gate even during a restart', async () => {
-      const server = createServerWithMiddleware();
-      const scheduler = {
-        ...createMockScheduler(),
-        waitForRestart: vi.fn(async () => {
-          // never resolves — proves bypass doesn't await it
-          await new Promise(() => {});
-        }),
-      };
-
-      setupBootWatch(server as never, 'src/boot.ts', scheduler as never);
-
-      const middleware = server._middlewares[0]!;
-
-      for (const url of ['/@vite/client', '/@id/x', '/__vite_ping', '/node_modules/foo/bar.js']) {
-        const next = vi.fn();
-
-        await middleware({ url }, {}, next);
-
-        expect(next, `expected ${url} to bypass`).toHaveBeenCalledTimes(1);
-      }
-
-      expect(scheduler.waitForRestart).not.toHaveBeenCalled();
-    });
   });
 });
 

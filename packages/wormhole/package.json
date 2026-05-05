@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
-    "astro": "^6.1.8",
+    "astro": "^6.2.2",
     "react": "^19.2.5",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
