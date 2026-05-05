@@ -1,5 +1,11 @@
 # @astroscope/i18n
 
+## 0.4.6
+
+### Patch Changes
+
+- a204b4a: bump @astrojs/compiler to v4 to align with astro 6
+
 ## 0.4.5
 
 ### Patch Changes
