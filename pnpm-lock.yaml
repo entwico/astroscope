@@ -527,8 +527,8 @@ importers:
   packages/i18n:
     dependencies:
       '@astrojs/compiler':
-        specifier: ^4.0.0
-        version: 4.0.0
+        specifier: ^3.0.1
+        version: 3.0.1
       '@astroscope/excludes':
         specifier: workspace:^
         version: link:../excludes
@@ -552,7 +552,7 @@ importers:
         specifier: ^7.20.5
         version: 7.20.5
       astro:
-        specifier: ^6.2.2
+        specifier: ^6.1.8
         version: 6.2.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.60.2)(yaml@2.8.3)
       tsup:
         specifier: ^8.5.1
@@ -561,8 +561,8 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
       vite:
-        specifier: ^8.0.10
-        version: 8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.8.3)
+        specifier: ^7.0.0
+        version: 7.3.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
 
   packages/opentelemetry:
     dependencies:

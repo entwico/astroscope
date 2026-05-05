@@ -1,5 +1,11 @@
 # @astroscope/boot
 
+## 0.7.1
+
+### Patch Changes
+
+- 389b680: show a holding page during dev-server restarts
+
 ## 0.7.0
 
 ### Minor Changes
