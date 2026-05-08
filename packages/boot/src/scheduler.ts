@@ -116,9 +116,8 @@ export class RestartScheduler {
         }
 
         if (this.restartDelayMs > 0) {
-          // reduces error logs
-          // await new Promise<void>((resolve) => setTimeout(resolve, this.restartDelayMs));
-          // resolve();
+          // reduces error logs during restarts
+          await new Promise<void>((resolve) => setTimeout(resolve, this.restartDelayMs));
         }
 
         try {

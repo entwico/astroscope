@@ -1,5 +1,11 @@
 # @astroscope/hyperspace
 
+## 0.1.7
+
+### Patch Changes
+
+- 65c036e: skip the middleware in dev mode
+
 ## 0.1.6
 
 ### Patch Changes
