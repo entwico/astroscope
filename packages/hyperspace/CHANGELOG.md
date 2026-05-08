@@ -1,5 +1,11 @@
 # @astroscope/hyperspace
 
+## 0.1.6
+
+### Patch Changes
+
+- 36c69d2: better client dir detection
+
 ## 0.1.5
 
 ### Patch Changes
