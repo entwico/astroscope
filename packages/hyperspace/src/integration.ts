@@ -15,7 +15,9 @@ export default function hyperspace(options: HyperspaceOptions = {}): AstroIntegr
   return {
     name: '@astroscope/hyperspace',
     hooks: {
-      'astro:config:setup': ({ addMiddleware }) => {
+      'astro:config:setup': ({ addMiddleware, command }) => {
+        if (command === 'dev') return;
+
         addMiddleware({
           entrypoint: '@astroscope/hyperspace/middleware',
           order: 'pre',
