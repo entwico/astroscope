@@ -78,32 +78,37 @@ describe.skipIf(skip)('dev-mode restart with in-flight requests', () => {
     stderrBuf = '';
     stdoutBuf = '';
 
-    const slowDelayMs = 2500;
+    // pick a delay that comfortably outlasts the restart pipeline even under
+    // ci load — the render must still be pending when disposeSingleton fires.
+    const slowDelayMs = 8000;
 
-    // start a slow request that will still be `await new Promise(setTimeout(...))`
-    // when the restart fires below. swallow socket teardown — the server-side
-    // render still throws and gets logged regardless of whether the client socket
-    // survives the restart.
     void fetch(`${baseUrl}/slow?delay=${slowDelayMs}`).catch(() => undefined);
 
     const requestStart = Date.now();
 
-    // give the request time to enter its delay before we trigger a restart
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // brief wait for the request to enter the route handler
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // write the boot file to itself to force a watcher event
     const bootSource = readFileSync(bootFile, 'utf8');
 
     writeFileSync(bootFile, `${bootSource}\n// touched at ${Date.now()}\n`);
 
-    // wait until the slow render's setTimeout has resolved server-side, then
-    // a bit more for astro's error pipeline to flush the log to stderr.
-    const remaining = slowDelayMs - (Date.now() - requestStart);
-
-    await new Promise((resolve) => setTimeout(resolve, remaining + 2000));
+    // wait for vite's "server restarted" log — emitted AFTER the new
+    // configureServer's priorShutdown() awaits, so disposeSingleton has
+    // definitely fired by then. removes the wall-clock race vs. a fixed sleep.
+    await waitFor(() => /\[vite\] server restarted\./.test(stdoutBuf), 25_000);
 
     // restore the file so the working tree stays clean
     writeFileSync(bootFile, bootSource);
+
+    // now wait out the remainder of the slow render's setTimeout — when it
+    // fires, readSingleton() throws (singleton was disposed), the middleware
+    // detects the stale stamp, and recordStaleError flushes its 50ms-buffered
+    // log. add a small buffer for that.
+    const remaining = slowDelayMs - (Date.now() - requestStart);
+
+    await new Promise((resolve) => setTimeout(resolve, Math.max(remaining, 0) + 500));
 
     // the runtime middleware catches the stale-request error so the multi-line
     // stack trace never reaches the logger.
@@ -111,5 +116,15 @@ describe.skipIf(skip)('dev-mode restart with in-flight requests', () => {
 
     // instead, a single concise line summarises what was suppressed.
     expect(stdoutBuf).toMatch(/\[@astroscope\/boot\] suppressed \d+ stale request error/);
-  }, 30_000);
+  }, 60_000);
 });
+
+async function waitFor(condition: () => boolean, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+
+  while (!condition()) {
+    if (Date.now() - start > timeoutMs) throw new Error(`waitFor timed out after ${timeoutMs}ms`);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
