@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/health",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Kubernetes-style health probes integration for Astro",
   "type": "module",
   "main": "./dist/index.js",
