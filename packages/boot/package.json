@@ -12,12 +12,12 @@
       "require": "./dist/index.cjs"
     },
     "./events": {
-      "types": "./dist/events.d.ts",
-      "import": "./dist/events.js"
+      "types": "./dist/lifecycle/events.d.ts",
+      "import": "./dist/lifecycle/events.js"
     },
     "./middleware": {
-      "types": "./dist/middleware-entrypoint.d.ts",
-      "import": "./dist/middleware-entrypoint.js"
+      "types": "./dist/watch/middleware-entrypoint.d.ts",
+      "import": "./dist/watch/middleware-entrypoint.js"
     },
     "./prepend": {
       "types": "./dist/prepend.d.ts",
@@ -53,7 +53,7 @@
   },
   "homepage": "https://github.com/entwico/astroscope/tree/main/packages/boot#readme",
   "scripts": {
-    "build": "tsup src/index.ts src/events.ts src/lifecycle.ts src/middleware-entrypoint.ts src/setup.ts src/prepend.ts --format esm,cjs --dts --onSuccess 'cp src/restart-page.html dist/'",
+    "build": "tsup src/index.ts src/lifecycle/events.ts src/lifecycle/lifecycle.ts src/watch/middleware-entrypoint.ts src/setup.ts src/prepend.ts --format esm,cjs --dts --onSuccess 'cp src/watch/restart-page.html dist/'",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix"

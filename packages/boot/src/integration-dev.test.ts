@@ -1,26 +1,26 @@
 import EventEmitter from 'node:events';
 import type { Plugin } from 'vite';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { BootModule } from './lifecycle';
+import type { BootModule } from './lifecycle/lifecycle';
 
-vi.mock('./vite-env.js', () => ({
+vi.mock('./watch/vite-env.js', () => ({
   ssrImport: vi.fn(),
   getAstroHotEnv: vi.fn(() => undefined),
 }));
 
-vi.mock('./lifecycle.js', () => ({
+vi.mock('./lifecycle/lifecycle.js', () => ({
   runStartup: vi.fn(),
   runShutdown: vi.fn(),
 }));
 
-vi.mock('./watch.js', () => ({
+vi.mock('./watch/watch.js', () => ({
   setupBootWatch: vi.fn(),
   installBootGate: vi.fn(),
 }));
 
 const boot = (await import('./index')).default;
-const { ssrImport } = await import('./vite-env.js');
-const { runStartup, runShutdown } = await import('./lifecycle.js');
+const { ssrImport } = await import('./watch/vite-env.js');
+const { runStartup, runShutdown } = await import('./lifecycle/lifecycle.js');
 
 const mockedSsrImport = vi.mocked(ssrImport);
 const mockedRunStartup = vi.mocked(runStartup);
@@ -226,7 +226,7 @@ describe('integration configureServer', () => {
 
     mockedSsrImport.mockResolvedValueOnce(mod);
 
-    const { setupBootWatch } = await import('./watch.js');
+    const { setupBootWatch } = await import('./watch/watch.js');
     const mockedSetup = vi.mocked(setupBootWatch);
 
     mockedSetup.mockClear();
@@ -290,7 +290,7 @@ describe('integration configureServer', () => {
 
     mockedSsrImport.mockResolvedValueOnce(mod);
 
-    const { setupBootWatch } = await import('./watch.js');
+    const { setupBootWatch } = await import('./watch/watch.js');
     const mockedSetup = vi.mocked(setupBootWatch);
 
     mockedSetup.mockClear();

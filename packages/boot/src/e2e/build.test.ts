@@ -1,9 +1,8 @@
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, test } from 'vitest';
+import { fixtureRoot, skip } from './fixture';
 
-const fixtureRoot = path.resolve(fileURLToPath(import.meta.url), '../../../../demo/boot-e2e');
 const distServer = path.join(fixtureRoot, 'dist/server');
 
 function findChunk(prefix: string): string {
@@ -15,8 +14,6 @@ function findChunk(prefix: string): string {
 
   return readFileSync(path.join(chunkDir, match), 'utf8');
 }
-
-const skip = !existsSync(path.join(fixtureRoot, 'node_modules'));
 
 describe.skipIf(skip)('e2e — programmatic astro build', () => {
   beforeAll(async () => {

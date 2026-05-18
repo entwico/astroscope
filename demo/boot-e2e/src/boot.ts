@@ -1,7 +1,9 @@
+import { disposeSingleton, initSingleton } from './server/singleton';
+
 export function onStartup(): void {
-  // intentional no-op — fixture only needs the boot module to exist
+  initSingleton();
 }
 
 export function onShutdown(): void {
-  // intentional no-op
+  disposeSingleton();
 }

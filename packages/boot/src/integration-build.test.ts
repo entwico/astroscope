@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import type { IntegrationResolvedRoute } from 'astro';
 import type { Plugin } from 'vite';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { ASTRO_MIDDLEWARE_VIRTUAL, RESOLVED_VIRTUAL_MODULE_ID, VIRTUAL_MODULE_ID } from './warmup';
+import { ASTRO_MIDDLEWARE_VIRTUAL, RESOLVED_VIRTUAL_MODULE_ID, VIRTUAL_MODULE_ID } from './warmup/warmup';
 import boot from './index';
 
 type RouteShape = Pick<IntegrationResolvedRoute, 'type' | 'isPrerendered' | 'entrypoint'>;

@@ -4,13 +4,10 @@ import { fileURLToPath } from 'node:url';
 import type { AstroConfig, AstroIntegration, IntegrationResolvedRoute } from 'astro';
 import MagicString from 'magic-string';
 import { perEnvironmentState } from 'vite';
-import { incrementGeneration } from './generation.js';
-import { type BootModule, runShutdown, runStartup } from './lifecycle.js';
+import { type BootModule, runShutdown, runStartup } from './lifecycle/lifecycle.js';
+import type { BootContext } from './lifecycle/types.js';
 import { getPrependCode } from './prepend.js';
-import { RestartScheduler } from './scheduler.js';
-import type { BootContext } from './types.js';
 import { serializeError } from './utils.js';
-import { ssrImport } from './vite-env.js';
 import {
   BOOT_VIRTUAL_MODULE_ID,
   RESOLVED_BOOT_VIRTUAL_MODULE_ID,
@@ -18,8 +15,11 @@ import {
   VIRTUAL_MODULE_ID,
   collectWarmupSpecifiers,
   generateWarmupCode,
-} from './warmup.js';
-import { installBootGate, installGenStamp, setupBootWatch } from './watch.js';
+} from './warmup/warmup.js';
+import { incrementGeneration } from './watch/generation.js';
+import { RestartScheduler } from './watch/scheduler.js';
+import { ssrImport } from './watch/vite-env.js';
+import { installBootGate, installGenStamp, setupBootWatch } from './watch/watch.js';
 
 export interface BootOptions {
   /**

@@ -1,17 +1,14 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { fixtureRoot, skip } from './fixture';
 
-const fixtureRoot = path.resolve(fileURLToPath(import.meta.url), '../../../../demo/boot-restart');
 const bootFile = path.join(fixtureRoot, 'src/boot.ts');
 
 type DevServer = {
   address: { address: string; port: number };
   stop: () => Promise<void>;
 };
-
-const skip = !existsSync(path.join(fixtureRoot, 'node_modules'));
 
 describe.skipIf(skip)('dev-mode restart with in-flight requests', () => {
   let server: DevServer;

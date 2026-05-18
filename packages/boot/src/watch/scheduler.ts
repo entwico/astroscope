@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { ViteDevServer } from 'vite';
-import { serializeError } from './utils.js';
+import { serializeError } from '../utils.js';
 
 type Logger = { info(msg: string): void; error(msg: string): void };
 

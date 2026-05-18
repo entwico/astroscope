@@ -1,4 +1,4 @@
-import { type BootModule, runShutdown, runStartup } from './lifecycle.js';
+import { type BootModule, runShutdown, runStartup } from './lifecycle/lifecycle.js';
 
 export async function setup(boot: BootModule, config: { host: string; port: number }): Promise<void> {
   const context = {
