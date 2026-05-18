@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { HotPayload, ViteDevServer } from 'vite';
+import { GEN_HEADER, getCurrentGeneration } from './generation.js';
 import { ignoredSuffixes } from './ignored.js';
 import type { RestartScheduler } from './scheduler.js';
 import { getAstroHotEnv } from './vite-env.js';
@@ -159,4 +160,23 @@ function isDevInternalPath(url: string | undefined): boolean {
   if (!url) return false;
 
   return url.startsWith('/@') || url.startsWith('/__') || url.includes('/node_modules/');
+}
+
+/**
+ * Stamp the current generation onto every incoming request so the runtime
+ * Astro middleware can later detect whether the request belongs to a previous
+ * (now torn-down) generation
+ */
+export function installGenStamp(server: Pick<ViteDevServer, 'middlewares'>): void {
+  const middlewares = server.middlewares as unknown as {
+    stack: { route: string; handle: unknown }[];
+  };
+
+  middlewares.stack.unshift({
+    route: '',
+    handle: ((req: { headers: Record<string, string> }, _res: unknown, next: () => void) => {
+      req.headers[GEN_HEADER] = String(getCurrentGeneration());
+      next();
+    }) as never,
+  });
 }

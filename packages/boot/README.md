@@ -52,6 +52,8 @@ export default defineConfig({
 });
 ```
 
+**IMPORTANT**: for watch mode (default) it is better to keep the boot integration last in the integrations list
+
 ## Boot Context
 
 Both `onStartup` and `onShutdown` receive a `BootContext` object:

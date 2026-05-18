@@ -50,6 +50,7 @@ function getConfigureServerPlugin(integration: ReturnType<typeof boot>): {
     updateConfig: updateConfig as never,
     logger: logger as never,
     config: {} as never,
+    addMiddleware: vi.fn() as never,
   } as never);
 
   const post = plugins.find((p) => p.name === '@astroscope/boot/startup');

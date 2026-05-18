@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { AstroConfig, AstroIntegration, IntegrationResolvedRoute } from 'astro';
 import MagicString from 'magic-string';
 import { perEnvironmentState } from 'vite';
+import { incrementGeneration } from './generation.js';
 import { type BootModule, runShutdown, runStartup } from './lifecycle.js';
 import { getPrependCode } from './prepend.js';
 import { RestartScheduler } from './scheduler.js';
@@ -18,7 +19,7 @@ import {
   collectWarmupSpecifiers,
   generateWarmupCode,
 } from './warmup.js';
-import { installBootGate, setupBootWatch } from './watch.js';
+import { installBootGate, installGenStamp, setupBootWatch } from './watch.js';
 
 export interface BootOptions {
   /**
@@ -123,11 +124,15 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
       'astro:routes:resolved': ({ routes }) => {
         resolvedRoutes = routes;
       },
-      'astro:config:setup': ({ command, updateConfig, logger, config }) => {
+      'astro:config:setup': ({ command, updateConfig, logger, config, addMiddleware }) => {
         astroConfig = config;
 
         if (command === 'dev' && watch) {
-          scheduler = new RestartScheduler(100, logger, 300);
+          scheduler = new RestartScheduler(100, logger);
+
+          // catches errors thrown by stale (post-shutdown) requests so
+          // they don't pollute the logs during dev-server restarts.
+          addMiddleware({ entrypoint: '@astroscope/boot/middleware', order: 'pre' });
         }
 
         updateConfig({
@@ -254,7 +259,8 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
               },
 
               // gate plugin: enforce 'post' + returned-function so our `stack.unshift`
-              // (in installBootGate) lands at connect position 0, ahead of astro's handler.
+              // (in installBootGate / installGenStamp) lands at connect position 0,
+              // ahead of astro's handler.
               {
                 name: '@astroscope/boot/gate',
                 enforce: 'post',
@@ -265,7 +271,11 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
                   const s = scheduler;
 
                   return () => {
+                    // gen-stamp is unshifted last so it ends up at position 0:
+                    // every request gets a generation header before anything else,
+                    // including the gate's readiness probe.
                     installBootGate(server, s);
+                    installGenStamp(server);
                   };
                 },
               },
@@ -277,6 +287,8 @@ export default function boot(options: BootOptions = {}): AstroIntegration {
 
                 async configureServer(server) {
                   if (command !== 'dev') return; // skip in build / sync modes (Astro uses 'sync' for 'astro check' command)
+
+                  incrementGeneration();
 
                   // tear down the previous module first so its resources are released
                   // before the new startup tries to claim them.

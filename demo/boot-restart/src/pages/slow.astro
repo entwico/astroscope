@@ -1,0 +1,11 @@
+---
+import { readSingleton } from '../server/singleton';
+
+const delayMs = Number(Astro.url.searchParams.get('delay') ?? '2000');
+
+await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+const value = readSingleton();
+---
+
+<p>{value}</p>

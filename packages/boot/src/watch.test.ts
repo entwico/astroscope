@@ -1,7 +1,10 @@
 import EventEmitter from 'node:events';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { GEN_HEADER, incrementGeneration } from './generation';
 import { RestartScheduler } from './scheduler';
-import { installBootGate, setupBootWatch } from './watch';
+import { installBootGate, installGenStamp, setupBootWatch } from './watch';
+
+const STATE_KEY = Symbol.for('@astroscope/boot/state');
 
 function createMockScheduler() {
   return {
@@ -775,3 +778,58 @@ function createDeferred<T = void>() {
 
   return { promise, resolve, reject };
 }
+
+describe('installGenStamp', () => {
+  beforeEach(() => {
+    (globalThis as Record<symbol, unknown>)[STATE_KEY] = undefined;
+  });
+
+  type Layer = { route: string; handle: (req: unknown, res: unknown, next: () => void) => void };
+
+  function createServerWithStack() {
+    const stack: Layer[] = [];
+
+    return { middlewares: { stack } as unknown as { stack: Layer[] }, _stack: stack };
+  }
+
+  test('unshifts a layer at the front of the connect stack', () => {
+    const server = createServerWithStack();
+
+    server._stack.push({ route: '', handle: vi.fn() });
+    installGenStamp(server as never);
+
+    expect(server._stack.length).toBe(2);
+    expect(typeof server._stack[0]!.handle).toBe('function');
+  });
+
+  test('stamps the current generation onto every incoming request', () => {
+    incrementGeneration();
+    incrementGeneration(); // current = 2
+
+    const server = createServerWithStack();
+
+    installGenStamp(server as never);
+
+    const req = { headers: {} as Record<string, string> };
+    const next = vi.fn();
+
+    server._stack[0]!.handle(req as never, {} as never, next);
+
+    expect(req.headers[GEN_HEADER]).toBe('2');
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  test('reads the current generation lazily on each request, not at install time', () => {
+    const server = createServerWithStack();
+
+    installGenStamp(server as never);
+
+    incrementGeneration(); // happens AFTER install
+
+    const req = { headers: {} as Record<string, string> };
+
+    server._stack[0]!.handle(req as never, {} as never, vi.fn());
+
+    expect(req.headers[GEN_HEADER]).toBe('1');
+  });
+});
