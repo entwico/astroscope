@@ -1,5 +1,11 @@
 # @astroscope/boot
 
+## 0.8.0
+
+### Minor Changes
+
+- 2b76c1e: silence stale-request error stacks during dev-server restarts
+
 ## 0.7.1
 
 ### Patch Changes
