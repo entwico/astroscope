@@ -36,8 +36,7 @@ describe.skipIf(skip)('dev-mode restart with in-flight requests', () => {
       return true;
     }) as never;
 
-    // vitest replaces console.log with its own wrapper that bypasses
-    // process.stdout.write, so we have to capture both.
+    // vitest's console.log wrapper bypasses process.stdout.write — capture both
     vi.spyOn(console, 'log').mockImplementation((...args) => {
       stdoutBuf += `${args.join(' ')}\n`;
     });
@@ -66,58 +65,54 @@ describe.skipIf(skip)('dev-mode restart with in-flight requests', () => {
   });
 
   test('a stale request whose singleton was disposed mid-render is silenced', async () => {
-    const baseUrl = `http://${server.address.address}:${server.address.port}`;
+    // linux resolves "localhost" to ::1 — bracket ipv6 hosts to keep the url parseable
+    const host = server.address.address.includes(':') ? `[${server.address.address}]` : server.address.address;
+    const baseUrl = `http://${host}:${server.address.port}`;
 
-    // warm up: hit the page once with a tiny delay so the route is compiled
-    // (the restart-window race below shouldn't include the first-compile cost)
+    // warm up so first-compile cost isn't in the restart-window timing
     await fetch(`${baseUrl}/slow?delay=0`)
       .then((r) => r.text())
       .catch(() => {});
 
-    // clear the captured buffers so assertions only see the restart-window output
     stderrBuf = '';
     stdoutBuf = '';
 
-    // pick a delay that comfortably outlasts the restart pipeline even under
-    // ci load — the render must still be pending when disposeSingleton fires.
+    // must outlast the restart pipeline so disposeSingleton fires before readSingleton
     const slowDelayMs = 8000;
 
     void fetch(`${baseUrl}/slow?delay=${slowDelayMs}`).catch(() => undefined);
 
     const requestStart = Date.now();
 
-    // brief wait for the request to enter the route handler
     await new Promise((resolve) => setTimeout(resolve, 300));
 
-    // write the boot file to itself to force a watcher event
     const bootSource = readFileSync(bootFile, 'utf8');
 
-    writeFileSync(bootFile, `${bootSource}\n// touched at ${Date.now()}\n`);
+    // try/finally — a failing assertion would otherwise leave "// touched at <ts>" in the fixture
+    try {
+      writeFileSync(bootFile, `${bootSource}\n// touched at ${Date.now()}\n`);
 
-    // wait for vite's "server restarted" log — emitted AFTER the new
-    // configureServer's priorShutdown() awaits, so disposeSingleton has
-    // definitely fired by then. removes the wall-clock race vs. a fixed sleep.
-    await waitFor(() => /\[vite\] server restarted\./.test(stdoutBuf), 25_000);
+      // "server restarted" is logged after priorShutdown awaits, so disposeSingleton has fired
+      await waitFor(() => /\[vite\] server restarted\./.test(stripAnsi(stdoutBuf)), 25_000);
 
-    // restore the file so the working tree stays clean
-    writeFileSync(bootFile, bootSource);
+      const remaining = slowDelayMs - (Date.now() - requestStart);
 
-    // now wait out the remainder of the slow render's setTimeout — when it
-    // fires, readSingleton() throws (singleton was disposed), the middleware
-    // detects the stale stamp, and recordStaleError flushes its 50ms-buffered
-    // log. add a small buffer for that.
-    const remaining = slowDelayMs - (Date.now() - requestStart);
+      // +500ms for recordStaleError's 50ms flush buffer + propagation
+      await new Promise((resolve) => setTimeout(resolve, Math.max(remaining, 0) + 500));
 
-    await new Promise((resolve) => setTimeout(resolve, Math.max(remaining, 0) + 500));
-
-    // the runtime middleware catches the stale-request error so the multi-line
-    // stack trace never reaches the logger.
-    expect(stderrBuf).not.toContain('singleton used before init or after dispose');
-
-    // instead, a single concise line summarises what was suppressed.
-    expect(stdoutBuf).toMatch(/\[@astroscope\/boot\] suppressed \d+ stale request error/);
+      expect(stripAnsi(stderrBuf)).not.toContain('singleton used before init or after dispose');
+      expect(stripAnsi(stdoutBuf)).toMatch(/\[@astroscope\/boot\] suppressed \d+ stale request error/);
+    } finally {
+      writeFileSync(bootFile, bootSource);
+    }
   }, 60_000);
 });
+
+// vite wraps [vite] / [@astroscope/boot] prefixes in ANSI codes — strip for literal regexes
+function stripAnsi(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/\x1b\[[0-9;]*m/g, '');
+}
 
 async function waitFor(condition: () => boolean, timeoutMs: number): Promise<void> {
   const start = Date.now();
