@@ -7,6 +7,7 @@ import type { ESLint, Linter, Rule } from 'eslint';
 
 import { noExcessJsxProps } from './rules/no-excess-jsx-props.js';
 import { noHtmlComments } from './rules/no-html-comments.js';
+import { preferSsrGuard } from './rules/prefer-ssr-guard.js';
 
 const pkg = JSON.parse(
   readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8'),
@@ -20,6 +21,7 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config | Linter.C
   rules: {
     'no-excess-jsx-props': noExcessJsxProps as unknown as Rule.RuleModule,
     'no-html-comments': noHtmlComments as unknown as Rule.RuleModule,
+    'prefer-ssr-guard': preferSsrGuard as unknown as Rule.RuleModule,
   },
   configs: {},
 };
@@ -45,6 +47,16 @@ plugin.configs.recommended = [
     rules: {
       '@astroscope/no-excess-jsx-props': 'error',
       '@astroscope/no-html-comments': 'error',
+    },
+  },
+  {
+    name: '@astroscope/recommended-scripts',
+    files: ['**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'],
+    plugins: {
+      '@astroscope': plugin,
+    },
+    rules: {
+      '@astroscope/prefer-ssr-guard': 'error',
     },
   },
 ] satisfies Linter.Config[];

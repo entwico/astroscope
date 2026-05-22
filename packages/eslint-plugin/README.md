@@ -28,6 +28,7 @@ export default [
 | --------------------------------- | -------- | ------- | ---------- | ------------------------------------------------------------------------------- |
 | `@astroscope/no-excess-jsx-props` | error    |         | yes        | flag excess properties passed to hydrated React islands (`client:*` elements)   |
 | `@astroscope/no-html-comments`    | error    | yes     |            | disallow HTML comments in `.astro` templates — they render into the output HTML |
+| `@astroscope/prefer-ssr-guard`    | error    | yes     |            | prefer `import.meta.env.SSR` over `typeof window !== 'undefined'` (and friends) |
 
 ## Rule Details
 
@@ -52,9 +53,7 @@ Also catches excess fields inside nested objects and array elements:
 ```astro
 ---
 // <ArticleList> declares only { title; excerpt } on each element
-const articles = [
-  { id: 'a1', title: 'Hello', excerpt: '…', body: '…', authorEmail: 'x@y.com' },
-];
+const articles = [{ id: 'a1', title: 'Hello', excerpt: '…', body: '…', authorEmail: 'x@y.com' }];
 ---
 
 <!-- flagged: 'articles[].authorEmail', 'articles[].body', 'articles[].id' -->
@@ -70,6 +69,24 @@ HTML comments (`<!-- -->`) in `.astro` templates render into the served HTML and
 ```
 
 Autofix rewrites `<!-- x -->` → `{/* x */}`. Declines to autofix when the comment body contains `*/` (would terminate the JSX comment early).
+
+### `prefer-ssr-guard`
+
+Unliker `typeof window !== 'undefined'`, `import.meta.env.SSR` tree-shakes the browser code from the server
+
+```ts
+// flagged
+if (typeof window !== 'undefined') {
+  const { default: HLS } = await import('hls.js'); // shipped to SSR bundle
+  player.attach(HLS);
+}
+
+// clean — `import('hls.js')` never appears in the SSR bundle
+if (!import.meta.env.SSR) {
+  const { default: HLS } = await import('hls.js');
+  player.attach(HLS);
+}
+```
 
 ## Compatibility
 
