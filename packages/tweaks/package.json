@@ -1,0 +1,61 @@
+{
+  "name": "@astroscope/tweaks",
+  "version": "0.0.0",
+  "description": "Small opinionated tweaks for Astro",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/entwico/astroscope",
+    "directory": "packages/tweaks"
+  },
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "ssr",
+    "sourcemap",
+    "treeshaking",
+    "react",
+    "vite-plugin"
+  ],
+  "author": "admin@entwico.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/entwico/astroscope/issues"
+  },
+  "homepage": "https://github.com/entwico/astroscope/tree/main/packages/tweaks#readme",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix"
+  },
+  "devDependencies": {
+    "astro": "^6.2.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.0"
+  },
+  "peerDependencies": {
+    "astro": "^6.0.0",
+    "vite": "^7.0.0"
+  },
+  "dependencies": {
+    "acorn": "^8.14.0",
+    "magic-string": "^0.30.21"
+  }
+}
