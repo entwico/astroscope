@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/eslint-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Additional ESLint rules for Astro projects. Plays well with eslint-plugin-astro.",
   "type": "module",
   "main": "./dist/index.js",
