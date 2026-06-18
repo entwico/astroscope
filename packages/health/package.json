@@ -47,7 +47,7 @@
   "scripts": {
     "build": "tsup src/index.ts src/register.ts --format esm --dts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {

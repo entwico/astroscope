@@ -1,3 +1,13 @@
 packages:
   - packages/*
   - demo/*
+
+overrides:
+  vite: ^7
+
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true
+  protobufjs: false
+  sharp: true
+  unrs-resolver: true

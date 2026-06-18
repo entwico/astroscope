@@ -84,7 +84,7 @@
   "scripts": {
     "build": "tsup src/index.ts src/internal.ts src/extraction/index.ts src/server/translate.ts src/client/translate.ts src/client/directives/load.ts src/client/directives/idle.ts src/client/directives/visible.ts src/client/directives/media.ts src/client/directives/only.ts src/client/directives/utils.ts --format esm --dts --external astro --external astro/client/load.js --external astro/client/idle.js --external astro/client/visible.js --external astro/client/media.js --external astro/client/only.js --external virtual:@astroscope/i18n/manifest --external @babel/core",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
   },
   "dependencies": {

@@ -55,7 +55,7 @@
   "scripts": {
     "build": "tsup src/index.ts src/lifecycle/events.ts src/lifecycle/lifecycle.ts src/watch/middleware-entrypoint.ts src/setup.ts src/prepend.ts --format esm,cjs --dts --onSuccess 'cp src/watch/restart-page.html dist/'",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "eslint src",
+    "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix",
     "lint:demo": "eslint src/examples --no-ignore"
   },

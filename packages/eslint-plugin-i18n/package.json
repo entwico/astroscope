@@ -39,7 +39,7 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {

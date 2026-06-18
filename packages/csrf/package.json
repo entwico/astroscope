@@ -43,7 +43,7 @@
   "scripts": {
     "build": "tsup src/index.ts src/middleware-entrypoint.ts --format esm --dts --external virtual:@astroscope/csrf/config",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {

@@ -10,7 +10,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "typecheck": "astro check",
-    "lint": "eslint src astro.config.ts",
+    "lint": "eslint src astro.config.ts --cache",
     "lint:fix": "eslint src astro.config.ts --fix",
     "test": "vitest run"
   },
