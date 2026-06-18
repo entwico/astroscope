@@ -54,6 +54,7 @@
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {
+    "@astroscope/excludes": "workspace:^",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/core": "^2.7.1",
     "astro": "^6.2.2",
