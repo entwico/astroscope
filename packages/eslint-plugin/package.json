@@ -45,6 +45,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@typescript-eslint/type-utils": "^8.59.2",
     "@typescript-eslint/utils": "^8.59.2"
   },
   "devDependencies": {

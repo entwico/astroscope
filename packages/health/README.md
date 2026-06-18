@@ -4,7 +4,7 @@
 
 Kubernetes-style health check endpoints for Astro SSR. Provides `/livez`, `/readyz`, `/startupz`, and `/healthz` probes on a separate HTTP server. Automatically manages probe lifecycle via [@astroscope/boot](../boot).
 
-[health-probes](https://github.com/smnbbrv/health-probes) is used under the hood. If you need more control, you can use it directly in your boot file instead of this integration.
+[health-probes](https://github.com/entwico/health-probes) is used under the hood. If you need more control, you can use it directly in your boot file instead of this integration.
 
 ## Examples
 

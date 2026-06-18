@@ -5,6 +5,9 @@ import tsParser from '@typescript-eslint/parser';
 import astroEslintParser from 'astro-eslint-parser';
 import type { ESLint, Linter, Rule } from 'eslint';
 
+import { islandNotSerializable } from './rules/island-not-serializable.js';
+import { islandReadonly } from './rules/island-readonly.js';
+import { noClientDirectiveOnAstroComponent } from './rules/no-client-directive-on-astro-component.js';
 import { noExcessJsxProps } from './rules/no-excess-jsx-props.js';
 import { noHtmlComments } from './rules/no-html-comments.js';
 import { preferSsrGuard } from './rules/prefer-ssr-guard.js';
@@ -22,6 +25,9 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config | Linter.C
     'no-excess-jsx-props': noExcessJsxProps as unknown as Rule.RuleModule,
     'no-html-comments': noHtmlComments as unknown as Rule.RuleModule,
     'prefer-ssr-guard': preferSsrGuard as unknown as Rule.RuleModule,
+    'island-readonly': islandReadonly as unknown as Rule.RuleModule,
+    'island-not-serializable': islandNotSerializable as unknown as Rule.RuleModule,
+    'no-client-directive-on-astro-component': noClientDirectiveOnAstroComponent as unknown as Rule.RuleModule,
   },
   configs: {},
 };
@@ -47,6 +53,9 @@ plugin.configs.recommended = [
     rules: {
       '@astroscope/no-excess-jsx-props': 'error',
       '@astroscope/no-html-comments': 'error',
+      '@astroscope/island-readonly': 'error',
+      '@astroscope/island-not-serializable': 'error',
+      '@astroscope/no-client-directive-on-astro-component': 'error',
     },
   },
   {

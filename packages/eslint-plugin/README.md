@@ -24,11 +24,14 @@ export default [
 
 ## Rules
 
-| Rule                              | Severity | Fixable | Type-aware | Description                                                                     |
-| --------------------------------- | -------- | ------- | ---------- | ------------------------------------------------------------------------------- |
-| `@astroscope/no-excess-jsx-props` | error    |         | yes        | flag excess properties passed to hydrated React islands (`client:*` elements)   |
-| `@astroscope/no-html-comments`    | error    | yes     |            | disallow HTML comments in `.astro` templates — they render into the output HTML |
-| `@astroscope/prefer-ssr-guard`    | error    | yes     |            | prefer `import.meta.env.SSR` over `typeof window !== 'undefined'` (and friends) |
+| Rule                                                 | Severity | Fixable | Type-aware | Description                                                                       |
+| ---------------------------------------------------- | -------- | ------- | ---------- | --------------------------------------------------------------------------------- |
+| `@astroscope/no-excess-jsx-props`                    | error    |         | yes        | flag excess properties passed to hydrated React islands (`client:*` elements)     |
+| `@astroscope/island-readonly`                        | error    |         | yes        | require a hydrated island's props to be deeply readonly (no server-data mutation) |
+| `@astroscope/island-not-serializable`                | error    |         | yes        | require a hydrated island's props to be directly serializable plain data          |
+| `@astroscope/no-client-directive-on-astro-component` | error    |         |            | disallow `client:*` directives on Astro components (they only hydrate frameworks) |
+| `@astroscope/no-html-comments`                       | error    | yes     |            | disallow HTML comments in `.astro` templates — they render into the output HTML   |
+| `@astroscope/prefer-ssr-guard`                       | error    | yes     |            | prefer `import.meta.env.SSR` over `typeof window !== 'undefined'` (and friends)   |
 
 ## Rule Details
 
@@ -58,6 +61,55 @@ const articles = [{ id: 'a1', title: 'Hello', excerpt: '…', body: '…', autho
 
 <!-- flagged: 'articles[].authorEmail', 'articles[].body', 'articles[].id' -->
 <ArticleList client:load articles={articles} />
+```
+
+### `island-readonly`
+
+A hydrated island is a framework component (React/Vue/Svelte/…) rendered server-side with the original props object — often a server/cache record. If the island's component body mutates a prop, it mutates that shared server object, which can poison a server cache. The fix is structural: declare the island's props deeply `readonly` so the type system forbids mutation.
+
+```astro
+---
+const article = await getArticle(); // a server/cache record
+---
+
+<!-- flagged: <Reader>'s props are mutable --><!-- declared: interface Props { article: { title: string } } -->
+<Reader client:load article={article} />
+
+<!-- clean -->
+<!-- declared: interface Props { readonly article: { readonly title: string } } -->
+<Reader client:load article={article} />
+```
+
+Pairs with `react/prefer-read-only-props` from `eslint-plugin-react` (shallow, auto-fixable): that enforces the top level on every React component; this enforces deep readonly specifically on island props.
+
+### `island-not-serializable`
+
+Props passed to a hydrated island are serialized into the page HTML and rehydrated in the browser. Only plain data survives that round-trip — primitives, plain objects, and arrays. Functions, symbols, bigints, and class instances (`Date`, `URL`, `RegExp`, `Map`, …) do not. The `children` prop is ignored: children arrive as slots, not serialized props.
+
+```astro
+<!-- flagged: 'onSelect' (function), 'createdAt' (Date) --><!-- declared: interface Props { onSelect: () => void; createdAt: Date } -->
+<Widget client:load onSelect={fn} createdAt={new Date()} />
+
+<!-- clean -->
+<!-- declared: interface Props { selectedId: string; createdAt: string } -->
+<Widget client:load selectedId="a1" createdAt={now.toISOString()} />
+```
+
+### `no-client-directive-on-astro-component`
+
+`client:*` directives hydrate framework components. On an Astro component (imported from a `.astro` file) they do nothing — a sign the markup was meant for a framework island or the directive is dead.
+
+```astro
+---
+import Card from './Card.astro';
+import Counter from './Counter.tsx';
+---
+
+<!-- flagged: client:visible has no effect on an Astro component -->
+<Card client:visible />
+
+<!-- clean -->
+<Counter client:visible />
 ```
 
 ### `no-html-comments`

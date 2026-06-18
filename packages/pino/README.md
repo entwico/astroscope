@@ -58,7 +58,7 @@ pino({ extended: true });
 
 ### Custom Logger Configuration
 
-For custom configuration (e.g., reading from environment variables at runtime), use `log.configure()` in boot.ts. This requires the [@astroscope/boot](https://github.com/smnbbrv/astroscope/tree/main/packages/boot) integration:
+For custom configuration (e.g., reading from environment variables at runtime), use `log.configure()` in boot.ts. This requires the [@astroscope/boot](https://github.com/entwico/astroscope/tree/main/packages/boot) integration:
 
 ```ts
 // src/boot.ts
