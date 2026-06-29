@@ -1,5 +1,15 @@
 # @astroscope/i18n
 
+## 0.5.0
+
+### Minor Changes
+
+- eafcbd5: inconsistent translation keys now fail the build by default
+
+### Patch Changes
+
+- eafcbd5: Log a clear error instead of crashing when `<I18nScript />` is missing
+
 ## 0.4.6
 
 ### Patch Changes
