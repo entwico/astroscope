@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/spare-parts",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Reusable Astro components for common client needs",
   "type": "module",
   "main": "./dist/index.js",
