@@ -1,0 +1,36 @@
+---
+// intercept clicks on same-page hash links and smoothly scroll to the target instead
+// of the browser's instant jump.
+---
+
+<script is:inline>
+  document.body.addEventListener('click', (event) => {
+    let target = event.target;
+
+    while (target && target !== document.body) {
+      if (target.tagName === 'A') {
+        const raw = target.getAttribute('href') || '';
+        let hash = '';
+
+        if (raw.startsWith('#')) {
+          hash = raw;
+        } else if (target.href.startsWith(`${window.location.origin}${window.location.pathname}#`)) {
+          hash = new URL(target.href).hash;
+        }
+
+        if (hash.length > 1) {
+          const el = document.querySelector(hash);
+
+          if (el) {
+            event.preventDefault();
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+
+        return;
+      }
+
+      target = target.parentNode;
+    }
+  });
+</script>

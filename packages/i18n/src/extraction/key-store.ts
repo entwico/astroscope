@@ -32,7 +32,7 @@ export class KeyStore {
 
   constructor(
     private readonly logger: AstroIntegrationLogger,
-    private readonly consistency: ConsistencyCheckLevel = 'warn',
+    private readonly consistency: ConsistencyCheckLevel = 'error',
   ) {}
 
   /**

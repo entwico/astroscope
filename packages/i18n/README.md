@@ -6,24 +6,24 @@ i18n for Astro + React islands — automatic tree-shaking, parallel loading, any
 
 ## Why this library?
 
-**SSR-first** — The only i18n solution built specifically for SSR + islands architecture. Works seamlessly with Astro's partial hydration model where most i18n libraries fail.
+**SSR-first** — Built for Astro's SSR + islands architecture, where client-only i18n libraries have no server story.
 
-**Automatic tree-shaking** — Only translations actually used by each component are delivered to the browser. No manual chunk splitting, no configuration. It just works.
+**Automatic tree-shaking** — Only the translations each component actually uses are delivered to the browser. No manual chunk splitting or configuration.
 
-**Parallel loading** — Translations load alongside component hydration via custom `client:*-x` directives. No waiting for translations before rendering.
+**Parallel loading** — Translations load alongside component hydration via custom `client:*-x` directives, so hydration doesn't wait on a separate translation fetch.
 
-**Unified API** — Same `t()` function works identically in Astro templates and React islands.
+**Unified API** — The same `t()` function works in Astro templates and React islands.
 
-**Any translation source** — Fetch translations from any provider: JSON files, database, headless CMS, TMS, or custom API. All of them will be optimized and chunked automatically.
+**Any translation source** — Fetch translations from any provider: JSON files, database, headless CMS, TMS, or custom API. All are chunked and optimized the same way.
 
-**Production optimized** — Fallback strings are stripped from production bundles via Babel, reducing bundle size while keeping fallbacks available via the manifest.
+**Production optimized** — Fallback strings are stripped from production bundles via Babel and kept available through the manifest.
 
 ## Features
 
 - **Per-chunk translation loading** — each island gets only its translations
 - **Unicode MessageFormat 2** (MF2) support via `messageformat` v4
 - **Built-in formatters** — `:number`, `:integer`, `:percent`, `:currency`, `:date`, `:time`, `:datetime`, `:unit`
-- **Babel-based extraction** — robust AST parsing, source maps, production stripping
+- **Babel-based extraction** — AST parsing, source maps, production stripping
 - **Manifest fallbacks** — missing translations automatically use extracted fallbacks
 - **Full TypeScript support**
 - **Tiny client runtime** — ~8KB gzipped for translations
@@ -58,17 +58,17 @@ The integration checks for translation key consistency — when the same key is 
 
 ```ts
 i18n({
-  consistency: 'warn',  // 'warn' (default) | 'error' | 'off'
+  consistency: 'error',  // 'error' (default) | 'warn' | 'off'
 })
 ```
 
-- **`'warn'`** — Log a warning but continue (default)
-- **`'error'`** — Fail the build
+- **`'error'`** — Fail the build (default)
+- **`'warn'`** — Log a warning but continue
 - **`'off'`** — Disable consistency checking
 
 ### 2. Configure i18n in your boot file
 
-**VERY IMPORTANT:** `i18n.configure` must be awaited during boot before handling any requests!
+> **Note:** `i18n.configure` must be awaited during boot, before any requests are handled.
 
 ```ts
 // src/boot.ts

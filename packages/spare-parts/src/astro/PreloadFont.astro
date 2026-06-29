@@ -1,0 +1,9 @@
+---
+import type { PreloadFontProps } from '../index';
+
+type Props = PreloadFontProps;
+
+const { url, type = 'font/woff2' } = Astro.props;
+---
+
+<link rel="preload" href={url} as="font" type={type} crossorigin />

@@ -1,0 +1,61 @@
+{
+  "name": "@astroscope/spare-parts",
+  "version": "0.0.0",
+  "description": "Reusable Astro components for common client needs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./astro": {
+      "import": "./src/astro/index.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src/astro",
+    "src/index.ts"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/entwico/astroscope",
+    "directory": "packages/spare-parts"
+  },
+  "keywords": [
+    "astro",
+    "seo",
+    "json-ld",
+    "schema-org",
+    "open-graph",
+    "components"
+  ],
+  "author": "admin@entwico.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/entwico/astroscope/issues"
+  },
+  "homepage": "https://github.com/entwico/astroscope/tree/main/packages/spare-parts#readme",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src --cache",
+    "lint:fix": "eslint src --fix"
+  },
+  "devDependencies": {
+    "astro": "^6.2.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "astro": "^6.0.0"
+  }
+}

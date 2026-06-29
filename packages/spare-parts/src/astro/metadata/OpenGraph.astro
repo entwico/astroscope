@@ -1,0 +1,38 @@
+---
+import type { OpenGraphProps } from '../../index';
+import { resolveCanonical, toAbsolute } from './url';
+
+type Props = OpenGraphProps;
+
+const props = Astro.props;
+
+const origin = props.origin || Astro.url.origin;
+
+// og:url is the page's canonical URL, falling back to the page's own url
+const canonical = resolveCanonical({
+  canonical: props.canonical,
+  origin,
+  pathname: Astro.originPathname,
+  hasSearchParams: Astro.url.searchParams.size > 0,
+});
+const url = canonical || origin + Astro.originPathname;
+
+const image = toAbsolute(props.ogImage, origin);
+const type = props.ogType || 'website';
+const card = props.twitterCard ?? (image ? 'summary_large_image' : 'summary');
+
+const { siteName, title, description, twitterSite } = props;
+---
+
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content={siteName} />
+{title && <meta property="og:title" content={title} />}
+{description && <meta property="og:description" content={description} />}
+<meta property="og:url" content={url} />
+{image && <meta property="og:image" content={image} />}
+
+<meta name="twitter:card" content={card} />
+{twitterSite && <meta name="twitter:site" content={twitterSite} />}
+{title && <meta name="twitter:title" content={title} />}
+{description && <meta name="twitter:description" content={description} />}
+{image && <meta name="twitter:image" content={image} />}

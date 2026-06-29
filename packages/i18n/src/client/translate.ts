@@ -2,12 +2,12 @@ import { compileMessage, formatMessageToParts } from '../shared/compiler.js';
 import { normalizeMeta } from '../shared/meta.js';
 import { type RichComponents, partsToNodes } from '../shared/rich.js';
 import type { CompiledTranslation, TranslateFunction, TranslationMeta } from '../shared/types.js';
-import './types.js';
+import { getI18nState } from './state.js';
 
 const cache = new Map<string, CompiledTranslation>();
 
 export function getLocale(): string {
-  return window.__i18n__.locale;
+  return getI18nState()?.locale ?? '';
 }
 
 /**
@@ -30,8 +30,11 @@ export const t: TranslateFunction = ((
 ): string => {
   const normalizedMeta: TranslationMeta = meta ? normalizeMeta(meta) : { fallback: '' };
 
+  const state = getI18nState();
+  const locale = state?.locale ?? '';
+
   // look up raw translation
-  const raw = window.__i18n__.translations[key];
+  const raw = state?.translations[key];
 
   if (!raw) {
     // translation missing: use fallback (dev) or key (prod)
@@ -39,7 +42,7 @@ export const t: TranslateFunction = ((
       let compiled = cache.get(`__fallback__${key}`);
 
       if (!compiled) {
-        compiled = compileMessage(window.__i18n__.locale, normalizedMeta.fallback);
+        compiled = compileMessage(locale, normalizedMeta.fallback);
         cache.set(`__fallback__${key}`, compiled);
       }
 
@@ -54,7 +57,7 @@ export const t: TranslateFunction = ((
   let compiled = cache.get(key);
 
   if (!compiled) {
-    compiled = compileMessage(window.__i18n__.locale, raw);
+    compiled = compileMessage(locale, raw);
     cache.set(key, compiled);
   }
 
@@ -88,10 +91,12 @@ export function rich<T = unknown>(
 ): (string | T)[] {
   const normalizedMeta: TranslationMeta = meta ? normalizeMeta(meta) : { fallback: '' };
 
-  // look up raw translation, fall back to meta.fallback or key
-  const raw = window.__i18n__.translations[key] ?? normalizedMeta.fallback ?? key;
+  const state = getI18nState();
 
-  const parts = formatMessageToParts(window.__i18n__.locale, raw, values);
+  // look up raw translation, fall back to meta.fallback or key
+  const raw = state?.translations[key] ?? normalizedMeta.fallback ?? key;
+
+  const parts = formatMessageToParts(state?.locale ?? '', raw, values);
 
   return partsToNodes(parts, components ?? {});
 }

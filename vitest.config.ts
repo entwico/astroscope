@@ -3,6 +3,8 @@ import { configDefaults, defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     passWithNoTests: true,
-    exclude: [...configDefaults.exclude, 'deprecated/**'],
+    // astro component tests (`*.astro.test.ts`) need the astro vite plugin — they run from
+    // packages/spare-parts/vitest.config.ts (its own `pnpm test`), not this node-environment config.
+    exclude: [...configDefaults.exclude, 'deprecated/**', '**/*.astro.test.ts'],
   },
 });

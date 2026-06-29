@@ -167,17 +167,17 @@ describe('KeyStore', () => {
   });
 
   describe('consistency check', () => {
-    test('warns on inconsistent fallback by default', () => {
+    test('errors on inconsistent fallback by default', () => {
       const logger = createMockLogger();
       const store = new KeyStore(logger);
 
       store.addFileKeys('a.ts', [createOccurrence('greeting', 'a.ts', 10, { fallback: 'Hello' })]);
       store.addFileKeys('b.ts', [createOccurrence('greeting', 'b.ts', 20, { fallback: 'Hi there' })]);
 
-      expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0]?.[0]).toContain('inconsistent fallback');
-      expect(logger.warn.mock.calls[0]?.[0]).toContain('greeting');
-      expect(store.hasErrors).toBe(false);
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error.mock.calls[0]?.[0]).toContain('inconsistent fallback');
+      expect(logger.error.mock.calls[0]?.[0]).toContain('greeting');
+      expect(store.hasErrors).toBe(true);
     });
 
     test('warns on inconsistent description', () => {

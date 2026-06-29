@@ -20,6 +20,7 @@ A collection of Astro integrations for common server-side needs — logging, tra
 | [@astroscope/opentelemetry](./packages/opentelemetry) | OpenTelemetry tracing and metrics — works in dev mode, no monkey-patching                                         |
 | [@astroscope/pino](./packages/pino)                   | Pino logging with request-scoped context                                                                          |
 | [@astroscope/proxy](./packages/proxy)                 | HTTP proxy for strangler fig migrations and API gateways                                                          |
+| [@astroscope/spare-parts](./packages/spare-parts)     | Reusable Astro components for common client needs                                                                 |
 | [@astroscope/tweaks](./packages/tweaks)               | Small opinionated tweaks for Astro                                                                                |
 | [@astroscope/wormhole](./packages/wormhole)           | Share dynamic server data with React islands and client scripts — typed, reactive                                 |
 

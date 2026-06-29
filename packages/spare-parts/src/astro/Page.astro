@@ -1,0 +1,49 @@
+---
+import type { PageProps } from '../index';
+import PreloadFont from './PreloadFont.astro';
+import BfCacheScript from './bfcache/BfCacheScript.astro';
+import { NO_BFCACHE_CACHE_CONTROL } from './bfcache/cache-control';
+import PageMetadata from './metadata/PageMetadata.astro';
+
+type Props = PageProps;
+
+const {
+  lang,
+  charset = 'utf-8',
+  viewport = 'width=device-width, initial-scale=1',
+  htmlClass,
+  bodyClass,
+  fonts,
+  disableBfCache,
+  ...metadata
+} = Astro.props;
+
+// set in Page's frontmatter so it lands before the response streams (Page renders the <head>,
+// which astro buffers before the first flush)
+if (disableBfCache) {
+  Astro.response.headers.set('Cache-Control', NO_BFCACHE_CACHE_CONTROL);
+}
+---
+
+<!doctype html>
+<html lang={lang} class={htmlClass}>
+  <head>
+    <meta charset={charset} />
+
+    {/* right after charset for things that must be earliest: preconnect / dns-prefetch, <base> */}
+    <slot name="head-early" />
+
+    <meta name="viewport" content={viewport} />
+
+    {fonts?.map((font) => <PreloadFont {...(typeof font === 'string' ? { url: font } : font)} />)}
+
+    <PageMetadata {...metadata} />
+
+    <slot name="head" />
+
+    {disableBfCache && <BfCacheScript />}
+  </head>
+  <body class={bodyClass}>
+    <slot />
+  </body>
+</html>

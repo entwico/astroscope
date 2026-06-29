@@ -96,7 +96,9 @@ export default [
   // disable prettier for astro files (prettier-plugin-astro has issues with TypeScript in scripts)
   // this must come AFTER prettierRecommended to override
   {
-    files: ['**/*.astro'],
+    // `**/*.astro/*` also covers the `<script>` blocks the astro processor extracts as
+    // virtual files — prettier mis-parses statement bodies in those, so keep it off there too
+    files: ['**/*.astro', '**/*.astro/*'],
     rules: {
       'prettier/prettier': 'off',
       'prefer-template': 'off', // astro inline scripts use string concat

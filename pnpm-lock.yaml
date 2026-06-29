@@ -373,6 +373,25 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  demo/spare-parts:
+    dependencies:
+      '@astrojs/node':
+        specifier: ^10.0.6
+        version: 10.1.4(astro@6.4.8(@types/node@25.9.3)(jiti@2.7.0)(lightningcss@1.32.0)(rollup@4.62.0)(yaml@2.9.0))
+      '@astroscope/spare-parts':
+        specifier: workspace:*
+        version: link:../../packages/spare-parts
+      astro:
+        specifier: ^6.2.2
+        version: 6.4.8(@types/node@25.9.3)(jiti@2.7.0)(lightningcss@1.32.0)(rollup@4.62.0)(yaml@2.9.0)
+    devDependencies:
+      '@astrojs/check':
+        specifier: ^0.9.9
+        version: 0.9.9(prettier-plugin-astro@0.14.1)(prettier@3.8.4)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   demo/tweaks-e2e:
     dependencies:
       '@astrojs/node':
@@ -654,6 +673,21 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/spare-parts:
+    devDependencies:
+      astro:
+        specifier: ^6.2.2
+        version: 6.4.8(@types/node@25.9.3)(jiti@2.7.0)(lightningcss@1.32.0)(rollup@4.62.0)(yaml@2.9.0)
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.15)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@25.9.3)(@vitest/coverage-v8@4.1.9)(vite@7.3.5(@types/node@25.9.3)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0))
 
   packages/tweaks:
     dependencies:

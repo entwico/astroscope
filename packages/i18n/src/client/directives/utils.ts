@@ -1,6 +1,6 @@
 import type { I18nClientState } from '../../shared/types.js';
 import { buildI18nChunkUrl, componentUrlToChunkName } from '../../shared/url.js';
-import '../types.js';
+import { getI18nState } from '../state.js';
 
 /**
  * Prefetch translation chunk (fire and forget)
@@ -24,8 +24,11 @@ export function warmUpI18nForChunk(el: HTMLElement): void {
 
   if (!componentUrl) return;
 
+  const i18n = getI18nState();
+
+  if (!i18n) return;
+
   const chunkName = componentUrlToChunkName(componentUrl);
-  const i18n = window.__i18n__;
 
   // prefetch this chunk's translations
   prefetchTranslation(chunkName, i18n);

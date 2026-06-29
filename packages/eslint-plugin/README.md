@@ -124,7 +124,7 @@ Autofix rewrites `<!-- x -->` → `{/* x */}`. Declines to autofix when the comm
 
 ### `prefer-ssr-guard`
 
-Unliker `typeof window !== 'undefined'`, `import.meta.env.SSR` tree-shakes the browser code from the server
+Unlike `typeof window !== 'undefined'`, `import.meta.env.SSR` lets the bundler tree-shake the browser-only code out of the SSR build.
 
 ```ts
 // flagged

@@ -2,9 +2,9 @@
 
 > **Note:** This package is in active development. APIs may change between versions.
 
-Pre-compressed in-memory static file serving for Astro SSR. Save space, serve from hyperspace.
+Pre-compressed in-memory static file serving for Astro SSR.
 
-CDNs and reverse proxies often compress on the fly with conservative settings — or sometimes not at all. Hyperspace pre-compresses static files at build time with maximum brotli and gzip quality, then serves them from memory at startup. The result is smaller responses than most CDNs produce in real-time, with zero per-request CPU or disk overhead. Works great standalone or behind a proxy.
+CDNs and reverse proxies often compress on the fly with conservative settings — or sometimes not at all. Hyperspace pre-compresses static files at build time with maximum brotli and gzip quality, then serves them from memory at startup. Responses are smaller than most CDNs produce on the fly, with no per-request CPU or disk cost. Works standalone or behind a proxy.
 
 ## Examples
 
@@ -29,7 +29,7 @@ export default defineConfig({
 });
 ```
 
-That's it. No configuration needed.
+No configuration needed.
 
 ## What it does
 

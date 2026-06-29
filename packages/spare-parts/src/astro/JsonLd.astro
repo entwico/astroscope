@@ -1,0 +1,13 @@
+---
+import JsonScript from './JsonScript.astro';
+
+interface Props {
+  /** A schema.org `Thing`, or an array of them. */
+  content: unknown | unknown[];
+}
+---
+
+<JsonScript
+  type="application/ld+json"
+  data={{ '@context': 'https://schema.org', '@graph': [Astro.props.content].flat() }}
+/>

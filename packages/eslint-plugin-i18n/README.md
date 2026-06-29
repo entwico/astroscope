@@ -2,7 +2,7 @@
 
 > **Note:** This package is in active development. APIs may change between versions.
 
-ESLint rules for projects using `@astroscope/i18n`. Enforces correct `t()` usage, catches build-time extraction issues, and promotes i18n best practices.
+ESLint rules for projects using `@astroscope/i18n`. Enforces correct `t()` usage, catches build-time extraction issues, and steers hydration to the i18n-aware directives.
 
 ## Installation
 

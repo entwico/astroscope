@@ -1,0 +1,34 @@
+---
+import type { PageMetadataProps } from '../../index';
+import OpenGraph from './OpenGraph.astro';
+import Seo from './Seo.astro';
+
+type Props = PageMetadataProps;
+
+const p = Astro.props;
+---
+
+<Seo
+  origin={p.origin}
+
+  title={p.title}
+  description={p.description}
+  index={p.index}
+  follow={p.follow}
+  canonical={p.canonical}
+  unavailableAfter={p.unavailableAfter}
+  alternates={p.alternates}
+/>
+
+<OpenGraph
+  siteName={p.siteName}
+  origin={p.origin}
+
+  title={p.ogTitle || p.title}
+  description={p.ogDescription || p.description}
+  ogType={p.ogType}
+  canonical={p.canonical}
+  ogImage={p.ogImage}
+  twitterCard={p.twitterCard}
+  twitterSite={p.twitterSite}
+/>

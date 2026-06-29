@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  // astro component tests import `.astro`
+  // which plain tsc can't resolve; the astro vite
+  // plugin type-checks them at test time instead
+  "exclude": ["src/**/*.astro.test.ts"]
+}

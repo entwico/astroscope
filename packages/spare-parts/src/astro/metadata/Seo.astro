@@ -1,0 +1,26 @@
+---
+import type { SeoProps } from '../../index';
+import { computeRobots } from './robots';
+import { resolveCanonical } from './url';
+
+type Props = SeoProps;
+
+const { title, description, index = true, follow = true, unavailableAfter, alternates } = Astro.props;
+
+const origin = Astro.props.origin || Astro.url.origin;
+
+const canonical = resolveCanonical({
+  canonical: Astro.props.canonical,
+  origin,
+  pathname: Astro.originPathname,
+  hasSearchParams: Astro.url.searchParams.size > 0,
+});
+
+const robots = computeRobots({ index, follow, unavailableAfter });
+---
+
+{robots.length > 0 && <meta name="robots" content={robots.join(', ')} />}
+{title && <title>{title}</title>}
+{description && <meta name="description" content={description} />}
+{index && canonical && <link rel="canonical" href={canonical} />}
+{index && alternates?.map((alternate) => <link rel="alternate" hreflang={alternate.hreflang} href={alternate.href} />)}

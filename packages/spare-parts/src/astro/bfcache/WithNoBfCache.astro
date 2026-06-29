@@ -1,0 +1,18 @@
+---
+import BfCacheScript from './BfCacheScript.astro';
+import { NO_BFCACHE_CACHE_CONTROL } from './cache-control';
+
+// disable the back-forward cache (bfcache) for the wrapped document.
+//
+// this is a wrapper on purpose: the response header must be set before astro starts streaming
+// the body. astro runs a component's frontmatter before rendering its slot, and it buffers the
+// <head> before the first flush — so wrapping your top-level layout / <html> makes this
+// frontmatter run in time. setting the header from a component inside <body> is too late.
+//
+// (using `<Page disableBfCache>` instead? that does the same thing without the wrapper.)
+Astro.response.headers.set('Cache-Control', NO_BFCACHE_CACHE_CONTROL);
+---
+
+<BfCacheScript />
+
+<slot />

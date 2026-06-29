@@ -12,7 +12,7 @@ const CLIENT_DIRECTIVES = ['load-x', 'idle-x', 'visible-x', 'media-x', 'only-x']
  * - Vite plugin for translation key extraction
  */
 export default function i18nIntegration(options: I18nOptions = {}): AstroIntegration {
-  const { consistency = 'warn' } = options;
+  const { consistency = 'error' } = options;
 
   return {
     name: '@astroscope/i18n',

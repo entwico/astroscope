@@ -1,0 +1,84 @@
+---
+import '../styles/index.css';
+import { JsonLd, JsonScript, SmoothHashScroll } from '@astroscope/spare-parts/astro';
+import Layout from '../../../shared/Layout.astro';
+
+const org = {
+  '@type': 'Organization',
+  name: 'Spare Parts Co',
+  url: 'https://example.com',
+};
+
+// a deliberately hostile payload: it contains </script> and an XSS attempt
+const bootstrap = { user: 'Ada', note: '</script><img src=x onerror=alert(1)>' };
+---
+
+<Layout title="@astroscope/spare-parts" package="@astroscope/spare-parts">
+  <SmoothHashScroll />
+
+  <div id="top" class="space-y-6">
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">Cherry-pickable Astro parts</h2>
+        <p>Head metadata, safe inline data scripts, and small client behaviors.</p>
+        <a class="link link-primary" href="/full-page">See the full &lt;Page&gt; document demo →</a>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">&lt;JsonScript&gt; — safe inline JSON</h2>
+        <p>
+          The payload below contains <code>&lt;/script&gt;</code> and an <code>onerror</code> XSS attempt. It's escaped
+          on render, then parsed back to the exact original by a client script — without ever breaking out of the tag.
+        </p>
+        <pre class="bg-base-300 p-4 rounded-lg overflow-x-auto"><code>{JSON.stringify(bootstrap, null, 2)}</code></pre>
+
+        <JsonScript id="bootstrap" data={bootstrap} />
+
+        <div class="mt-2">round-trips to: <code id="roundtrip" class="text-success">…</code></div>
+        <div>broke out of the script tag? <code id="safe">checking…</code></div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">&lt;JsonLd&gt; — schema.org</h2>
+        <p>Renders a safe <code>&lt;script type="application/ld+json"&gt;</code> into the page (view source). Source:</p>
+        <pre class="bg-base-300 p-4 rounded-lg overflow-x-auto"><code>{JSON.stringify(org, null, 2)}</code></pre>
+        <JsonLd content={org} />
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">&lt;SmoothHashScroll&gt;</h2>
+        <p><a class="link link-primary" href="#bottom">Jump to the bottom ↓</a> — it smooth-scrolls instead of jumping.</p>
+      </div>
+    </div>
+
+    <div class="h-[120vh]"></div>
+
+    <div id="bottom" class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">You're at the bottom 🎉</h2>
+        <p><a class="link link-primary" href="#top">Back to top ↑</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    // read the embedded JSON back to prove the escape round-trips and didn't break out
+    const el = document.getElementById('bootstrap');
+    const data = JSON.parse(el.textContent);
+
+    document.getElementById('roundtrip').textContent = data.note;
+
+    // if the escape had failed, the breakout payload would have created a real <img> in the DOM
+    const brokeOut = Boolean(document.querySelector('img[src="x"]'));
+    const safe = document.getElementById('safe');
+
+    safe.textContent = brokeOut ? 'YES — vulnerable!' : 'no — safe';
+    safe.className = brokeOut ? 'text-error' : 'text-success';
+  </script>
+</Layout>
