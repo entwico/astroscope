@@ -51,6 +51,20 @@ tester.run('island-not-serializable', islandNotSerializable, {
         export const v = <C onClick={() => {}} />;
       `,
     },
+    // intersection of plain shapes, including one with a nested union arm, stays serializable
+    {
+      filename,
+      code: `
+        type Base = { id: string };
+        type Item = Base & { name: string } & (
+          | { custom: false; extra?: never }
+          | { custom: true; extra: { note: string } }
+        );
+        interface Props { item: Item }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load item={{ id: 'a', name: 'x', custom: false }} />;
+      `,
+    },
   ],
   invalid: [
     // function prop
@@ -92,6 +106,18 @@ tester.run('island-not-serializable', islandNotSerializable, {
         export const v = <C client:load outer={{ inner: { cb: () => {} } }} />;
       `,
       errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'outer.inner'`, v: 'is' } }],
+    },
+    // a non-serializable member contributed by one arm of an intersection is still caught
+    {
+      filename,
+      code: `
+        type Base = { id: string };
+        type Item = Base & { when: Date };
+        interface Props { item: Item }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load item={{ id: 'a', when: new Date() }} />;
+      `,
+      errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'item.when'`, v: 'is' } }],
     },
   ],
 });

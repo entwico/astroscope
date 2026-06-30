@@ -88,6 +88,16 @@ function walk(
     return;
   }
 
+  // an intersection's value carries every member's properties; walking each
+  // constituent covers the merged shape and reuses all object/array/index logic
+  if (type.isIntersection()) {
+    for (const member of type.types) {
+      walk(member, path, seen, out, checker, site);
+    }
+
+    return;
+  }
+
   if ((type.flags & UNDECIDABLE_FLAGS) !== 0 || (type.flags & ts.TypeFlags.Never) !== 0) {
     return;
   }
