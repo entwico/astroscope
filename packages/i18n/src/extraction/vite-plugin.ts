@@ -142,8 +142,10 @@ export function getManifest() { return _getManifest(); }
       syncGlobalState();
 
       // build mode: return transformed code with source map
+      // serialize babel's map to a string: vite accepts string source maps and
+      // its structural ExistingRawSourceMap type (vite 8) rejects babel's map shape
       if (isBuild && result.code) {
-        return { code: result.code, map: result.map };
+        return result.map ? { code: result.code, map: JSON.stringify(result.map) } : { code: result.code };
       }
 
       return null; // dev mode: keep fallbacks

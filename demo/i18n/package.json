@@ -15,11 +15,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@astrojs/node": "^10.0.6",
-    "@astrojs/react": "^5.0.4",
+    "@astrojs/node": "^11.0.0",
+    "@astrojs/react": "^6.0.0",
     "@astroscope/boot": "workspace:*",
     "@astroscope/i18n": "workspace:*",
-    "astro": "^6.2.2",
+    "astro": "^7.0.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },

@@ -37,17 +37,19 @@ describe.skipIf(skip)('e2e — programmatic astro build', () => {
     expect(warmup).toContain('Promise.allSettled');
     expect(warmup).toContain('warmup import failed');
 
-    // user SSR routes
-    expect(warmup).toMatch(/import\('\.\/index_[^']+\.mjs'\)/); // src/pages/index.astro
-    expect(warmup).toMatch(/import\('\.\/api_[^']+\.mjs'\)/); // src/pages/api.ts
+    // import quoting and chunk names differ across bundlers: rollup emits single
+    // quotes and names the index chunk `index_`; rolldown emits double quotes and
+    // derives the index chunk from its parent directory (`pages_`). accept either.
+    expect(warmup).toMatch(/import\(['"]\.\/(index|pages)_[^'"]+\.mjs['"]\)/); // src/pages/index.astro
+    expect(warmup).toMatch(/import\(['"]\.\/api_[^'"]+\.mjs['"]\)/); // src/pages/api.ts
 
     // integration-injected routes flow through astro:routes:resolved too
-    expect(warmup).toMatch(/import\('\.\/route_[^']+\.mjs'\)/); // /_actions/[...path]
+    expect(warmup).toMatch(/import\(['"]\.\/route_[^'"]+\.mjs['"]\)/); // /_actions/[...path]
 
     expect(warmup).toMatch(/virtual_astro_middleware/);
 
     // prerendered → static html, no SSR chunk
-    expect(warmup).not.toMatch(/import\('\.\/static_[^']+\.mjs'\)/);
+    expect(warmup).not.toMatch(/import\(['"]\.\/static_[^'"]+\.mjs['"]\)/);
 
     // synthetic — no real file backs them
     expect(warmup).not.toContain('_server-islands');
@@ -57,9 +59,11 @@ describe.skipIf(skip)('e2e — programmatic astro build', () => {
   describe('shipped chunks must be portable (no host-machine paths)', () => {
     // posix-absolute (`/foo/bar`), windows-drive (`C:\\foo`), and pnpm node_modules
     // signature. covers the common ways an absolute path can leak into output.
-    const fixtureBasename = path.basename(fixtureRoot);
+    // the fixture pattern matches the host-machine absolute root only — bundler
+    // module-id annotations (rolldown's `//#region`) are root-relative and portable.
+    const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const ABSOLUTE_PATH_PATTERNS = [
-      { name: 'fixture absolute path', re: new RegExp(`/[^"'\\s]*${fixtureBasename}/[^"'\\s]*`) },
+      { name: 'fixture absolute path', re: new RegExp(escapeRe(fixtureRoot)) },
       { name: 'windows drive path', re: /[A-Z]:\\\\[^"'\s]+/ },
       { name: 'pnpm store reference', re: /node_modules\/\.pnpm\//i },
     ];

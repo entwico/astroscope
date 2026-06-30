@@ -3,7 +3,7 @@ packages:
   - demo/*
 
 overrides:
-  vite: ^7
+  vite: ^8
 
 allowBuilds:
   '@tailwindcss/oxide': true
@@ -11,3 +11,5 @@ allowBuilds:
   protobufjs: false
   sharp: true
   unrs-resolver: true
+
+minimumReleaseAge: 1440

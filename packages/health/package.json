@@ -52,14 +52,14 @@
   },
   "devDependencies": {
     "@astroscope/boot": "workspace:^",
-    "astro": "^6.2.2",
+    "astro": "^7.0.3",
     "health-probes": "^1.1.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "@astroscope/boot": "workspace:^",
-    "astro": "^6.0.0",
+    "astro": "^6.0.0 || ^7.0.0",
     "health-probes": "^1.1.0"
   }
 }

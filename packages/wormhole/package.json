@@ -57,13 +57,13 @@
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
-    "astro": "^6.2.2",
+    "astro": "^7.0.3",
     "react": "^19.2.5",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "astro": "^6.0.0",
+    "astro": "^6.0.0 || ^7.0.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {

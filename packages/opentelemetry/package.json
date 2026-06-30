@@ -57,7 +57,7 @@
     "@astroscope/excludes": "workspace:^",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/core": "^2.7.1",
-    "astro": "^6.2.2",
+    "astro": "^7.0.3",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
@@ -65,6 +65,6 @@
     "@astroscope/excludes": "workspace:^",
     "@opentelemetry/api": "^1.0.0",
     "@opentelemetry/core": "^2.0.0",
-    "astro": "^6.0.0"
+    "astro": "^6.0.0 || ^7.0.0"
   }
 }

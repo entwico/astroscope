@@ -50,12 +50,12 @@
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {
-    "astro": "^6.2.2",
+    "astro": "^7.0.3",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9"
   },
   "peerDependencies": {
-    "astro": "^6.0.0"
+    "astro": "^6.0.0 || ^7.0.0"
   }
 }
