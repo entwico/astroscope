@@ -1,5 +1,11 @@
 # @astroscope/wormhole
 
+## 0.3.0
+
+### Minor Changes
+
+- 329f3f2: support Astro 7 (Vite 8)
+
 ## 0.2.3
 
 ### Patch Changes

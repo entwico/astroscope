@@ -1,5 +1,16 @@
 # @astroscope/health
 
+## 0.5.0
+
+### Minor Changes
+
+- 329f3f2: support Astro 7 (Vite 8)
+
+### Patch Changes
+
+- Updated dependencies [329f3f2]
+  - @astroscope/boot@0.9.0
+
 ## 0.4.4
 
 ### Patch Changes

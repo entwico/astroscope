@@ -1,5 +1,11 @@
 # @astroscope/excludes
 
+## 0.4.0
+
+### Minor Changes
+
+- 329f3f2: support Astro 7 (Vite 8)
+
 ## 0.3.2
 
 ### Patch Changes

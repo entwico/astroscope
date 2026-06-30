@@ -1,5 +1,11 @@
 # @astroscope/eslint-plugin-i18n
 
+## 0.2.0
+
+### Minor Changes
+
+- 0d48e7f: add t-static-meta rule flagging concatenated or interpolated t() fallback and description strings
+
 ## 0.1.6
 
 ### Patch Changes

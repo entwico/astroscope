@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/eslint-plugin-i18n",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "description": "ESLint rules for @astroscope/i18n",
   "type": "module",
   "main": "./dist/index.js",
