@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tsParser from '@typescript-eslint/parser';
-import astroEslintParser from 'astro-eslint-parser';
+import * as astroEslintParser from 'astro-eslint-parser';
 import type { ESLint, Linter, Rule } from 'eslint';
 
 import { islandNotSerializable } from './rules/island-not-serializable.js';

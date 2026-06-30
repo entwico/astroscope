@@ -1,5 +1,5 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
-import astroParser from 'astro-eslint-parser';
+import * as astroParser from 'astro-eslint-parser';
 import { afterAll, describe, it } from 'vitest';
 
 import { noHtmlComments } from './no-html-comments.js';

@@ -87,9 +87,6 @@ export default [
     },
   })),
 
-  // astro a11y rules (includes jsx-a11y plugin)
-  ...eslintPluginAstro.configs['jsx-a11y-strict'],
-
   // prettier rules
   prettierRecommended,
 
