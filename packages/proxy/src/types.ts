@@ -64,6 +64,5 @@ export interface ProxyOptions {
    * Can return a custom error response or void for default 502 response.
    */
   onError?:
-    | ((context: APIContext, error: Error, targetUrl: URL) => Response | void | Promise<Response | void>)
-    | undefined;
+    ((context: APIContext, error: Error, targetUrl: URL) => Response | void | Promise<Response | void>) | undefined;
 }

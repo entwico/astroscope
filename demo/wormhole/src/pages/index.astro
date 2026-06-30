@@ -78,7 +78,7 @@ const counter = counterWormhole.get();
 </Layout>
 
 <script>
-  /* eslint-disable prettier/prettier */
+   
   import { counterWormhole } from '../wormholes';
 
   const el = document.getElementById('script-counter')!;
@@ -88,5 +88,5 @@ const counter = counterWormhole.get();
   counterWormhole.subscribe((data) => {
     el.textContent = String(data.count);
   });
-  /* eslint-enable prettier/prettier */
+   
 </script>

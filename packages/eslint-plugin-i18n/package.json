@@ -37,15 +37,16 @@
   },
   "homepage": "https://github.com/entwico/astroscope/tree/main/packages/eslint-plugin-i18n#readme",
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsdown src/index.ts --format esm --dts --no-fixed-extension",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {
+    "@types/node": "^26.0.1",
     "eslint": "^9.39.3",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "eslint": "^9.0.0 || ^10.0.0"

@@ -43,7 +43,7 @@
   },
   "homepage": "https://github.com/entwico/astroscope/tree/main/packages/pino#readme",
   "scripts": {
-    "build": "tsup src/index.ts src/middleware-entrypoint.ts --format esm --dts --external virtual:@astroscope/pino/config",
+    "build": "tsdown src/index.ts src/middleware-entrypoint.ts --format esm --dts --no-fixed-extension --deps.never-bundle virtual:@astroscope/pino/config",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
@@ -52,12 +52,12 @@
     "@astroscope/excludes": "workspace:^",
     "astro": "^7.0.3",
     "pino": "^10.3.1",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "@astroscope/excludes": "workspace:^",
-    "astro": "^6.0.0 || ^7.0.0",
+    "astro": "^7.0.0",
     "pino": "^10.0.0"
   }
 }

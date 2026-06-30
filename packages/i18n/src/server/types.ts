@@ -4,10 +4,7 @@ import type { CompiledTranslations, RawTranslations, TranslationMeta } from '../
  * Fallback behavior when translation is missing
  */
 export type FallbackBehavior =
-  | 'key'
-  | 'fallback'
-  | 'throw'
-  | ((key: string, meta?: TranslationMeta | undefined) => string);
+  'key' | 'fallback' | 'throw' | ((key: string, meta?: TranslationMeta | undefined) => string);
 
 /**
  * Request-scoped i18n context

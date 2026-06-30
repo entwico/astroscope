@@ -38,30 +38,30 @@
   },
   "homepage": "https://github.com/entwico/astroscope/tree/main/packages/eslint-plugin#readme",
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsdown src/index.ts --format esm --dts --no-fixed-extension",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix",
     "test": "vitest run"
   },
   "dependencies": {
-    "@typescript-eslint/type-utils": "^8.59.2",
-    "@typescript-eslint/utils": "^8.59.2"
+    "@typescript-eslint/type-utils": "^8.62.0",
+    "@typescript-eslint/utils": "^8.62.0"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
-    "@typescript-eslint/parser": "^8.59.2",
-    "@typescript-eslint/rule-tester": "^8.59.2",
+    "@types/node": "^26.0.1",
+    "@typescript-eslint/parser": "^8.62.0",
+    "@typescript-eslint/rule-tester": "^8.62.0",
     "astro-eslint-parser": "^1.4.0",
     "eslint": "^9.39.3",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.5"
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   },
   "peerDependencies": {
     "@typescript-eslint/parser": "^8.0.0",
     "astro-eslint-parser": "^1.0.0",
     "eslint": "^9.0.0 || ^10.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0 || ^6.0.0"
   }
 }

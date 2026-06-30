@@ -48,7 +48,7 @@
   },
   "homepage": "https://github.com/entwico/astroscope/tree/main/packages/opentelemetry#readme",
   "scripts": {
-    "build": "tsup src/index.ts src/middleware-entrypoint.ts --format esm --dts --external virtual:@astroscope/opentelemetry/config",
+    "build": "tsdown src/index.ts src/middleware-entrypoint.ts --format esm --dts --no-fixed-extension --deps.never-bundle virtual:@astroscope/opentelemetry/config",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
@@ -56,15 +56,15 @@
   "devDependencies": {
     "@astroscope/excludes": "workspace:^",
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/core": "^2.7.1",
+    "@opentelemetry/core": "^2.8.0",
     "astro": "^7.0.3",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "@astroscope/excludes": "workspace:^",
     "@opentelemetry/api": "^1.0.0",
     "@opentelemetry/core": "^2.0.0",
-    "astro": "^6.0.0 || ^7.0.0"
+    "astro": "^7.0.0"
   }
 }
