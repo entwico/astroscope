@@ -1,5 +1,17 @@
 # @astroscope/i18n
 
+## 1.0.0
+
+### Minor Changes
+
+- 329f3f2: support Astro 7 (Vite 8)
+
+### Patch Changes
+
+- 6b4669d: upgrade the build-time t() extraction to Babel 8
+- Updated dependencies [329f3f2]
+  - @astroscope/excludes@0.4.0
+
 ## 0.5.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @astroscope/hyperspace
 
+## 0.2.0
+
+### Minor Changes
+
+- 329f3f2: support Astro 7 (Vite 8)
+
 ## 0.1.7
 
 ### Patch Changes

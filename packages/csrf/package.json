@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/csrf",
-  "version": "0.4.3",
+  "version": "1.0.0",
   "description": "CSRF protection with path exclusions — for webhooks, OIDC callbacks, and third-party integrations",
   "type": "module",
   "main": "./dist/index.js",

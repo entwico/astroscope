@@ -1,5 +1,11 @@
 # @astroscope/boot
 
+## 0.9.0
+
+### Minor Changes
+
+- 329f3f2: support Astro 7 (Vite 8)
+
 ## 0.8.0
 
 ### Minor Changes

@@ -1,5 +1,15 @@
 # @astroscope/eslint-plugin
 
+## 0.4.0
+
+### Minor Changes
+
+- 12e5e65: update to ESLint 10 and astro-eslint-parser 2
+
+### Patch Changes
+
+- 339df48: stop island-not-serializable from flagging intersection-typed props that are plain serializable data
+
 ## 0.3.0
 
 ### Minor Changes

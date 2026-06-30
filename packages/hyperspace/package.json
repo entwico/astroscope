@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/hyperspace",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "Pre-compressed in-memory static file serving for Astro — save space, serve from hyperspace",
   "type": "module",
   "main": "./dist/index.js",
