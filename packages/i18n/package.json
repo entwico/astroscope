@@ -89,14 +89,14 @@
   },
   "dependencies": {
     "@astrojs/compiler": "^4.0.0",
-    "@babel/core": "^7.29.0",
-    "@babel/preset-typescript": "^7.28.5",
+    "@babel/core": "^8.0.1",
+    "@babel/preset-typescript": "^8.0.1",
     "messageformat": "^4.0.0",
     "magic-string": "^0.30.21"
   },
   "devDependencies": {
     "@astroscope/excludes": "workspace:^",
-    "@babel/types": "^7.29.0",
+    "@babel/types": "^8.0.0",
     "@types/babel__core": "^7.20.5",
     "astro": "^7.0.3",
     "tsdown": "^0.22.3",

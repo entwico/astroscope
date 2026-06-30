@@ -1,4 +1,4 @@
-import type { BabelFileResult } from '@babel/core';
+import type { FileResult, PluginItem } from '@babel/core';
 import type { AstroIntegrationLogger } from 'astro';
 import type { ExtractedKeyOccurrence } from './types.js';
 
@@ -34,7 +34,7 @@ export type ExtractOptions = {
 export type ExtractResult = {
   keys: ExtractedKeyOccurrence[];
   code: string | null;
-  map: BabelFileResult['map'];
+  map: FileResult['map'];
 };
 
 /**
@@ -75,13 +75,13 @@ export async function extractKeysFromFile(options: ExtractOptions): Promise<Extr
           },
           logger,
         },
-      ],
+      ] as PluginItem,
     ],
   });
 
   return {
     keys,
     code: result?.code ?? null,
-    map: result?.map,
+    map: result?.map ?? null,
   };
 }

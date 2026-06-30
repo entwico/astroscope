@@ -1,4 +1,4 @@
-import type { PluginObj, PluginPass } from '@babel/core';
+import type { NodePath, PluginObject, PluginPass } from '@babel/core';
 import type * as BabelTypes from '@babel/types';
 import type { Expression, Node, ObjectExpression } from '@babel/types';
 import type { AstroIntegrationLogger } from 'astro';
@@ -155,11 +155,11 @@ function extractVariables(
  * - Extracts t() calls with key and metadata
  * - Strips fallback argument in production builds
  */
-export function i18nExtractPlugin({ types: t }: { types: typeof BabelTypes }): PluginObj<PluginState> {
+export function i18nExtractPlugin({ types: t }: { types: typeof BabelTypes }): PluginObject<PluginState> {
   return {
     name: '@astroscope/i18n/extract',
     visitor: {
-      CallExpression(path, state) {
+      CallExpression(path: NodePath<BabelTypes.CallExpression>, state: PluginState) {
         // check if callee is 't' identifier
         // we assume that it was not aliased / reassigned
         if (!path.get('callee').isIdentifier({ name: 't' })) return;
