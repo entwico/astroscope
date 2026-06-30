@@ -9,6 +9,7 @@ import { preferXDirectives } from './rules/prefer-x-directives.js';
 import { tImportSource } from './rules/t-import-source.js';
 import { tRequiresMeta } from './rules/t-requires-meta.js';
 import { tStaticKey } from './rules/t-static-key.js';
+import { tStaticMeta } from './rules/t-static-meta.js';
 
 const pkg = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8'));
 
@@ -21,6 +22,7 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config> } = {
     't-import-source': tImportSource,
     'no-module-level-t': noModuleLevelT,
     't-static-key': tStaticKey,
+    't-static-meta': tStaticMeta,
     't-requires-meta': tRequiresMeta,
     'prefer-x-directives': preferXDirectives,
     'no-raw-strings-in-jsx': noRawStringsInJsx,
@@ -37,6 +39,7 @@ plugin.configs.recommended = {
     '@astroscope/i18n/t-import-source': 'error',
     '@astroscope/i18n/no-module-level-t': 'error',
     '@astroscope/i18n/t-static-key': 'error',
+    '@astroscope/i18n/t-static-meta': 'warn',
     '@astroscope/i18n/t-requires-meta': 'warn',
     '@astroscope/i18n/no-t-reassign': 'error',
     '@astroscope/i18n/prefer-x-directives': 'error',

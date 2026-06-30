@@ -524,6 +524,9 @@ importers:
 
   packages/eslint-plugin-i18n:
     devDependencies:
+      '@types/estree':
+        specifier: ^1.0.9
+        version: 1.0.9
       '@types/node':
         specifier: ^26.0.1
         version: 26.0.1

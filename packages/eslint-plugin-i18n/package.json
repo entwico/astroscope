@@ -43,6 +43,7 @@
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {
+    "@types/estree": "^1.0.9",
     "@types/node": "^26.0.1",
     "eslint": "^10.6.0",
     "tsdown": "^0.22.3",
