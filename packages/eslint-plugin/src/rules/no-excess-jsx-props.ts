@@ -166,7 +166,7 @@ function narrowByDiscriminant(expected: ts.Type, actual: ts.Type, checker: ts.Ty
 
   if (!disc) return expected;
 
-  let actualValue: string | null = null;
+  const actualValues = new Set<string>();
 
   for (const c of constituents(actual)) {
     const prop = c.getProperty(disc);
@@ -175,20 +175,29 @@ function narrowByDiscriminant(expected: ts.Type, actual: ts.Type, checker: ts.Ty
 
     const propType = checker.getTypeOfSymbolAtLocation(prop, site);
 
-    if (!isLiteralType(propType)) return expected;
+    // the actual discriminant may be a single literal or a union of literals (e.g. 'grid' | 'carousel');
+    // anything else can't pick a branch
+    if (isLiteralType(propType)) {
+      actualValues.add(getLiteralValue(propType));
+    } else if (propType.isUnion() && propType.types.every(isLiteralType)) {
+      for (const member of propType.types) actualValues.add(getLiteralValue(member));
+    } else {
+      return expected;
+    }
 
-    actualValue = getLiteralValue(propType);
     break;
   }
 
-  if (actualValue === null) return expected;
+  if (actualValues.size === 0) return expected;
 
   const matches = expected.types.filter((branch) => {
     const bp = branch.getProperty(disc);
 
     if (!bp) return false;
 
-    return literalContains(checker.getTypeOfSymbolAtLocation(bp, site), actualValue);
+    const bpType = checker.getTypeOfSymbolAtLocation(bp, site);
+
+    return [...actualValues].some((value) => literalContains(bpType, value));
   });
 
   return matches.length === 1 ? matches[0]! : expected;

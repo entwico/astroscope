@@ -287,6 +287,20 @@ tester.run('no-excess-jsx-props', noExcessJsxProps, {
         export const v = <C client:load shape={shape} />;
       `,
     },
+    // discriminated union whose actual discriminant is itself a union of literals ('b' | 'c') —
+    // must narrow to the single branch covering both before comparing the (per-branch) payload shape
+    {
+      filename,
+      code: `
+        type Shape =
+          | { kind: 'a'; data: { x: string } }
+          | { kind: 'b' | 'c'; data: { y: number } };
+        interface Props { shape: Shape; }
+        function C(p: Props) { return null as any; }
+        declare const shape: { kind: 'b' | 'c'; data: { y: number } };
+        export const v = <C client:load shape={shape} />;
+      `,
+    },
     // non-discriminated union — variant-specific keys are permissive (union-of-all-branches)
     {
       filename,
@@ -559,6 +573,20 @@ tester.run('no-excess-jsx-props', noExcessJsxProps, {
         export const v = <C client:load blocks={blocks} />;
       `,
       errors: [err('C', ['blocks[].value'])],
+    },
+    // union-of-literals discriminant narrows to the matching branch — a genuine extra is still caught
+    {
+      filename,
+      code: `
+        type Shape =
+          | { kind: 'a'; data: { x: string } }
+          | { kind: 'b' | 'c'; data: { y: number } };
+        interface Props { shape: Shape; }
+        function C(p: Props) { return null as any; }
+        declare const shape: { kind: 'b' | 'c'; data: { y: number; leak: string } };
+        export const v = <C client:load shape={shape} />;
+      `,
+      errors: [err('C', ['shape.data.leak'])],
     },
     // number-literal discriminant
     {
