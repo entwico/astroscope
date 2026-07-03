@@ -1,5 +1,11 @@
 # @astroscope/eslint-plugin
 
+## 0.4.1
+
+### Patch Changes
+
+- 1387287: no-excess-jsx-props no longer reports false excess props when a discriminated-union has a union-of-literals discriminant
+
 ## 0.4.0
 
 ### Minor Changes
