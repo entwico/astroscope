@@ -1,5 +1,11 @@
 # @astroscope/eslint-plugin-i18n
 
+## 0.2.1
+
+### Patch Changes
+
+- 5a2ec4d: no-raw-strings-in-jsx now ignores attributes ending in *Class
+
 ## 0.2.0
 
 ### Minor Changes
