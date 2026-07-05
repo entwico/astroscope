@@ -68,9 +68,11 @@ tester.run('no-raw-strings-in-jsx', noRawStringsInJsx, {
     // svg attributes
     { code: '<path d="M0 0L10 10" />;' },
     { code: '<svg viewBox="0 0 24 24" />;' },
-    // *ClassName / *classNames pattern
+    // *Class / *ClassName / *classNames pattern
     { code: '<div labelClassName="text-sm" />;' },
     { code: '<div pictureClassName="w-full" />;' },
+    { code: '<div bodyClass="bg-sv-gradient-hero" />;' },
+    { code: '<div wrapperClass="flex p-3" />;' },
     // classNames object prop with string values
     { code: `<Comp classNames={{ root: 'flex p-3', label: 'text-sm' }} />;` },
     // data-* pattern

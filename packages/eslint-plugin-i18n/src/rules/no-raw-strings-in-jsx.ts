@@ -145,7 +145,7 @@ export const DEFAULT_IGNORE_ATTRIBUTES = [
 
 // attribute name patterns — any attribute matching these is ignored
 const DEFAULT_IGNORE_ATTRIBUTE_PATTERNS = [
-  /classNames?$/i, // *ClassName, *classNames, *classname (e.g. labelClassName, classNames)
+  /class(names?)?$/i, // *Class, *ClassName, *classNames (e.g. bodyClass, labelClassName, classNames)
   /^data-/, // data-* attributes
   /^on[a-zA-Z]/, // event handlers (onclick, onClick, onChange, etc.)
 ];
