@@ -9,11 +9,10 @@ describe('compileMessage', () => {
     expect(fn()).toBe('Hello World');
   });
 
-  test('compiles variable interpolation', () => {
+  test('compiles variable interpolation without bidi isolation characters', () => {
     const fn = compileMessage('en', 'Hello {$name}');
 
-    // MF2 adds bidi isolation characters around variables
-    expect(fn({ name: 'World' })).toContain('World');
+    expect(fn({ name: 'World' })).toBe('Hello World');
   });
 
   test('compiles plural', () => {

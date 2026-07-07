@@ -4,7 +4,9 @@ import { DraftFunctions } from 'messageformat/functions';
 import type { CompiledTranslation, CompiledTranslations, RawTranslations } from './types.js';
 
 // enable draft functions for :currency, :date, :datetime, :time, :percent, :unit
-const mfOptions = { functions: DraftFunctions };
+// bidi isolation is disabled: the default wraps string placeholders in invisible
+// U+2068/U+2069 characters that end up in the DOM and copy-paste
+const mfOptions = { functions: DraftFunctions, bidiIsolation: 'none' as const };
 
 const cache = new Map<string, MessageFormat<string, string>>();
 
