@@ -1,5 +1,11 @@
 # @astroscope/spare-parts
 
+## 0.2.1
+
+### Patch Changes
+
+- 2aed559: SmoothHashScroll now updates the URL hash and leaves modifier-key clicks to the browser
+
 ## 0.2.0
 
 ### Minor Changes
