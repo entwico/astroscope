@@ -1,5 +1,11 @@
 # @astroscope/i18n
 
+## 0.6.1
+
+### Patch Changes
+
+- 6d10301: no more invisible bidi isolation characters around interpolated variables
+
 ## 0.6.0
 
 ### Minor Changes
