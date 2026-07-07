@@ -190,7 +190,7 @@ import { SmoothHashScroll } from '@astroscope/spare-parts/astro';
 <SmoothHashScroll />
 ```
 
-Delegates a single click listener that smooth-scrolls same-page `#anchor` links.
+Delegates a single click listener that smooth-scrolls same-page `#anchor` links and updates the URL hash for deep-linking.
 
 ## License
 

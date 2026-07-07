@@ -1,10 +1,13 @@
 ---
-// intercept clicks on same-page hash links and smoothly scroll to the target instead
-// of the browser's instant jump.
+// intercept plain left-clicks on same-page hash links and smoothly scroll to the target
 ---
 
 <script is:inline>
   document.body.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+
     let target = event.target;
 
     while (target && target !== document.body) {
@@ -19,10 +22,23 @@
         }
 
         if (hash.length > 1) {
-          const el = document.querySelector(hash);
+          let id;
+
+          try {
+            id = decodeURIComponent(hash.slice(1));
+          } catch {
+            id = hash.slice(1);
+          }
+
+          const el = document.getElementById(id);
 
           if (el) {
             event.preventDefault();
+
+            if (hash !== window.location.hash) {
+              history.pushState(null, '', hash);
+            }
+
             el.scrollIntoView({ behavior: 'smooth' });
           }
         }
