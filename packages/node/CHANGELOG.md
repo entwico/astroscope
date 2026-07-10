@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 1.0.1
+
+### Patch Changes
+
+- fc8bbe8: load env files before the boot module graph is evaluated
+
 ## 1.0.0
 
 ### Major Changes

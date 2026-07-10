@@ -1,5 +1,16 @@
 # @astroscope/wormhole
 
+## 1.1.0
+
+### Minor Changes
+
+- a4b3b60: open() with data that does not match the wormhole's type is now a compile error instead of being silently accepted
+- a4b3b60: open() accepts an array of [wormhole, data] pairs to open several wormholes in one call
+
+### Patch Changes
+
+- a4b3b60: get() outside an open() context now throws instead of returning undefined
+
 ## 1.0.0
 
 ### Major Changes
