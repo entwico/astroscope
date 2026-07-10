@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/node",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Opinionated, cloud-friendly Node adapter for Astro: boot lifecycle, health probes, request logging, telemetry, CSRF and static serving run as plain code around server.listen()",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,5 +1,25 @@
 # @astroscope/i18n
 
+## 1.0.0
+
+### Major Changes
+
+- 8eda3c5: first stable release
+
+### Minor Changes
+
+- 8eda3c5: `@astroscope/node` replaces `@astroscope/excludes` as a peer dependency; exclude patterns now come from `@astroscope/node/excludes`
+
+### Patch Changes
+
+- Updated dependencies [8eda3c5]
+- Updated dependencies [8eda3c5]
+- Updated dependencies [8eda3c5]
+- Updated dependencies [8eda3c5]
+- Updated dependencies [8eda3c5]
+- Updated dependencies [8eda3c5]
+  - @astroscope/node@1.0.0
+
 ## 0.6.1
 
 ### Patch Changes

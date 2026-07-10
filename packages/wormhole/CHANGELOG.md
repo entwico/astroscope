@@ -1,5 +1,11 @@
 # @astroscope/wormhole
 
+## 1.0.0
+
+### Major Changes
+
+- 8eda3c5: expose wormhole values as deeply readonly
+
 ## 0.3.0
 
 ### Minor Changes

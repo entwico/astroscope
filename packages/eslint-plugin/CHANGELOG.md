@@ -1,5 +1,11 @@
 # @astroscope/eslint-plugin
 
+## 1.0.0
+
+### Major Changes
+
+- 8eda3c5: absorb `@astroscope/eslint-plugin-i18n`: the i18n rules ship as a second config set (`configs.i18n`) with unchanged rule ids (`@astroscope/i18n/...`)
+
 ## 0.4.1
 
 ### Patch Changes

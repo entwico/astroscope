@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/wormhole",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Share dynamic server data with React islands and client scripts — typed, reactive",
   "type": "module",
   "main": "./dist/index.js",
