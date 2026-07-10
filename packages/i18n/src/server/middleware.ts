@@ -1,4 +1,4 @@
-import { type ExcludePattern, RECOMMENDED_EXCLUDES, shouldExclude } from '@astroscope/excludes';
+import { type ExcludePattern, RECOMMENDED_EXCLUDES, shouldExclude } from '@astroscope/node/excludes';
 import type { APIContext, MiddlewareHandler } from 'astro';
 import { runWithContext } from './context.js';
 import { i18n } from './i18n.js';
@@ -12,7 +12,7 @@ export type I18nMiddlewareOptions = {
    *
    * @example
    * ```ts
-   * import { RECOMMENDED_EXCLUDES } from '@astroscope/excludes';
+   * import { RECOMMENDED_EXCLUDES } from '@astroscope/node/excludes';
    *
    * // extend defaults
    * createI18nMiddleware({

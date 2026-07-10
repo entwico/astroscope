@@ -5,6 +5,7 @@ import tsParser from '@typescript-eslint/parser';
 import * as astroEslintParser from 'astro-eslint-parser';
 import type { ESLint, Linter, Rule } from 'eslint';
 
+import { i18nConfigs } from './i18n.js';
 import { islandNotSerializable } from './rules/island-not-serializable.js';
 import { islandReadonly } from './rules/island-readonly.js';
 import { noClientDirectiveOnAstroComponent } from './rules/no-client-directive-on-astro-component.js';
@@ -69,5 +70,11 @@ plugin.configs.recommended = [
     },
   },
 ] satisfies Linter.Config[];
+
+// i18n rules for @astroscope/i18n projects, opt-in alongside `recommended`
+plugin.configs.i18n = i18nConfigs;
+
+export { i18nPlugin } from './i18n.js';
+export { DEFAULT_IGNORE_ATTRIBUTES } from './rules/i18n/no-raw-strings-in-jsx.js';
 
 export default plugin;

@@ -14,7 +14,7 @@ HTTP proxy for Astro — strangler fig migrations and API gateway. Gradually mig
 Astro has no built-in proxy support ([roadmap discussion #665](https://github.com/withastro/roadmap/discussions/665)). This package adds it, for two patterns:
 
 - **Strangler fig migration** - Gradually migrate any website to Astro - WordPress, Rails, Django, .NET, PHP, or anything else. New Astro pages take precedence while unhandled requests fall through to your existing site.
-- **Standalone gateway** - Run Astro in standalone mode while proxying to your backend APIs. No need to embed Astro as middleware in Express/Fastify just because you need features like startup hooks or API proxying - use [`@astroscope/boot`](../boot) for lifecycle and this package for proxying.
+- **Standalone gateway** - Run Astro in standalone mode while proxying to your backend APIs. No need to embed Astro as middleware in Express/Fastify just because you need features like startup hooks or API proxying - use [`@astroscope/node`](../node) for lifecycle and this package for proxying.
 
 ## Installation
 

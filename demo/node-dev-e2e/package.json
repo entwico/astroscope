@@ -1,0 +1,13 @@
+{
+  "name": "demo-node-dev-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build"
+  },
+  "dependencies": {
+    "@astroscope/node": "workspace:*",
+    "astro": "^7.0.3"
+  }
+}

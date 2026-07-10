@@ -22,6 +22,7 @@ Astro recommends [nanostores](https://docs.astro.build/en/recipes/sharing-state/
 
 - **No secrets in wormholes.** All wormhole data is serialized into an inline `<script>` tag and sent to the browser. Never store tokens, API keys, credentials, or any sensitive data in a wormhole.
 - **`set()` is client-only.** Calling `set()` does not work on the server. Use `open(wormhole, data, fn)` from `@astroscope/wormhole/server` to populate data in middleware.
+- **Values are deeply readonly.** `get()`, `subscribe()` and `useWormhole()` expose the value as `DeepReadonly<T>` — in-place mutation would silently bypass subscribers (and on the server would corrupt the request-scoped store). The only way to update is `set()` with a new value: `wh.set({ ...wh.get(), count: 1 })`.
 
 ## Examples
 
@@ -180,11 +181,23 @@ const wh = defineWormhole<{ count: number }>('counter');
 
 | Method             | Description                                                                                         |
 | ------------------ | --------------------------------------------------------------------------------------------------- |
-| `wh.get()`         | Read current value (from `AsyncLocalStorage` on server, from `globalThis` or local store on client) |
-| `wh.set(data)`     | Update value and notify all subscribers (client-side)                                               |
+| `wh.get()`         | Read current value as `DeepReadonly<T>` (from `AsyncLocalStorage` on server, from `globalThis` or local store on client) |
+| `wh.set(data)`     | Replace value with a new one and notify all subscribers (client-side)                               |
 | `wh.subscribe(fn)` | Listen for changes, returns unsubscribe function                                                    |
 | `wh.name`          | The wormhole name                                                                                   |
 | `wh.key`           | The internal `globalThis` key                                                                       |
+
+### `DeepReadonly<T>`
+
+Exported helper type — recursively `readonly` version of `T`. Wormhole values are exposed with this type; use it in your own function signatures when passing wormhole data around:
+
+```ts
+import type { DeepReadonly } from '@astroscope/wormhole';
+
+function isWithinCart(cart: DeepReadonly<Cart>, id: string) {
+  return cart.items.some((item) => item.productId === id);
+}
+```
 
 ### `open(wh, data, fn)` <sub>server only</sub>
 

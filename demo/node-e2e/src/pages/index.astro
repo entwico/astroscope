@@ -1,0 +1,16 @@
+---
+import { Island } from '../components/Island';
+import { getSingleton } from '../server/singleton';
+
+const state = getSingleton();
+---
+
+<html lang="en">
+  <head>
+    <title>node e2e</title>
+  </head>
+  <body>
+    <p id="state">{state}</p>
+    <Island client:load />
+  </body>
+</html>

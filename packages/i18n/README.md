@@ -31,7 +31,7 @@ i18n for Astro + React islands — automatic tree-shaking, parallel loading, any
 ## Installation
 
 ```bash
-npm install @astroscope/i18n @astroscope/boot @astroscope/excludes
+npm install @astroscope/i18n @astroscope/node
 ```
 
 ## Usage
@@ -41,12 +41,13 @@ npm install @astroscope/i18n @astroscope/boot @astroscope/excludes
 ```ts
 // astro.config.ts
 import { defineConfig } from 'astro/config';
-import boot from '@astroscope/boot';
+import node from '@astroscope/node';
 import i18n from '@astroscope/i18n';
 
 export default defineConfig({
+  output: 'server',
+  adapter: node(),
   integrations: [
-    boot(),
     i18n(),
   ],
 });
@@ -119,7 +120,7 @@ By default, `RECOMMENDED_EXCLUDES` (static assets like `/_astro/`) are excluded 
 ```ts
 import { sequence } from 'astro:middleware';
 import { createI18nChunkMiddleware, createI18nMiddleware, i18n } from '@astroscope/i18n';
-import { RECOMMENDED_EXCLUDES } from '@astroscope/excludes';
+import { RECOMMENDED_EXCLUDES } from '@astroscope/node/excludes';
 
 export const onRequest = sequence(
   createI18nChunkMiddleware(),

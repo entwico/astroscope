@@ -1,4 +1,4 @@
-import type { Wormhole } from './types.js';
+import type { DeepReadonly, Wormhole } from './types.js';
 
 /**
  * Define a wormhole that transfers state from server middleware to client components.
@@ -7,25 +7,25 @@ import type { Wormhole } from './types.js';
  * Never store secrets (tokens, API keys, credentials) in a wormhole.
  */
 export function defineWormhole<T>(name: string): Wormhole<T> {
-  const listeners = new Set<(data: T) => void>();
+  const listeners = new Set<(data: DeepReadonly<T>) => void>();
   const key = `__wormhole_${name}__`;
-  let store: T | undefined;
+  let store: DeepReadonly<T> | undefined;
 
   return {
     name,
     key,
 
-    get(): T {
+    get(): DeepReadonly<T> {
       if (store !== undefined) return store;
 
       const getter = (globalThis as any)[key];
 
-      if (typeof getter === 'function') return getter() as T;
+      if (typeof getter === 'function') return getter() as DeepReadonly<T>;
 
       throw new Error(`wormhole "${name}" is not initialized`);
     },
 
-    set(data: T): void {
+    set(data: DeepReadonly<T>): void {
       if (typeof (globalThis as any).window === 'undefined') {
         throw new Error(
           `wormhole "${name}" set() cannot be called on the server as it is not request-scoped; use open(wormhole, data, fn) from "@astroscope/wormhole/server" instead`,
@@ -37,7 +37,7 @@ export function defineWormhole<T>(name: string): Wormhole<T> {
       for (const fn of listeners) fn(data);
     },
 
-    subscribe(fn: (data: T) => void): () => void {
+    subscribe(fn: (data: DeepReadonly<T>) => void): () => void {
       listeners.add(fn);
 
       return () => {

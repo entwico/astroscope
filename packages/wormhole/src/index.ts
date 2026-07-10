@@ -1,2 +1,2 @@
 export { defineWormhole } from './define.js';
-export type { Wormhole } from './types.js';
+export type { DeepReadonly, Wormhole } from './types.js';

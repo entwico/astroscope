@@ -44,6 +44,33 @@ describe('defineWormhole', () => {
     });
   });
 
+  describe('readonly typing', () => {
+    test('exposes the stored value as deeply readonly while set() accepts mutable input', () => {
+      const wh = defineWormhole<{ cart: { items: string[] }; count: number }>('test-readonly');
+
+      const use = (): void => {
+        const data = wh.get();
+
+        // @ts-expect-error top-level properties are readonly
+        data.count = 1;
+        // @ts-expect-error nested properties are readonly
+        data.cart.items = [];
+        // @ts-expect-error nested arrays are readonly
+        data.cart.items.push('x');
+
+        wh.set({ cart: { items: ['fresh'] }, count: 1 });
+        wh.set({ ...data, count: 2 });
+
+        wh.subscribe((next) => {
+          // @ts-expect-error subscriber payload is readonly
+          next.count = 3;
+        });
+      };
+
+      expect(use).toBeTypeOf('function');
+    });
+  });
+
   describe('subscribe', () => {
     afterEach(() => {
       delete (globalThis as any).window;
