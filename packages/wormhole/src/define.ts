@@ -19,10 +19,13 @@ export function defineWormhole<T>(name: string): Wormhole<T> {
       if (store !== undefined) return store;
 
       const getter = (globalThis as any)[key];
+      const value = typeof getter === 'function' ? (getter() as DeepReadonly<T> | undefined) : undefined;
 
-      if (typeof getter === 'function') return getter() as DeepReadonly<T>;
+      if (value === undefined) {
+        throw new Error(`wormhole "${name}" is not initialized`);
+      }
 
-      throw new Error(`wormhole "${name}" is not initialized`);
+      return value;
     },
 
     set(data: DeepReadonly<T>): void {

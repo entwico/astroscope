@@ -19,7 +19,9 @@ export type DeepReadonly<T> = T extends (...args: never[]) => unknown
  * The stored value is exposed as deeply readonly — the only way to change it is `set()`
  * (client) or `open()` (server) with a new value, which keeps subscribers in sync.
  */
-export interface Wormhole<T> {
+// `in out` forces invariance: methods are bivariant in TS, so without it a
+// Wormhole<A> unifies into Wormhole<A | B> and mismatched open() data slips through
+export interface Wormhole<in out T> {
   readonly name: string;
   readonly key: string;
   get(): DeepReadonly<T>;

@@ -4,12 +4,20 @@ interface Props {
 }
 
 const { wormhole } = Astro.props;
-const data = wormhole.get();
+
+let data: unknown;
+
+try {
+  data = wormhole.get();
+} catch {
+  data = undefined;
+}
+
 const key = wormhole.key;
 ---
 
 {
-  data ? (
+  data !== undefined ? (
     <script is:inline define:vars={{ data, key }}>
       globalThis[key] = function(){return data;}
     </script>

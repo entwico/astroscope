@@ -102,7 +102,18 @@ export function register(ctx: InstrumentationContext) {
 }
 ```
 
-**`src/log.ts`** — pino logger *options* (or a factory), never a logger instance. The platform constructs the logger itself, after instrumentation, and adds a mixin that stamps `trace_id`/`span_id`/`trace_flags` onto every entry when a span is active.
+**`src/log.ts`** — pino logger *options* (a static object or a factory), never a logger instance. The platform constructs the logger itself, after instrumentation, and adds a mixin that stamps `trace_id`/`span_id`/`trace_flags` onto every entry when a span is active. This file runs after env loading and `src/config.ts`, so the options may safely read config.
+
+```typescript
+// src/log.ts
+import type { LoggerOptions } from '@astroscope/node/log';
+
+export default {
+  base: { app: 'my-app' },
+} satisfies LoggerOptions;
+```
+
+Use the factory form when the options depend on the runtime context:
 
 ```typescript
 // src/log.ts

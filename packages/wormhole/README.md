@@ -209,6 +209,17 @@ import { open } from '@astroscope/wormhole/server';
 return open(myWormhole, { count: 0 }, () => next());
 ```
 
+To open several wormholes at once, pass an array of `[wormhole, data]` pairs — each pair is type-checked against its own wormhole:
+
+```ts
+return open([
+  [cartStore, cart],
+  [sessionStore, session],
+], () => next());
+```
+
+Nested `open()` calls shadow only the wormholes they name; everything else stays visible.
+
 ### `useWormhole(wh)` <sub>React only</sub>
 
 React hook that reads the wormhole and re-renders on changes. Uses `useSyncExternalStore` internally.
