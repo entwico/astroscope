@@ -4,8 +4,6 @@ import { SpanStatusCode } from '@opentelemetry/api';
 import { createApp } from 'astro/app/entrypoint';
 import { setGetEnv } from 'astro/env/setup';
 // @ts-expect-error virtual module provided by the integration
-import * as bootModule from 'virtual:@astroscope/node/boot';
-// @ts-expect-error virtual module provided by the integration
 import { options } from 'virtual:@astroscope/node/config';
 import { activateHealthChecks, deactivateHealthChecks } from '../health/store.js';
 import { setBootContext } from '../lifecycle/context.js';
@@ -101,6 +99,9 @@ export async function startServer(overrides?: {
 
   const startup = startLifecycleSpan('startup');
 
+  // the boot module graph may read config at import time, so it must only be
+  // evaluated after preparePlatform() has loaded env and config
+  let bootModule: BootModule = {};
   let bootMs = 0;
   let warmupMs = 0;
 
@@ -117,9 +118,9 @@ export async function startServer(overrides?: {
   ): Promise<void> => {
     try {
       if (shutdownContext) {
-        await withLifecycleSpan('onShutdown', shutdownContext, () => runShutdown(bootModule as BootModule, context));
+        await withLifecycleSpan('onShutdown', shutdownContext, () => runShutdown(bootModule, context));
       } else {
-        await runShutdown(bootModule as BootModule, context);
+        await runShutdown(bootModule, context);
       }
     } catch (err) {
       log.error(err instanceof Error ? { err } : { reason: err }, 'shutdown failed');
@@ -146,7 +147,10 @@ export async function startServer(overrides?: {
   try {
     const bootStartedAt = performance.now();
 
-    await withLifecycleSpan('boot', startup.context, () => runStartup(bootModule as BootModule, context));
+    // @ts-expect-error virtual module provided by the integration
+    bootModule = (await import('virtual:@astroscope/node/boot')) as BootModule;
+
+    await withLifecycleSpan('boot', startup.context, () => runStartup(bootModule, context));
 
     bootMs = roundMs(performance.now() - bootStartedAt);
   } catch (err) {

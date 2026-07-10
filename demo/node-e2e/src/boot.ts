@@ -2,7 +2,10 @@ import type { BootContext } from '@astroscope/node';
 import { getBootContext } from '@astroscope/node/boot';
 import { registerHealthCheck } from '@astroscope/node/health';
 import { mountNativeHandler } from '@astroscope/node/native';
+import { config } from './config';
 import { disposeSingleton, getSingleton, initSingleton } from './server/singleton';
+
+const configValueAtImport = config.value;
 
 export function onStartup(context: BootContext): void {
   initSingleton();
@@ -43,7 +46,7 @@ export function onStartup(context: BootContext): void {
       ? 'ok'
       : 'mismatch';
 
-  console.log(`[e2e] startup dev=${context.dev} host=${context.host} port=${context.port} ctx=${ctx}`);
+  console.log(`[e2e] startup dev=${context.dev} host=${context.host} port=${context.port} ctx=${ctx} config=${configValueAtImport}`);
 }
 
 export function onShutdown(): void {

@@ -127,7 +127,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     // the port only opens after startup completes, so the successful fetch in
     // beforeAll plus this line proves the ordering; ctx=ok additionally proves
     // getBootContext() was stamped with the same context before onStartup ran
-    expect(stdout).toContain(`[e2e] startup dev=false host=127.0.0.1 port=${port} ctx=ok`);
+    expect(stdout).toContain(`[e2e] startup dev=false host=127.0.0.1 port=${port} ctx=ok config=default`);
   });
 
   test('renders an on-demand page using state initialized by onStartup', async () => {
@@ -535,6 +535,45 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ state: 'initialized' });
     });
+  });
+
+  describe('env loading order', () => {
+    test('boot graph module scope sees env vars loaded from CONFIG_PATH', async () => {
+      const envPort = port + 9;
+      const envServer = spawn('node', ['dist/server/entry.mjs'], {
+        cwd: fixtureRoot,
+        env: {
+          ...process.env,
+          CONFIG_PATH: 'e2e.env',
+          HOST: '127.0.0.1',
+          PORT: String(envPort),
+          HEALTH_HOST: '127.0.0.1',
+          HEALTH_PORT: String(port + 10),
+          OTEL_EXPORTER_PROMETHEUS_HOST: '127.0.0.1',
+          OTEL_EXPORTER_PROMETHEUS_PORT: String(port + 11),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      let output = '';
+
+      envServer.stdout!.on('data', (chunk: Buffer) => (output += chunk.toString()));
+      envServer.stderr!.on('data', (chunk: Buffer) => (output += chunk.toString()));
+
+      try {
+        const deadline = Date.now() + 15_000;
+
+        while (!output.includes('[e2e] startup') && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        expect(output).toContain(`[e2e] startup dev=false host=127.0.0.1 port=${envPort} ctx=ok config=from-env-file`);
+        expect(logLines(output).find((l) => l['msg'] === 'config loaded')).toMatchObject({ value: 'from-env-file' });
+      } finally {
+        envServer.kill('SIGKILL');
+        await new Promise((resolve) => envServer.once('exit', resolve));
+      }
+    }, 30_000);
   });
 
   describe('startup failure before logger construction', () => {
