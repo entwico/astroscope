@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 1.2.1
+
+### Patch Changes
+
+- cf035ea: no longer exclude favicon/robots/sitemap paths from request logging and tracing by default
+
 ## 1.2.0
 
 ### Minor Changes
