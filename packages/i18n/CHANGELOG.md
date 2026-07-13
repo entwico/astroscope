@@ -1,5 +1,15 @@
 # @astroscope/i18n
 
+## 1.0.1
+
+### Patch Changes
+
+- 9b5fb13: detectLocale tolerates whitespace around Accept-Language quality values
+- 9b5fb13: chunk hashes now account for empty-string translations
+- 9b5fb13: detectLocale returns undefined instead of throwing when i18n is not configured
+- 9b5fb13: windows file paths no longer get truncated in the extraction manifest
+- 9b5fb13: rich() now falls back to the key when no translation and no fallback exist, like t()
+
 ## 1.0.0
 
 ### Major Changes
