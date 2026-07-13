@@ -254,14 +254,14 @@ node({
   // request logging at the native handler. Enabled by default in production;
   // false disables it (the log proxy keeps working).
   logging: {
-    exclude: [{ prefix: '/internal/' }], // replaces RECOMMENDED_EXCLUDES + STATIC_EXCLUDES
+    exclude: [{ prefix: '/internal/' }], // replaces RECOMMENDED_EXCLUDES
     extended: false, // query/headers/client address (may capture sensitive data)
     dev: false, // also log requests in dev (astro narrates them already)
   },
 
   // platform telemetry. Enabled by default in production, off in dev; false disables.
   telemetry: {
-    exclude: [{ prefix: '/internal/' }], // replaces RECOMMENDED_EXCLUDES + STATIC_EXCLUDES
+    exclude: [{ prefix: '/internal/' }], // replaces RECOMMENDED_EXCLUDES
     prometheus: { host: '0.0.0.0', port: 9464 }, // false disables the reader
     dev: false, // start the SDK in dev too (once per process)
   },

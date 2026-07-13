@@ -2,8 +2,10 @@ import { type IncomingMessage, type Server, type ServerResponse, createServer } 
 import type { AddressInfo } from 'node:net';
 import { SpanStatusCode, context, trace } from '@opentelemetry/api';
 import { node, tracing } from '@opentelemetry/sdk-node';
+import pino, { type DestinationStream } from 'pino';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { type RequestInstrumentationConfig, createRequestInstrumentation } from './instrument';
+import { getLogStore } from './log/store';
 
 const exporter = new tracing.InMemorySpanExporter();
 
@@ -15,11 +17,21 @@ beforeAll(() => {
 });
 
 const servers: Server[] = [];
+const logLines: Record<string, unknown>[] = [];
+
+const sink: DestinationStream = {
+  write: (msg: string) => {
+    logLines.push(JSON.parse(msg) as Record<string, unknown>);
+  },
+};
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
 
   exporter.reset();
+
+  logLines.length = 0;
+  getLogStore().root = undefined;
 });
 
 async function startServer(
@@ -139,5 +151,133 @@ describe('request tracing', () => {
 
     expect(spans.filter((s) => s.name === 'GET')).toHaveLength(1);
     expect(spans.find((s) => s.name === 'GET')?.attributes['url.path']).toBe('/traced');
+  });
+
+  test('action requests are named after the action', async () => {
+    const url = await startServer((_req, res) => res.end('{}'));
+
+    await (await fetch(`${url}/_actions/checkout.submit/`, { method: 'POST' })).text();
+
+    const spans = await waitForSpans(2);
+
+    expect(spans.find((s) => s.name === 'ACTION checkout.submit')).toBeDefined();
+  });
+});
+
+describe('request logging', () => {
+  function enableLogging(): void {
+    getLogStore().root = pino({ base: null, timestamp: false }, sink);
+  }
+
+  async function waitForLog(): Promise<Record<string, unknown>> {
+    await vi.waitFor(() => expect(logLines.length).toBeGreaterThanOrEqual(1));
+
+    return logLines[0]!;
+  }
+
+  test('logs completion with timing fields and sets x-request-id', async () => {
+    enableLogging();
+
+    const url = await startServer(
+      (_req, res) => {
+        res.write('first chunk');
+
+        setTimeout(() => res.end(Buffer.from('rest')), 20);
+      },
+      { logging: { exclude: [], extended: false }, telemetry: false },
+    );
+
+    const response = await fetch(`${url}/page`);
+
+    await response.text();
+
+    const line = await waitForLog();
+
+    expect(line['msg']).toBe('request completed');
+    expect(line['level']).toBe(30);
+    expect(line['req']).toEqual({ method: 'GET', url: '/page' });
+    expect(line['responseTime']).toBeTypeOf('number');
+    expect(line['ttfb']).toBeTypeOf('number');
+    expect(line['ttfb'] as number).toBeLessThanOrEqual(line['responseTime'] as number);
+    expect(line['responseSize']).toBe(Buffer.byteLength('first chunk') + Buffer.byteLength('rest'));
+    expect(line['reqId']).toBe(response.headers.get('x-request-id'));
+  });
+
+  test('reuses a valid incoming x-request-id', async () => {
+    enableLogging();
+
+    const url = await startServer((_req, res) => res.end('ok'), {
+      logging: { exclude: [], extended: false },
+      telemetry: false,
+    });
+
+    const response = await fetch(`${url}/page`, { headers: { 'x-request-id': 'upstream-id.1' } });
+
+    await response.text();
+
+    const line = await waitForLog();
+
+    expect(line['reqId']).toBe('upstream-id.1');
+    expect(response.headers.get('x-request-id')).toBe('upstream-id.1');
+  });
+
+  test('logs 4xx as warn and 5xx as error', async () => {
+    enableLogging();
+
+    const url = await startServer(
+      (req, res) => {
+        res.statusCode = req.url === '/missing' ? 404 : 500;
+
+        res.end();
+      },
+      { logging: { exclude: [], extended: false }, telemetry: false },
+    );
+
+    await (await fetch(`${url}/missing`)).text();
+    await (await fetch(`${url}/broken`)).text();
+
+    await vi.waitFor(() => expect(logLines.length).toBe(2));
+
+    const missing = logLines.find((l) => (l['req'] as { url: string }).url === '/missing');
+    const broken = logLines.find((l) => (l['req'] as { url: string }).url === '/broken');
+
+    expect(missing?.['level']).toBe(40);
+    expect(broken?.['level']).toBe(50);
+  });
+
+  test('logs aborted requests', async () => {
+    enableLogging();
+
+    const url = await startServer(() => {}, { logging: { exclude: [], extended: false }, telemetry: false });
+
+    const controller = new AbortController();
+    const request = fetch(`${url}/hanging`, { signal: controller.signal }).catch(() => undefined);
+
+    setTimeout(() => controller.abort(), 30);
+
+    await request;
+
+    const line = await waitForLog();
+
+    expect(line['msg']).toBe('request aborted');
+    expect(line['aborted']).toBe(true);
+  });
+
+  test('extended logging includes query, headers and remote address', async () => {
+    enableLogging();
+
+    const url = await startServer((_req, res) => res.end('ok'), {
+      logging: { exclude: [], extended: true },
+      telemetry: false,
+    });
+
+    await (await fetch(`${url}/search?q=astro`, { headers: { 'x-forwarded-for': '10.0.0.1, 10.0.0.2' } })).text();
+
+    const line = await waitForLog();
+    const req = line['req'] as Record<string, unknown>;
+
+    expect(req['query']).toBe('q=astro');
+    expect(req['remoteAddress']).toBe('10.0.0.1');
+    expect((req['headers'] as Record<string, unknown>)['x-forwarded-for']).toBe('10.0.0.1, 10.0.0.2');
   });
 });

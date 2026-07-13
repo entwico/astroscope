@@ -48,7 +48,7 @@ export interface NodeHealthOptions {
 export interface NodeLoggingOptions {
   /**
    * Paths excluded from request logging. Replaces the default
-   * (`RECOMMENDED_EXCLUDES` + `STATIC_EXCLUDES`) entirely when provided.
+   * (`RECOMMENDED_EXCLUDES`) entirely when provided.
    */
   exclude?: ExcludePattern[] | undefined;
 
@@ -84,7 +84,7 @@ export interface NodePrometheusOptions {
 export interface NodeTelemetryOptions {
   /**
    * Paths excluded from request tracing and metrics. Replaces the default
-   * (`RECOMMENDED_EXCLUDES` + `STATIC_EXCLUDES`) entirely when provided.
+   * (`RECOMMENDED_EXCLUDES`) entirely when provided.
    */
   exclude?: ExcludePattern[] | undefined;
 

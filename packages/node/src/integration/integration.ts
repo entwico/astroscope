@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AstroConfig, AstroIntegration } from 'astro';
 import { createDevMachinery } from '../dev-mode/machinery.js';
-import { type ExcludePattern, RECOMMENDED_EXCLUDES, STATIC_EXCLUDES } from '../excludes/excludes.js';
+import { type ExcludePattern, RECOMMENDED_EXCLUDES } from '../excludes/excludes.js';
 import { serializeExcludePatterns } from '../excludes/serialize.js';
 import { createRequestInstrumentation } from '../observability/instrument.js';
 import { preparePlatform } from '../platform/prepare.js';
@@ -27,8 +27,7 @@ const RESOLVED_INSTRUMENTATION_ENTRY_VIRTUAL_MODULE_ID = `\0${INSTRUMENTATION_EN
 const RESOLVED_LOG_ENTRY_VIRTUAL_MODULE_ID = `\0${LOG_ENTRY_VIRTUAL_MODULE_ID}`;
 
 const SERVER_ENVIRONMENTS = ['ssr', 'prerender', 'astro'];
-
-const DEFAULT_REQUEST_EXCLUDES: ExcludePattern[] = [...RECOMMENDED_EXCLUDES, ...STATIC_EXCLUDES];
+const DEFAULT_REQUEST_EXCLUDES: ExcludePattern[] = [...RECOMMENDED_EXCLUDES];
 
 function resolveHost(host: string | boolean | undefined): string {
   if (typeof host === 'string') return host;
