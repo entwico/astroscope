@@ -1,5 +1,15 @@
 # @astroscope/node
 
+## 1.2.0
+
+### Minor Changes
+
+- 8e43e05: request traces include a response:first-byte child span and a ttfb attribute
+
+### Patch Changes
+
+- 8e43e05: request traces no longer parent under the startup trace
+
 ## 1.1.0
 
 ### Minor Changes
