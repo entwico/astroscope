@@ -94,7 +94,7 @@ export function rich<T = unknown>(
   const state = getI18nState();
 
   // look up raw translation, fall back to meta.fallback or key
-  const raw = state?.translations[key] ?? normalizedMeta.fallback ?? key;
+  const raw = state?.translations[key] || normalizedMeta.fallback || key;
 
   const parts = formatMessageToParts(state?.locale ?? '', raw, values);
 

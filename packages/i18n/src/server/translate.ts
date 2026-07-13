@@ -117,8 +117,8 @@ export function rich<T = unknown>(
   const ctx = getContext();
   const locale = ctx?.locale ?? i18n.getConfig().defaultLocale;
 
-  // get raw translation string - prefer from context, then fallback
-  const raw = ctx?.rawTranslations[key] ?? normalizedMeta.fallback ?? key;
+  // get raw translation string - prefer from context, then fallback, then key
+  const raw = ctx?.rawTranslations[key] || normalizedMeta.fallback || key;
 
   const parts = formatMessageToParts(locale, raw, values);
 

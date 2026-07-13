@@ -5,11 +5,9 @@ import { i18n } from './i18n.js';
  * Returns best match from configured locales, or undefined if none match.
  */
 export function detectLocale(request: Request): string | undefined {
-  const config = i18n.getConfig();
+  if (!i18n.isConfigured()) return undefined;
 
-  if (!config) return undefined;
-
-  const { locales } = config;
+  const { locales } = i18n.getConfig();
   const acceptLanguage = request.headers.get('accept-language');
 
   if (!acceptLanguage) return undefined;
@@ -17,7 +15,8 @@ export function detectLocale(request: Request): string | undefined {
   const preferred = acceptLanguage
     .split(',')
     .map((part) => {
-      const [lang, q = 'q=1'] = part.trim().split(';');
+      // optional whitespace around `;` is legal per rfc 9110
+      const [lang, q = 'q=1'] = part.split(';').map((s) => s.trim());
       const baseLang = lang?.split('-')[0]?.toLowerCase();
 
       return {

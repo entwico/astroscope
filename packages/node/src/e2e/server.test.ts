@@ -441,7 +441,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     });
 
     test('excluded paths produce no request log', async () => {
-      await fetch(`${baseUrl}/favicon.ico`);
+      await fetch(`${baseUrl}/_astro/missing.css`);
       await fetch(`${baseUrl}/api`);
 
       await waitFor(
@@ -450,9 +450,9 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
         'subsequent request log',
       );
 
-      const faviconLines = logLines(stdout).filter((l) => (l['req'] as any)?.url === '/favicon.ico');
+      const excludedLines = logLines(stdout).filter((l) => (l['req'] as any)?.url === '/_astro/missing.css');
 
-      expect(faviconLines).toEqual([]);
+      expect(excludedLines).toEqual([]);
     });
   });
 

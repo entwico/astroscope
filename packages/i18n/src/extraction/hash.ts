@@ -15,8 +15,8 @@ function hashString(str: string): string {
 export function computeChunkHash(translations: RawTranslations, keys: string[]): string {
   const relevantTranslations: RawTranslations = {};
 
-  for (const key of keys.sort()) {
-    if (translations[key]) {
+  for (const key of [...keys].sort()) {
+    if (translations[key] !== undefined) {
       relevantTranslations[key] = translations[key];
     }
   }

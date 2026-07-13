@@ -54,7 +54,9 @@ export function getManifest(): ExtractionManifest {
     // make file paths relative to project root for better readability
     // and avoiding leaking absolute paths from dev or ci environments
     files: key.files.map((fileLocation) => {
-      const [filePath, line] = fileLocation.split(':');
+      // split on the trailing `:line` only — the path itself may contain colons (windows drive letters)
+      const match = /^(.+):(\d+)$/.exec(fileLocation);
+      const [filePath, line] = match ? [match[1], match[2]] : [fileLocation, undefined];
 
       if (!filePath) return fileLocation;
 
