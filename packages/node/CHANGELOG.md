@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 1.1.0
+
+### Minor Changes
+
+- 75a3b38: serve HTTPS when SERVER_CERT_PATH and SERVER_KEY_PATH are set
+
 ## 1.0.1
 
 ### Patch Changes
