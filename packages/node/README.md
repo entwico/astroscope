@@ -15,12 +15,12 @@ Opinionated, cloud-friendly Node adapter for Astro: boot lifecycle, health probe
 - **Native mounts** — http-native handlers (`oidc-provider`, ACME) mounted on the adapter's server
 - **Build tweaks** — SSR sourcemaps, SSR effect stripping
 - **Dev restart machinery** — changes to the boot file or entry seams restart the dev server behind a holding page
+- **HTTPS for development** — `SERVER_CERT_PATH` / `SERVER_KEY_PATH` serve TLS directly for local runs of the built server ([HTTPS](#https)); in production, terminate TLS at the ingress
 
 ## What it does NOT do — beware
 
 The adapter assumes a container behind a load balancer / reverse proxy (Kubernetes, Docker + ingress). Outside that setup, several defaults are wrong for you:
 
-- **No TLS.** Plain HTTP only — terminate TLS at the ingress.
 - **Opens `0.0.0.0:9090` in production** — the health probe server. Meant for the kubelet; do not expose it publicly.
 - **Opens `0.0.0.0:9464` in production** — the Prometheus metrics reader. Same: cluster-internal only.
 - **Trusts any `Host` / `X-Forwarded-Host`** — sets `security.allowedDomains: [{}]` (unless you set it yourself), because the reverse proxy is expected to control these headers. Without one, host header injection is possible.
@@ -102,7 +102,7 @@ export function register(ctx: InstrumentationContext) {
 }
 ```
 
-**`src/log.ts`** — pino logger *options* (a static object or a factory), never a logger instance. The platform constructs the logger itself, after instrumentation, and adds a mixin that stamps `trace_id`/`span_id`/`trace_flags` onto every entry when a span is active. This file runs after env loading and `src/config.ts`, so the options may safely read config.
+**`src/log.ts`** — pino logger _options_ (a static object or a factory), never a logger instance. The platform constructs the logger itself, after instrumentation, and adds a mixin that stamps `trace_id`/`span_id`/`trace_flags` onto every entry when a span is active. This file runs after env loading and `src/config.ts`, so the options may safely read config.
 
 ```typescript
 // src/log.ts
@@ -235,14 +235,14 @@ node({
   // boot lifecycle; false disables it. Skipped automatically when no boot file exists.
   boot: {
     entry: 'src/boot.ts', // default: src/boot.ts or src/boot/index.ts
-    watch: true,          // dev: restart the dev server on boot-dependency changes
+    watch: true, // dev: restart the dev server on boot-dependency changes
   },
 
   // Kubernetes-style probes on a separate port. Enabled by default in
   // production (never active in dev); false disables.
   health: {
     host: '0.0.0.0', // falls back to HEALTH_HOST env, then 0.0.0.0 (kubelet probes hit the pod IP)
-    port: 9090,      // falls back to HEALTH_PORT env, then 9090
+    port: 9090, // falls back to HEALTH_PORT env, then 9090
   },
 
   // CSRF protection (origin check for POST/PUT/PATCH/DELETE with exclusions).
@@ -255,33 +255,47 @@ node({
   // false disables it (the log proxy keeps working).
   logging: {
     exclude: [{ prefix: '/internal/' }], // replaces RECOMMENDED_EXCLUDES + STATIC_EXCLUDES
-    extended: false,                     // query/headers/client address (may capture sensitive data)
-    dev: false,                          // also log requests in dev (astro narrates them already)
+    extended: false, // query/headers/client address (may capture sensitive data)
+    dev: false, // also log requests in dev (astro narrates them already)
   },
 
   // platform telemetry. Enabled by default in production, off in dev; false disables.
   telemetry: {
     exclude: [{ prefix: '/internal/' }], // replaces RECOMMENDED_EXCLUDES + STATIC_EXCLUDES
     prometheus: { host: '0.0.0.0', port: 9464 }, // false disables the reader
-    dev: false,                          // start the SDK in dev too (once per process)
+    dev: false, // start the SDK in dev too (once per process)
   },
 
   bodySizeLimit: 1024 * 1024 * 1024, // request body limit in bytes
-  shutdownTimeout: 10_000,           // ms to wait for in-flight requests on shutdown
+  shutdownTimeout: 10_000, // ms to wait for in-flight requests on shutdown
 });
 ```
 
+## HTTPS
+
+The built server serves plain HTTP — in production, TLS is expected to terminate at the ingress. For local runs of the built server (e.g. auth flows that require a secure origin), set `SERVER_CERT_PATH` and `SERVER_KEY_PATH` to serve HTTPS directly — the same contract as `@astrojs/node`:
+
+```sh
+SERVER_CERT_PATH=./cert/tls.crt
+SERVER_KEY_PATH=./cert/tls.key
+```
+
+Both must be set — startup fails if only one is present. Since env files load before the server starts listening, the variables may live in `.env` (or the file pointed to by `CONFIG_PATH`) instead of the shell environment.
+
+This only affects the built server. The dev server is Vite's — configure `vite.server.https` in `astro.config` for HTTPS in dev.
+
 ## Environment variables
 
-| Variable | Effect |
-|----------|--------|
-| `HOST` / `PORT` | Override the listen address at runtime |
-| `HEALTH_HOST` / `HEALTH_PORT` | Override the health probe address (when not set in options) |
-| `CONFIG_PATH` | Env file to load at startup (falls back to `./.env`) |
-| `OTEL_EXPORTER_PROMETHEUS_HOST` / `OTEL_EXPORTER_PROMETHEUS_PORT` | Override the Prometheus reader address |
-| `OTEL_SDK_DISABLED=true` | Disable the telemetry SDK entirely |
-| standard `OTEL_*` | Exporter/resource configuration (e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`) |
-| `ASTROSCOPE_NODE_AUTOSTART=disabled` | Build the entry without starting the server (exports `startServer()`) |
+| Variable                                                          | Effect                                                                                                    |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `HOST` / `PORT`                                                   | Override the listen address at runtime                                                                    |
+| `SERVER_CERT_PATH` / `SERVER_KEY_PATH`                            | Serve HTTPS with the given certificate/key (see [HTTPS](#https))                                          |
+| `HEALTH_HOST` / `HEALTH_PORT`                                     | Override the health probe address (when not set in options)                                               |
+| `CONFIG_PATH`                                                     | Env file to load at startup (falls back to `./.env`)                                                      |
+| `OTEL_EXPORTER_PROMETHEUS_HOST` / `OTEL_EXPORTER_PROMETHEUS_PORT` | Override the Prometheus reader address                                                                    |
+| `OTEL_SDK_DISABLED=true`                                          | Disable the telemetry SDK entirely                                                                        |
+| standard `OTEL_*`                                                 | Exporter/resource configuration (e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`)                 |
+| `ASTROSCOPE_NODE_AUTOSTART=disabled`                              | Build the entry without starting the server (exports `startServer()`)                                     |
 
 ## Shutdown sequence
 

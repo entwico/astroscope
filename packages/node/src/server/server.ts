@@ -1,4 +1,6 @@
+import fs from 'node:fs';
 import http from 'node:http';
+import https from 'node:https';
 import { checks, server as healthServer, probes } from '@entwico/health-probes';
 import { SpanStatusCode } from '@opentelemetry/api';
 import { createApp } from 'astro/app/entrypoint';
@@ -52,6 +54,23 @@ async function warmupModules(): Promise<void> {
       );
     }
   }
+}
+
+/**
+ * TLS tokens from `SERVER_CERT_PATH` / `SERVER_KEY_PATH` (same contract as
+ * `@astrojs/node`). Read after env loading, so the paths may come from `.env`.
+ */
+function loadTlsOptions(): { cert: Buffer; key: Buffer } | undefined {
+  const certPath = process.env['SERVER_CERT_PATH'];
+  const keyPath = process.env['SERVER_KEY_PATH'];
+
+  if (!certPath && !keyPath) return undefined;
+
+  if (!certPath || !keyPath) {
+    throw new Error('SERVER_CERT_PATH and SERVER_KEY_PATH must both be set to serve HTTPS');
+  }
+
+  return { cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) };
 }
 
 export interface ServerHandle {
@@ -169,7 +188,15 @@ export async function startServer(overrides?: {
     telemetry: runtimeOptions.telemetry ? { exclude: runtimeOptions.telemetry.exclude } : false,
   });
 
-  const server = http.createServer((req, res) => {
+  let tls: { cert: Buffer; key: Buffer } | undefined;
+
+  try {
+    tls = loadTlsOptions();
+  } catch (err) {
+    await failStartup(err, 'failed to load TLS options');
+  }
+
+  const listener: http.RequestListener = (req, res) => {
     try {
       decodeURI(req.url ?? '');
     } catch {
@@ -184,7 +211,9 @@ export async function startServer(overrides?: {
 
       staticHandler(req, res, () => void appHandler(req, res));
     });
-  });
+  };
+
+  const server = tls ? https.createServer(tls, listener) : http.createServer(listener);
 
   try {
     await withLifecycleSpan('listen', startup.context, () => {
@@ -203,7 +232,15 @@ export async function startServer(overrides?: {
   startup.span.end();
 
   log.info(
-    { host, port, health: !!health, bootMs, warmupMs, totalMs: roundMs(performance.now() - startedAt) },
+    {
+      host,
+      port,
+      ...(tls && { https: true }),
+      health: !!health,
+      bootMs,
+      warmupMs,
+      totalMs: roundMs(performance.now() - startedAt),
+    },
     'server ready',
   );
 

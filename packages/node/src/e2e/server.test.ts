@@ -1,6 +1,8 @@
-import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import http from 'node:http';
+import https from 'node:https';
+import os from 'node:os';
 import path from 'node:path';
 import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -573,6 +575,128 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
         envServer.kill('SIGKILL');
         await new Promise((resolve) => envServer.once('exit', resolve));
       }
+    }, 30_000);
+  });
+
+  describe('https', () => {
+    const hasOpenssl = !skip && spawnSync('openssl', ['version'], { stdio: 'ignore' }).status === 0;
+
+    function tlsGet(url: string): Promise<RawResponse> {
+      return new Promise((resolve, reject) => {
+        const req = https.get(url, { rejectUnauthorized: false }, (res) => {
+          const chunks: Buffer[] = [];
+
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () =>
+            resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }),
+          );
+        });
+
+        req.on('error', reject);
+      });
+    }
+
+    test.skipIf(!hasOpenssl)(
+      'serves TLS when SERVER_CERT_PATH and SERVER_KEY_PATH are set',
+      async () => {
+        const certDir = mkdtempSync(path.join(os.tmpdir(), 'astroscope-tls-'));
+        const certPath = path.join(certDir, 'tls.crt');
+        const keyPath = path.join(certDir, 'tls.key');
+
+        const generated = spawnSync(
+          'openssl',
+          [
+            'req',
+            '-x509',
+            '-newkey',
+            'rsa:2048',
+            '-keyout',
+            keyPath,
+            '-out',
+            certPath,
+            '-days',
+            '2',
+            '-nodes',
+            '-subj',
+            '/CN=localhost',
+          ],
+          { stdio: 'ignore' },
+        );
+
+        expect(generated.status).toBe(0);
+
+        const tlsPort = port + 12;
+        const tlsUrl = `https://127.0.0.1:${tlsPort}`;
+        const tlsServer = spawn('node', ['dist/server/entry.mjs'], {
+          cwd: fixtureRoot,
+          env: {
+            ...process.env,
+            SERVER_CERT_PATH: certPath,
+            SERVER_KEY_PATH: keyPath,
+            HOST: '127.0.0.1',
+            PORT: String(tlsPort),
+            HEALTH_HOST: '127.0.0.1',
+            HEALTH_PORT: String(port + 13),
+            OTEL_EXPORTER_PROMETHEUS_HOST: '127.0.0.1',
+            OTEL_EXPORTER_PROMETHEUS_PORT: String(port + 14),
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        let output = '';
+
+        tlsServer.stdout!.on('data', (chunk: Buffer) => (output += chunk.toString()));
+        tlsServer.stderr!.on('data', (chunk: Buffer) => (output += chunk.toString()));
+
+        try {
+          const deadline = Date.now() + 15_000;
+          let res: RawResponse | undefined;
+
+          while (!res && Date.now() < deadline) {
+            res = await tlsGet(`${tlsUrl}/`).catch(() => undefined);
+
+            if (!res) await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+
+          if (!res) throw new Error(`timed out waiting for the TLS server\n--- server output ---\n${output}`);
+
+          expect(res.status).toBe(200);
+          expect(res.body.toString()).toContain('<p id="state">initialized</p>');
+          expect(logLines(output).find((l) => l['msg'] === 'server ready')).toMatchObject({ https: true });
+        } finally {
+          tlsServer.kill('SIGKILL');
+          await new Promise((resolve) => tlsServer.once('exit', resolve));
+          rmSync(certDir, { recursive: true, force: true });
+        }
+      },
+      30_000,
+    );
+
+    test('fails startup when only one of the TLS env vars is set', async () => {
+      const halfConfigured = spawn('node', ['dist/server/entry.mjs'], {
+        cwd: fixtureRoot,
+        env: {
+          ...process.env,
+          SERVER_CERT_PATH: '/nonexistent/tls.crt',
+          HOST: '127.0.0.1',
+          PORT: String(port + 15),
+          HEALTH_HOST: '127.0.0.1',
+          HEALTH_PORT: String(port + 16),
+          OTEL_EXPORTER_PROMETHEUS_HOST: '127.0.0.1',
+          OTEL_EXPORTER_PROMETHEUS_PORT: String(port + 17),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      let output = '';
+
+      halfConfigured.stdout!.on('data', (chunk: Buffer) => (output += chunk.toString()));
+      halfConfigured.stderr!.on('data', (chunk: Buffer) => (output += chunk.toString()));
+
+      const code = await new Promise<number | null>((resolve) => halfConfigured.once('exit', resolve));
+
+      expect(code).toBe(1);
+      expect(output).toContain('SERVER_CERT_PATH and SERVER_KEY_PATH must both be set');
     }, 30_000);
   });
 
