@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createMatcher } from '@entwico/dash/match';
-import { SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
+import { ROOT_CONTEXT, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
 import type { Logger } from 'pino';
 import type { ExcludePattern } from '../excludes/excludes.js';
 import { generateReqId } from './log/index.js';
@@ -110,10 +110,11 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
     };
 
     let span: ReturnType<typeof tracer.startSpan> | undefined;
+    let firstByteSpan: ReturnType<typeof tracer.startSpan> | undefined;
     let endActiveRequest: (() => void) | undefined;
 
     if (telemetry) {
-      const parentContext = propagation.extract(context.active(), req.headers);
+      const parentContext = propagation.extract(ROOT_CONTEXT, req.headers);
       const contentLength = req.headers['content-length'];
       const clientIp = getClientIp(req);
       const host = req.headers['host'];
@@ -136,6 +137,8 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
         parentContext,
       );
 
+      firstByteSpan = tracer.startSpan('response:first-byte', undefined, trace.setSpan(parentContext, span));
+
       endActiveRequest = recordHttpRequestStart(method);
     }
 
@@ -145,15 +148,26 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
     const originalWrite = res.write.bind(res);
     const originalEnd = res.end.bind(res);
 
+    const markFirstByte = (): void => {
+      if (firstByteTime !== undefined) return;
+
+      firstByteTime = performance.now();
+
+      if (firstByteSpan) {
+        firstByteSpan.setAttribute('http.response.status_code', res.statusCode);
+        firstByteSpan.end();
+      }
+    };
+
     res.write = ((chunk: unknown, ...rest: unknown[]) => {
-      firstByteTime ??= performance.now();
+      markFirstByte();
       responseSize += chunkSize(chunk);
 
       return (originalWrite as (...args: unknown[]) => boolean)(chunk, ...rest);
     }) as typeof res.write;
 
     res.end = ((chunk: unknown, ...rest: unknown[]) => {
-      firstByteTime ??= performance.now();
+      markFirstByte();
       responseSize += chunkSize(chunk);
 
       return (originalEnd as (...args: unknown[]) => ServerResponse)(chunk, ...rest);
@@ -168,6 +182,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
 
       const status = res.statusCode;
       const responseTime = performance.now() - startTime;
+      const ttfb = roundTime((firstByteTime ?? performance.now()) - startTime);
 
       if (requestLogger) {
         const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
@@ -176,7 +191,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
           {
             res: { statusCode: status },
             responseTime: roundTime(responseTime),
-            ttfb: roundTime((firstByteTime ?? performance.now()) - startTime),
+            ttfb,
             responseSize,
             ...(record.route && { route: record.route }),
             ...(aborted && { aborted: true }),
@@ -185,9 +200,15 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
         );
       }
 
+      if (firstByteSpan && firstByteTime === undefined) {
+        firstByteSpan.setStatus({ code: SpanStatusCode.ERROR, message: 'request aborted' });
+        firstByteSpan.end();
+      }
+
       if (span) {
         span.setAttribute('http.response.status_code', status);
         span.setAttribute('http.response.body.size', responseSize);
+        span.setAttribute('ttfb', ttfb);
 
         if (aborted || status >= 400) {
           span.setStatus({ code: SpanStatusCode.ERROR, message: aborted ? 'request aborted' : `HTTP ${status}` });
