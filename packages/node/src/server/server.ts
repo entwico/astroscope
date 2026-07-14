@@ -118,6 +118,8 @@ export async function startServer(overrides?: {
 
   const startup = startLifecycleSpan('startup');
 
+  log.info({ host, port }, 'starting');
+
   // the boot module graph may read config at import time, so it must only be
   // evaluated after preparePlatform() has loaded env and config
   let bootModule: BootModule = {};
@@ -254,7 +256,7 @@ export async function startServer(overrides?: {
   const doStop = async (): Promise<void> => {
     if (health) probes.ready.disable();
 
-    log.info('draining');
+    log.info('shutdown initiated');
 
     const drainStartedAt = performance.now();
     const shutdown = startLifecycleSpan('shutdown');
