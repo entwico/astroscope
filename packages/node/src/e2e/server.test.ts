@@ -753,12 +753,12 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
     const lines = logLines(stdout);
 
-    expect(lines.some((l) => l['msg'] === 'draining')).toBe(true);
+    expect(lines.some((l) => l['msg'] === 'shutdown initiated')).toBe(true);
 
     const complete = lines.find((l) => l['msg'] === 'shutdown complete');
 
     expect(complete).toBeDefined();
     expect(complete!['drainMs']).toBeTypeOf('number');
-    expect(stdout.indexOf('"draining"')).toBeLessThan(stdout.indexOf('[e2e] shutdown'));
+    expect(stdout.indexOf('"shutdown initiated"')).toBeLessThan(stdout.indexOf('[e2e] shutdown'));
   });
 });
