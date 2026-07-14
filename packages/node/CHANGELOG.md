@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 1.2.2
+
+### Patch Changes
+
+- cbe0235: log a `starting` line at boot and rename the shutdown log from `draining` to `shutdown initiated`
+
 ## 1.2.1
 
 ### Patch Changes
