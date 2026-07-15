@@ -144,6 +144,26 @@ Entries logged before the logger is constructed (env loading, config, instrument
 
 Request logging happens at the native handler on `finish`/`close`: real status code, response size, `ttfb`, aborted-vs-completed, and the route pattern (fed back by an internal astro middleware). An incoming `x-request-id` header is passed through (and echoed on the response); otherwise a short id is generated.
 
+### Reporting the route yourself
+
+The route comes from the route astro matched, which is wrong for a middleware that serves a request astro has no page for — one that rewrites via `next(url)`, or answers itself. Astro matches `/404` there, so the request is logged as `/404` despite its `200`, and every such request collapses into one `/404` bucket in the request duration metric. `overrideRequestRoute` lets the middleware report what it actually served:
+
+```typescript
+import { overrideRequestRoute } from '@astroscope/node/log';
+
+export const onRequest: MiddlewareHandler = (ctx, next) => {
+  const page = lookupPage(ctx.url.pathname);
+
+  if (!page) return next();
+
+  overrideRequestRoute('/cms/pages/[id]');
+
+  return next(`/cms/pages/${page.id}`);
+};
+```
+
+This fixes the log line, the metric and the server span name together. Pass a templated label, not a concrete path, so metric cardinality stays bounded. An overridden route always wins over the one astro matched, regardless of middleware order.
+
 The adapter itself emits exactly one info line on startup — `server ready { host, port, health, bootMs, warmupMs, totalMs }` — and `draining` / `shutdown complete { drainMs }` on the way down. Everything else is debug or error level.
 
 ## Telemetry

@@ -1,4 +1,5 @@
 import { type ExcludePattern, RECOMMENDED_EXCLUDES, shouldExclude } from '@astroscope/node/excludes';
+import { overrideRequestRoute } from '@astroscope/node/log';
 import type { APIContext, MiddlewareHandler } from 'astro';
 import { runWithContext } from './context.js';
 import { i18n } from './i18n.js';
@@ -32,6 +33,81 @@ export type I18nMiddlewareOptions = {
 
 const I18N_ENDPOINT_PREFIX = '/_i18n/';
 
+// astro has no route behind the chunk endpoint, so requests would otherwise be
+// logged and measured under whatever routing matched — typically `/404`
+const I18N_ENDPOINT_ROUTE = '/_i18n/[locale]/[chunk]';
+
+/**
+ * Serve a translation chunk. Returns `undefined` when the path isn't a chunk
+ * request, and the caller passes it on to astro.
+ */
+function createChunkResponse(pathname: string): Response | undefined {
+  if (!pathname.startsWith(I18N_ENDPOINT_PREFIX)) {
+    return undefined;
+  }
+
+  if (!i18n.isConfigured()) {
+    console.warn(`[@astroscope/i18n] not configured, passing through: ${pathname}`);
+
+    return undefined;
+  }
+
+  const path = pathname.slice(I18N_ENDPOINT_PREFIX.length);
+
+  // attempt to parse as efficient as possible
+  // expected path format: {locale}/{chunkName}.{hash}.js
+  // avoiding regex or split for performance
+  const slashIdx = path.indexOf('/');
+
+  if (slashIdx === -1) {
+    return undefined;
+  }
+
+  const locale = path.slice(0, slashIdx);
+
+  // validate locale against configured locales to prevent arbitrary locale injection
+  const config = i18n.getConfig();
+
+  if (!config.locales.includes(locale)) {
+    return new Response('/* unknown locale */', {
+      status: 404,
+      headers: { 'Content-Type': 'application/javascript' },
+    });
+  }
+
+  const rest = path.slice(slashIdx + 1);
+
+  if (!rest.endsWith('.js')) {
+    return undefined;
+  }
+
+  const withoutJs = rest.slice(0, -3);
+  const lastDotIdx = withoutJs.lastIndexOf('.');
+
+  if (lastDotIdx === -1) {
+    return undefined;
+  }
+
+  const chunkName = withoutJs.slice(0, lastDotIdx);
+  const body = i18n.getChunkBody(locale, chunkName);
+
+  if (!body) {
+    return new Response(`/* chunk not found: ${chunkName} */`, {
+      status: 404,
+      headers: { 'Content-Type': 'application/javascript' },
+    });
+  }
+
+  return new Response(body as BodyInit, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Content-Length': String(body.byteLength),
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
+  });
+}
+
 /**
  * Create the i18n chunk middleware that serves translation chunks at `/_i18n/` endpoints.
  *
@@ -53,72 +129,16 @@ const I18N_ENDPOINT_PREFIX = '/_i18n/';
  */
 export function createI18nChunkMiddleware(): MiddlewareHandler {
   return (ctx, next) => {
-    const { pathname } = ctx.url;
+    const response = createChunkResponse(ctx.url.pathname);
 
-    if (!pathname.startsWith(I18N_ENDPOINT_PREFIX)) {
+    if (!response) {
       return next();
     }
 
-    if (!i18n.isConfigured()) {
-      console.warn(`[@astroscope/i18n] not configured, passing through: ${pathname}`);
+    // this middleware, not astro's routing, is what serves the request
+    overrideRequestRoute(I18N_ENDPOINT_ROUTE);
 
-      return next();
-    }
-
-    const path = pathname.slice(I18N_ENDPOINT_PREFIX.length);
-
-    // attempt to parse as efficient as possible
-    // expected path format: {locale}/{chunkName}.{hash}.js
-    // avoiding regex or split for performance
-    const slashIdx = path.indexOf('/');
-
-    if (slashIdx === -1) {
-      return next();
-    }
-
-    const locale = path.slice(0, slashIdx);
-
-    // validate locale against configured locales to prevent arbitrary locale injection
-    const config = i18n.getConfig();
-
-    if (!config.locales.includes(locale)) {
-      return new Response('/* unknown locale */', {
-        status: 404,
-        headers: { 'Content-Type': 'application/javascript' },
-      });
-    }
-
-    const rest = path.slice(slashIdx + 1);
-
-    if (!rest.endsWith('.js')) {
-      return next();
-    }
-
-    const withoutJs = rest.slice(0, -3);
-    const lastDotIdx = withoutJs.lastIndexOf('.');
-
-    if (lastDotIdx === -1) {
-      return next();
-    }
-
-    const chunkName = withoutJs.slice(0, lastDotIdx);
-    const body = i18n.getChunkBody(locale, chunkName);
-
-    if (!body) {
-      return new Response(`/* chunk not found: ${chunkName} */`, {
-        status: 404,
-        headers: { 'Content-Type': 'application/javascript' },
-      });
-    }
-
-    return new Response(body as BodyInit, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/javascript; charset=utf-8',
-        'Content-Length': String(body.byteLength),
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
+    return response;
   };
 }
 

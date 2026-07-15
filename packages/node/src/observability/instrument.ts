@@ -105,7 +105,9 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
     const record: RequestRecord = {
       logger: requestLogger,
       url,
+      method,
       route: undefined,
+      routeOverride: false,
       actionName: isAction ? pathname.slice(ACTIONS_PREFIX.length).replace(/\/$/, '') : undefined,
     };
 

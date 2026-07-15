@@ -150,6 +150,9 @@ function createLogProxy(bindings: Bindings[]): LogProxy {
  */
 export const log: LogProxy = createLogProxy([]);
 
+// public surface for middleware that serves a route astro never matched
+export { overrideRequestRoute } from '../request-route.js';
+
 // re-exported so apps don't need a direct pino dependency for typing
 export type { Logger, LoggerOptions, Bindings } from 'pino';
 

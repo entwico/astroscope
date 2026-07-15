@@ -21,7 +21,9 @@ export interface BufferedEntry {
 export interface RequestRecord {
   logger: Logger | undefined;
   url: string;
+  method: string;
   route: string | undefined;
+  routeOverride: boolean;
   actionName: string | undefined;
 }
 

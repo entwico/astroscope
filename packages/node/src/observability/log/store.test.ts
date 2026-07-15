@@ -34,7 +34,9 @@ describe('getRequestRecord', () => {
     const record: RequestRecord = {
       logger: pino({ level: 'silent' }),
       url: '/x',
+      method: 'GET',
       route: undefined,
+      routeOverride: false,
       actionName: undefined,
     };
 

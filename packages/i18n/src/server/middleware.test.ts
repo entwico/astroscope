@@ -9,14 +9,20 @@ const mocks = vi.hoisted(() => ({
     chunks: Record<string, string[]>;
     imports: Record<string, string[]>;
   },
+  overrideRequestRoute: vi.fn(),
 }));
 
 vi.mock('virtual:@astroscope/i18n/manifest', () => ({
   getManifest: () => mocks.manifest,
 }));
 
+vi.mock('@astroscope/node/log', () => ({
+  overrideRequestRoute: mocks.overrideRequestRoute,
+}));
+
 async function load(options?: { configured?: boolean; manifest?: Partial<ExtractionManifest> }) {
   mocks.manifest = { keys: [], chunks: {}, imports: {}, ...options?.manifest };
+  mocks.overrideRequestRoute.mockClear();
 
   vi.resetModules();
 
@@ -63,6 +69,43 @@ describe('createI18nChunkMiddleware', () => {
 
     expect(next).toHaveBeenCalledOnce();
     expect(result).toBe(response);
+  });
+
+  test('reports the endpoint route for served chunks', async () => {
+    const { createI18nChunkMiddleware, i18n } = await load({ manifest: chunkManifest });
+
+    i18n.setTranslations('en', { 'cart.title': 'Cart' });
+
+    const result = await invoke(
+      createI18nChunkMiddleware(),
+      createCtx('/_i18n/en/Cart.Cabc.hash.js'),
+      createNext().next,
+    );
+
+    expect(result.status).toBe(200);
+    expect(mocks.overrideRequestRoute).toHaveBeenCalledWith('/_i18n/[locale]/[chunk]');
+  });
+
+  test('reports the endpoint route for chunk 404s', async () => {
+    const { createI18nChunkMiddleware } = await load({ manifest: chunkManifest });
+
+    const result = await invoke(
+      createI18nChunkMiddleware(),
+      createCtx('/_i18n/en/Nope.Cxyz.hash.js'),
+      createNext().next,
+    );
+
+    expect(result.status).toBe(404);
+    expect(mocks.overrideRequestRoute).toHaveBeenCalledWith('/_i18n/[locale]/[chunk]');
+  });
+
+  test('leaves the route alone when passing through to astro', async () => {
+    const { createI18nChunkMiddleware } = await load({ manifest: chunkManifest });
+
+    await invoke(createI18nChunkMiddleware(), createCtx('/some/page'), createNext().next);
+    await invoke(createI18nChunkMiddleware(), createCtx('/_i18n/en/Cart.Cabc.hash.css'), createNext().next);
+
+    expect(mocks.overrideRequestRoute).not.toHaveBeenCalled();
   });
 
   test('warns and passes through when not configured', async () => {

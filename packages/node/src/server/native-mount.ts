@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { trace } from '@opentelemetry/api';
 import { log } from '../observability/log/index.js';
-import { getRequestRecord } from '../observability/log/store.js';
+import { overrideRequestRoute } from '../observability/request-route.js';
 
 /**
  * Native mounts: raw `(req, res)` handlers dispatched before static/astro,
@@ -151,19 +150,9 @@ export function dispatchNativeMount(req: IncomingMessage, res: ServerResponse): 
 
   if (!mount) return false;
 
+  // the mount, not astro's routing, is what serves this request
   if (mount.name) {
-    const record = getRequestRecord();
-
-    if (record && !record.route) {
-      record.route = mount.name;
-    }
-
-    const span = trace.getActiveSpan();
-
-    if (span?.isRecording()) {
-      span.setAttribute('http.route', mount.name);
-      span.updateName(`${req.method ?? 'GET'} ${mount.name}`);
-    }
+    overrideRequestRoute(mount.name);
   }
 
   try {
