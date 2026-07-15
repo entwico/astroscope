@@ -752,13 +752,11 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     expect(shutdownIndex).toBeGreaterThan(startupIndex);
 
     const lines = logLines(stdout);
+    const initiatedIndex = lines.findIndex((l) => l['msg'] === 'shutdown initiated');
+    const completeIndex = lines.findIndex((l) => l['msg'] === 'shutdown complete');
 
-    expect(lines.some((l) => l['msg'] === 'shutdown initiated')).toBe(true);
-
-    const complete = lines.find((l) => l['msg'] === 'shutdown complete');
-
-    expect(complete).toBeDefined();
-    expect(complete!['drainMs']).toBeTypeOf('number');
-    expect(stdout.indexOf('"shutdown initiated"')).toBeLessThan(stdout.indexOf('[e2e] shutdown'));
+    expect(initiatedIndex).toBeGreaterThanOrEqual(0);
+    expect(completeIndex).toBeGreaterThan(initiatedIndex);
+    expect(lines[completeIndex]!['drainMs']).toBeTypeOf('number');
   });
 });
