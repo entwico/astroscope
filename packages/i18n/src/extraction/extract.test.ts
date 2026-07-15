@@ -1,15 +1,5 @@
-import type { AstroIntegrationLogger } from 'astro';
 import { describe, expect, test } from 'vitest';
 import { extractKeysFromFile } from './extract.js';
-
-const mockLogger = {
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  debug: () => {},
-  label: 'test',
-  fork: () => mockLogger,
-} as unknown as AstroIntegrationLogger;
 
 describe('extractKeysFromFile', () => {
   describe('TypeScript files', () => {
@@ -24,7 +14,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.ts',
         code,
-        logger: mockLogger,
       });
 
       expect(result.keys).toHaveLength(1);
@@ -43,7 +32,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.ts',
         code,
-        logger: mockLogger,
       });
 
       expect(result.keys).toHaveLength(1);
@@ -65,7 +53,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.ts',
         code,
-        logger: mockLogger,
       });
 
       expect(result.keys).toHaveLength(2);
@@ -88,7 +75,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.ts',
         code,
-        logger: mockLogger,
       });
 
       expect(result.keys).toHaveLength(1);
@@ -108,7 +94,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.ts',
         code,
-        logger: mockLogger,
       });
 
       expect(result.keys).toHaveLength(0);
@@ -127,7 +112,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.tsx',
         code,
-        logger: mockLogger,
       });
 
       expect(result.keys).toHaveLength(1);
@@ -147,7 +131,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.ts',
         code,
-        logger: mockLogger,
         stripFallbacks: true,
       });
 
@@ -166,7 +149,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.ts',
         code,
-        logger: mockLogger,
         stripFallbacks: true,
       });
 
@@ -185,7 +167,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'test.ts',
         code,
-        logger: mockLogger,
         stripFallbacks: false,
       });
 
@@ -208,7 +189,6 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'Page.astro',
         code,
-        logger: mockLogger,
       });
 
       expect(result.keys).toHaveLength(1);
@@ -229,11 +209,85 @@ describe('extractKeysFromFile', () => {
       const result = await extractKeysFromFile({
         filename: 'cart.astro',
         code,
-        logger: mockLogger,
       });
 
       expect(result.keys).toHaveLength(1);
       expect(result.keys[0]?.key).toBe('cart.title');
+    });
+  });
+
+  describe('non-extractable meta', () => {
+    const extract = (body: string) =>
+      extractKeysFromFile({
+        filename: 'test.ts',
+        code: `import { t } from '@astroscope/i18n/translate';\n${body}`,
+      });
+
+    test('reports no errors when every fallback is a static literal', async () => {
+      const result = await extract(`
+        const a = t('a', 'plain');
+        const b = t('b', { fallback: 'object form' });
+        const c = t('c', \`untagged template\`);
+      `);
+
+      expect(result.errors).toEqual([]);
+    });
+
+    test('reports a template literal fallback with expressions', async () => {
+      const result = await extract('const x = t("greeting", `Hello ${name}`);');
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.key).toBe('greeting');
+      expect(result.errors[0]?.reason).toContain('template literal with expressions');
+    });
+
+    test('reports a fallback built by concatenation', async () => {
+      const result = await extract('const x = t("greeting", { fallback: "Hello " + name });');
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.key).toBe('greeting');
+      expect(result.errors[0]?.reason).toContain('fallback is not a static string');
+    });
+
+    test('reports meta that is neither a string nor an object literal', async () => {
+      const result = await extract('const x = t("greeting", someMeta);');
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.reason).toContain('neither a static string nor an object literal');
+    });
+
+    test('reports a spread in the meta object', async () => {
+      const result = await extract('const x = t("greeting", { ...base, description: "d" });');
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.reason).toContain('spread element');
+    });
+
+    test('reports a non-static per-variable fallback', async () => {
+      const result = await extract(
+        'const x = t("greeting", { fallback: "Hi {$name}", variables: { name: { fallback: dyn } } });',
+      );
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.reason).toContain('variable "name.fallback" is not a static string');
+    });
+
+    test('carries the file and reports each offending call separately', async () => {
+      const result = await extract(`
+        const a = t('one', \`a \${x}\`);
+        const b = t('two', \`b \${y}\`);
+      `);
+
+      expect(result.errors.map((e) => e.key)).toEqual(['one', 'two']);
+      expect(result.errors.every((e) => e.file.endsWith('test.ts'))).toBe(true);
+    });
+
+    test('still extracts the key so the manifest stays complete', async () => {
+      const result = await extract('const x = t("greeting", `Hello ${name}`);');
+
+      expect(result.keys).toHaveLength(1);
+      expect(result.keys[0]?.key).toBe('greeting');
+      expect(result.keys[0]?.meta.fallback).toBe('');
     });
   });
 });

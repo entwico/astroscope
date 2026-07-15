@@ -91,8 +91,9 @@
     "@astrojs/compiler": "^4.0.0",
     "@babel/core": "^8.0.1",
     "@babel/preset-typescript": "^8.0.1",
-    "messageformat": "^4.0.0",
-    "magic-string": "^0.30.21"
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "magic-string": "^0.30.21",
+    "messageformat": "^4.0.0"
   },
   "devDependencies": {
     "@astroscope/node": "workspace:^",

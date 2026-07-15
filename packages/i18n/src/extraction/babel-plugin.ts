@@ -1,19 +1,18 @@
 import type { NodePath, PluginObject, PluginPass } from '@babel/core';
 import type * as BabelTypes from '@babel/types';
 import type { Expression, Node, ObjectExpression } from '@babel/types';
-import type { AstroIntegrationLogger } from 'astro';
 import type { TranslationMeta, VariableDef } from '../shared/types.js';
-import type { ExtractedKeyOccurrence } from './types.js';
+import type { ExtractedKeyOccurrence, ExtractionError } from './types.js';
 
 export type I18nExtractPluginOpts = {
   onKeyExtracted: (key: ExtractedKeyOccurrence) => void;
-  logger: AstroIntegrationLogger;
+  onExtractionError: (error: ExtractionError) => void;
   stripFallbacks: boolean;
 };
 
 type PluginState = PluginPass & { opts: I18nExtractPluginOpts };
 
-type WarnFn = (message: string) => void;
+type ReportFn = (reason: string) => void;
 
 /**
  * Extract string value from AST node
@@ -33,7 +32,7 @@ function getStringValue(t: typeof BabelTypes, node: Node): string | null {
 /**
  * Extract TranslationMeta from the second argument of t()
  */
-function extractMeta(t: typeof BabelTypes, node: Expression, warn: WarnFn): TranslationMeta {
+function extractMeta(t: typeof BabelTypes, node: Expression, report: ReportFn): TranslationMeta {
   // string shorthand: t('key', 'fallback')
   const stringValue = getStringValue(t, node);
 
@@ -43,7 +42,7 @@ function extractMeta(t: typeof BabelTypes, node: Expression, warn: WarnFn): Tran
 
   // dynamic template literal: t('key', `Hello ${name}`)
   if (t.isTemplateLiteral(node) && node.expressions.length > 0) {
-    warn('t() meta contains template literal with expressions - cannot extract statically');
+    report('the fallback is a template literal with expressions');
 
     return { fallback: '' };
   }
@@ -55,7 +54,7 @@ function extractMeta(t: typeof BabelTypes, node: Expression, warn: WarnFn): Tran
     for (const prop of node.properties) {
       // spread elements cannot be extracted statically
       if (t.isSpreadElement(prop)) {
-        warn('t() meta contains spread element - cannot extract statically');
+        report('the meta object contains a spread element');
 
         continue;
       }
@@ -71,7 +70,7 @@ function extractMeta(t: typeof BabelTypes, node: Expression, warn: WarnFn): Tran
         if (value !== null) {
           meta.fallback = value;
         } else {
-          warn('t() fallback is not a static string - cannot extract');
+          report('the fallback is not a static string');
         }
       } else if (name === 'description') {
         const value = getStringValue(t, prop.value as Node);
@@ -79,10 +78,10 @@ function extractMeta(t: typeof BabelTypes, node: Expression, warn: WarnFn): Tran
         if (value !== null) {
           meta.description = value;
         } else {
-          warn('t() description is not a static string - cannot extract');
+          report('the description is not a static string');
         }
       } else if (name === 'variables' && t.isObjectExpression(prop.value)) {
-        meta.variables = extractVariables(t, prop.value, warn);
+        meta.variables = extractVariables(t, prop.value, report);
       }
     }
 
@@ -90,7 +89,7 @@ function extractMeta(t: typeof BabelTypes, node: Expression, warn: WarnFn): Tran
   }
 
   // dynamic meta (e.g. variable reference)
-  warn('t() meta is not a static string or object - cannot extract');
+  report('the meta is neither a static string nor an object literal');
 
   return { fallback: '' };
 }
@@ -101,13 +100,13 @@ function extractMeta(t: typeof BabelTypes, node: Expression, warn: WarnFn): Tran
 function extractVariables(
   t: typeof BabelTypes,
   obj: ObjectExpression,
-  warn: WarnFn,
+  report: ReportFn,
 ): Record<string, VariableDef> | undefined {
   const result: Record<string, VariableDef> = {};
 
   for (const prop of obj.properties) {
     if (t.isSpreadElement(prop)) {
-      warn('t() variables contains spread element - cannot extract statically');
+      report('the variables object contains a spread element');
       continue;
     }
 
@@ -121,7 +120,7 @@ function extractVariables(
 
       for (const varProp of prop.value.properties) {
         if (t.isSpreadElement(varProp)) {
-          warn(`t() variable "${varName}" contains spread element - cannot extract statically`);
+          report(`variable "${varName}" contains a spread element`);
           continue;
         }
 
@@ -138,7 +137,7 @@ function extractVariables(
             varDef.description = value;
           }
         } else if (varPropName === 'fallback' || varPropName === 'description') {
-          warn(`t() variable "${varName}.${varPropName}" is not a static string - cannot extract`);
+          report(`variable "${varName}.${varPropName}" is not a static string`);
         }
       }
 
@@ -177,11 +176,12 @@ export function i18nExtractPlugin({ types: t }: { types: typeof BabelTypes }): P
 
         const file = state.filename ?? '';
         const line = path.node.loc?.start.line ?? 0;
-        const warn: WarnFn = (message) => state.opts.logger.warn(`${message} at ${file}:${line}`);
+        const column = path.node.loc?.start.column ?? 0;
+        const report: ReportFn = (reason) => state.opts.onExtractionError({ key, reason, file, line, column });
 
         // second arg is always meta (fallback string or object)
         // may not exist if we're processing already-transformed code
-        const meta = args.length >= 2 && t.isExpression(args[1]) ? extractMeta(t, args[1], warn) : { fallback: '' };
+        const meta = args.length >= 2 && t.isExpression(args[1]) ? extractMeta(t, args[1], report) : { fallback: '' };
 
         // report extracted key
         state.opts.onKeyExtracted({ key, meta, file, line });

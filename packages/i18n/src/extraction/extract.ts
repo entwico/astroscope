@@ -1,6 +1,5 @@
 import type { FileResult, PluginItem } from '@babel/core';
-import type { AstroIntegrationLogger } from 'astro';
-import type { ExtractedKeyOccurrence } from './types.js';
+import type { ExtractedKeyOccurrence, ExtractionError } from './types.js';
 
 /** TypeScript extensions (need 'typescript' babel plugin) */
 export const TS_EXTENSIONS = ['.ts', '.tsx'] as const;
@@ -26,13 +25,14 @@ export const ALL_EXTENSIONS = [...BABEL_EXTENSIONS, '.astro'] as const;
 export type ExtractOptions = {
   filename: string;
   code: string;
-  logger: AstroIntegrationLogger;
   stripFallbacks?: boolean | undefined;
   onKeyExtracted?: ((key: ExtractedKeyOccurrence) => void) | undefined;
 };
 
 export type ExtractResult = {
   keys: ExtractedKeyOccurrence[];
+  /** t() calls whose meta could not be read statically */
+  errors: ExtractionError[];
   code: string | null;
   map: FileResult['map'];
 };
@@ -42,9 +42,10 @@ export type ExtractResult = {
  * Optionally strips fallbacks (for production builds).
  */
 export async function extractKeysFromFile(options: ExtractOptions): Promise<ExtractResult> {
-  const { filename, code, logger, stripFallbacks = false, onKeyExtracted } = options;
+  const { filename, code, stripFallbacks = false, onKeyExtracted } = options;
 
   const keys: ExtractedKeyOccurrence[] = [];
+  const errors: ExtractionError[] = [];
 
   // dynamic imports prevent Babel from being bundled into server runtime
   const [{ transformAsync }, { i18nExtractPlugin }] = await Promise.all([
@@ -73,7 +74,9 @@ export async function extractKeysFromFile(options: ExtractOptions): Promise<Extr
             keys.push(key);
             onKeyExtracted?.(key);
           },
-          logger,
+          onExtractionError: (error: ExtractionError) => {
+            errors.push(error);
+          },
         },
       ] as PluginItem,
     ],
@@ -81,6 +84,7 @@ export async function extractKeysFromFile(options: ExtractOptions): Promise<Extr
 
   return {
     keys,
+    errors,
     code: result?.code ?? null,
     map: result?.map ?? null,
   };

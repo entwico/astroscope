@@ -4,19 +4,20 @@ import type { AstroIntegrationLogger } from 'astro';
 import type { ConsistencyCheckLevel } from '../integration/types.js';
 import { ALL_EXTENSIONS, extractKeysFromFile } from './extract.js';
 import { KeyStore } from './key-store.js';
+import { mapErrorsToSource } from './source-map.js';
 
 const GLOB_PATTERN = `src/**/*.{${ALL_EXTENSIONS.map((e) => e.slice(1)).join(',')}}`;
 
 /**
  * Compile .astro file to JS using Astro's compiler.
- * Returns the compiled code or null if compilation fails.
+ * Returns the compiled code and its source map, or null if compilation fails.
  */
-async function compileAstro(code: string, filename: string): Promise<string | null> {
+async function compileAstro(code: string, filename: string): Promise<{ code: string; map: string } | null> {
   try {
     const { transform } = await import('@astrojs/compiler');
-    const result = await transform(code, { filename });
+    const result = await transform(code, { filename, sourcemap: 'external' });
 
-    return result.code;
+    return { code: result.code, map: result.map };
   } catch {
     return null;
   }
@@ -52,36 +53,44 @@ export async function scan(options: ScanOptions): Promise<KeyStore> {
 
       // quick check: skip files without i18n translate import
       if (!code.includes('@astroscope/i18n/translate')) {
-        return { file, keys: null };
+        return { file, keys: null, errors: [] };
       }
 
-      // compile .astro files first
+      // compile .astro files first, keeping the map to report authored positions
+      let astroMap: string | undefined;
+
       if (file.endsWith('.astro')) {
         const compiled = await compileAstro(code, file);
 
         if (!compiled) {
-          return { file, keys: null };
+          return { file, keys: null, errors: [] };
         }
 
-        code = compiled;
+        code = compiled.code;
+        astroMap = compiled.map;
       }
 
       // extract keys
       const result = await extractKeysFromFile({
         filename: file,
         code,
-        logger,
         stripFallbacks: false,
       });
 
-      return { file, keys: result.keys.length > 0 ? result.keys : null };
+      return {
+        file,
+        keys: result.keys.length > 0 ? result.keys : null,
+        errors: mapErrorsToSource(result.errors, astroMap),
+      };
     }),
   );
 
-  for (const { file, keys } of results) {
+  for (const { file, keys, errors } of results) {
     if (keys) {
       store.addFileKeys(file, keys);
     }
+
+    store.addFileErrors(file, errors);
   }
 
   return store;

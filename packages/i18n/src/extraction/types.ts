@@ -11,6 +11,21 @@ export type ExtractedKeyOccurrence = {
 };
 
 /**
+ * A t() call whose meta could not be read statically at build time.
+ *
+ * The line is the position babel saw, which for .astro files is a position in
+ * the compiled output rather than the authored source — the key is the reliable
+ * anchor for the developer.
+ */
+export type ExtractionError = {
+  key: string;
+  reason: string;
+  file: string;
+  line: number;
+  column: number;
+};
+
+/**
  * Deduplicated translation key with all file locations (used in manifest)
  */
 export type ExtractedKey = {

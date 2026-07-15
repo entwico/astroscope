@@ -9,6 +9,8 @@ import { ALL_EXTENSIONS, extractKeysFromFile } from './extract.js';
 import { KeyStore } from './key-store.js';
 import { getGlobalState, getManifest } from './manifest.js';
 import { scan } from './scan.js';
+import { mapErrorsToSource } from './source-map.js';
+import type { ExtractionError } from './types.js';
 
 const VIRTUAL_MODULE_ID = 'virtual:@astroscope/i18n/manifest';
 const isVirtualModuleId = (id: string) => id === VIRTUAL_MODULE_ID || id.startsWith(`${VIRTUAL_MODULE_ID}?`);
@@ -24,6 +26,32 @@ export type I18nVitePluginOptions = {
   logger: AstroIntegrationLogger;
   consistency: ConsistencyCheckLevel;
 };
+
+/**
+ * Describe a non-extractable t() call for a developer.
+ */
+function formatExtractionError(error: ExtractionError, projectRoot: string): string {
+  const location = `${path.relative(projectRoot, error.file)}:${error.line}:${error.column + 1}`;
+
+  return `${location} — t('${error.key}') ${error.reason}`;
+}
+
+/**
+ * Non-extractable meta is fatal for a production build. The fallback argument is
+ * stripped from the bundle, so a key whose fallback could not be read at build
+ * time has nothing to fall back to and renders its own key string to end users.
+ */
+function formatExtractionErrors(errors: ExtractionError[], projectRoot: string): string {
+  const list = errors.map((e) => `  - ${formatExtractionError(e, projectRoot)}`).join('\n');
+
+  return (
+    `i18n: ${errors.length} t() call(s) have a fallback that cannot be read at build time.\n\n` +
+    `${list}\n\n` +
+    `Production builds strip the fallback argument, so these keys would render as their own key string. ` +
+    `Fallbacks must be static string literals — pass runtime values as MF2 variables instead:\n` +
+    `  t('some.key', 'Hello {$name}', { name })`
+  );
+}
 
 /**
  * Vite plugin for i18n extraction, chunk mapping, and loader injection
@@ -79,6 +107,11 @@ export function i18nVitePlugin(options: I18nVitePluginOptions): Plugin {
       syncGlobalState();
 
       logger.info(`dev mode: scanned ${result.fileToKeys.size} files, found ${result.uniqueKeyCount} keys`);
+
+      // surface here what the build would later reject
+      for (const error of store.extractionErrors) {
+        logger.warn(formatExtractionError(error, projectRoot));
+      }
     },
 
     resolveId(id) {
@@ -133,11 +166,22 @@ export function getManifest() { return _getManifest(); }
       const result = await extractKeysFromFile({
         filename,
         code,
-        logger,
         stripFallbacks: isBuild,
       });
 
+      // only pay for the sourcemap lookup when there is something to report
+      const errors = result.errors.length > 0 ? mapErrorsToSource(result.errors, this.getCombinedSourcemap()) : [];
+
       store.addFileKeys(filename, result.keys);
+      store.addFileErrors(filename, errors);
+
+      // dev keeps the fallback argument, so a non-extractable one still renders
+      // correctly at runtime — warn here and let the build be the hard gate
+      if (!isBuild) {
+        for (const error of errors) {
+          logger.warn(formatExtractionError(error, projectRoot));
+        }
+      }
 
       syncGlobalState();
 
@@ -271,6 +315,13 @@ export function getManifest() { return _getManifest(); }
       }
 
       logger.info(`manifest: ${Object.keys(state.chunkManifest).length} chunks, ${store.uniqueKeyCount} keys`);
+
+      // a fallback that could not be read is a broken string in production
+      const extractionErrors = store.extractionErrors;
+
+      if (extractionErrors.length > 0) {
+        throw new Error(formatExtractionErrors(extractionErrors, projectRoot));
+      }
 
       // fail build if consistency check is set to 'error' and inconsistencies were found
       if (consistency === 'error' && store.hasErrors) {

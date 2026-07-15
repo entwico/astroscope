@@ -1,7 +1,7 @@
 import type { AstroIntegrationLogger } from 'astro';
 import type { ConsistencyCheckLevel } from '../integration/types.js';
 import type { TranslationMeta } from '../shared/types.js';
-import type { ExtractedKey, ExtractedKeyOccurrence } from './types.js';
+import type { ExtractedKey, ExtractedKeyOccurrence, ExtractionError } from './types.js';
 
 /**
  * Inconsistency between two occurrences of the same translation key
@@ -26,6 +26,9 @@ export class KeyStore {
 
   /** Whether an error-level inconsistency was found (for build failure) */
   private hasInconsistencyError = false;
+
+  /** Non-extractable t() meta, per file (replaced wholesale on HMR) */
+  private readonly errorsByFile = new Map<string, ExtractionError[]>();
 
   readonly fileToKeys = new Map<string, string[]>();
   readonly filesWithI18n = new Set<string>();
@@ -81,6 +84,25 @@ export class KeyStore {
     }
 
     this.fileToKeys.set(filename, newKeyStrings);
+  }
+
+  /**
+   * Record the non-extractable t() calls found in a file, replacing any
+   * previously recorded for it.
+   */
+  addFileErrors(filename: string, errors: ExtractionError[]): void {
+    if (errors.length > 0) {
+      this.errorsByFile.set(filename, errors);
+    } else {
+      this.errorsByFile.delete(filename);
+    }
+  }
+
+  /**
+   * All non-extractable t() calls found so far, across every scanned file.
+   */
+  get extractionErrors(): ExtractionError[] {
+    return Array.from(this.errorsByFile.values()).flat();
   }
 
   /**
@@ -246,6 +268,10 @@ export class KeyStore {
   merge(other: KeyStore): void {
     for (const [file, keys] of other.fileToKeys) {
       this.fileToKeys.set(file, keys);
+    }
+
+    for (const [file, errors] of other.errorsByFile) {
+      this.errorsByFile.set(file, errors);
     }
 
     for (const file of other.filesWithI18n) {

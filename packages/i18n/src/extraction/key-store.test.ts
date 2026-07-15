@@ -276,4 +276,49 @@ describe('KeyStore', () => {
       expect(logger.warn.mock.calls[0]?.[0]).toContain('inconsistent fallback');
     });
   });
+
+  describe('extraction errors', () => {
+    const createError = (key: string, file: string) => ({ key, file, line: 1, column: 0, reason: 'not static' });
+
+    test('collects errors across files', () => {
+      const store = new KeyStore(createMockLogger());
+
+      store.addFileErrors('a.ts', [createError('one', 'a.ts')]);
+      store.addFileErrors('b.ts', [createError('two', 'b.ts')]);
+
+      expect(store.extractionErrors.map((e) => e.key)).toEqual(['one', 'two']);
+    });
+
+    test('has no errors by default', () => {
+      expect(new KeyStore(createMockLogger()).extractionErrors).toEqual([]);
+    });
+
+    test('replaces a file’s errors rather than accumulating them', () => {
+      const store = new KeyStore(createMockLogger());
+
+      store.addFileErrors('a.ts', [createError('one', 'a.ts')]);
+      store.addFileErrors('a.ts', [createError('one', 'a.ts')]);
+
+      expect(store.extractionErrors).toHaveLength(1);
+    });
+
+    test('drops a file’s errors once it is fixed', () => {
+      const store = new KeyStore(createMockLogger());
+
+      store.addFileErrors('a.ts', [createError('one', 'a.ts')]);
+      store.addFileErrors('a.ts', []);
+
+      expect(store.extractionErrors).toEqual([]);
+    });
+
+    test('carries errors through merge', () => {
+      const store = new KeyStore(createMockLogger());
+      const other = new KeyStore(createMockLogger());
+
+      other.addFileErrors('a.ts', [createError('one', 'a.ts')]);
+      store.merge(other);
+
+      expect(store.extractionErrors.map((e) => e.key)).toEqual(['one']);
+    });
+  });
 });

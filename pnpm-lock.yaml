@@ -321,6 +321,9 @@ importers:
       '@babel/preset-typescript':
         specifier: ^8.0.1
         version: 8.0.1(@babel/core@8.0.1)
+      '@jridgewell/trace-mapping':
+        specifier: ^0.3.31
+        version: 0.3.31
       magic-string:
         specifier: ^0.30.21
         version: 0.30.21
