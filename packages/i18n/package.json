@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/i18n",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "i18n for Astro + React islands — MessageFormat 2, automatic tree-shaking, parallel loading, any translation source",
   "type": "module",
   "main": "./dist/index.js",

@@ -1,5 +1,15 @@
 # @astroscope/i18n
 
+## 1.1.0
+
+### Minor Changes
+
+- 27cb499: builds now fail on t() fallbacks that cannot be read statically, instead of shipping the raw key
+
+### Patch Changes
+
+- 27cb499: t() extraction problems in .astro files now point at the authored line instead of a line in the compiled output
+
 ## 1.0.2
 
 ### Patch Changes
