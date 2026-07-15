@@ -1,5 +1,11 @@
 # @astroscope/i18n
 
+## 1.0.2
+
+### Patch Changes
+
+- 638d8be: log and measure translation chunk requests under their own route instead of `/404`
+
 ## 1.0.1
 
 ### Patch Changes

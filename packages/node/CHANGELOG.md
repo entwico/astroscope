@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 1.3.0
+
+### Minor Changes
+
+- 638d8be: add `overrideRequestRoute` for observability overrides
+
 ## 1.2.2
 
 ### Patch Changes
