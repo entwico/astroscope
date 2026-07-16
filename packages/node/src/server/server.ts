@@ -45,15 +45,24 @@ async function warmupModules(): Promise<void> {
   ].filter((load) => load !== undefined);
 
   const results = await Promise.allSettled(loaders.map((load) => load()));
+  const failures = results.filter((result) => result.status === 'rejected');
 
-  for (const result of results) {
-    if (result.status === 'rejected') {
-      log.error(
-        result.reason instanceof Error ? { err: result.reason } : { reason: result.reason },
-        'warmup import failed',
-      );
-    }
+  if (failures.length === 0) return;
+
+  for (const failure of failures) {
+    log.error(
+      failure.reason instanceof Error ? { err: failure.reason } : { reason: failure.reason },
+      'warmup import failed',
+    );
   }
+
+  // a module that cannot even be imported would throw on its first request;
+  // failing the boot turns a silently-degraded deploy into a crash the health
+  // checks catch before it takes traffic
+  throw new AggregateError(
+    failures.map((failure) => failure.reason),
+    'warmup import failed',
+  );
 }
 
 /**
@@ -126,13 +135,26 @@ export async function startServer(overrides?: {
   let bootMs = 0;
   let warmupMs = 0;
 
-  // starts in parallel with the boot startup, awaited before listen
+  // starts in parallel with the boot startup, awaited before listen. resolves
+  // to the failure (if any) instead of rejecting, so a warmup error landing
+  // before the join below is never seen as an unhandled rejection
   const warmupStartedAt = performance.now();
   const warmupSpan = startLifecycleSpan('warmup', startup.context);
-  const warmup = warmupModules().then(() => {
-    warmupMs = roundMs(performance.now() - warmupStartedAt);
-    warmupSpan.span.end();
-  });
+  const warmup = warmupModules().then(
+    () => {
+      warmupMs = roundMs(performance.now() - warmupStartedAt);
+      warmupSpan.span.end();
+
+      return undefined;
+    },
+    (error: unknown) => {
+      warmupMs = roundMs(performance.now() - warmupStartedAt);
+      warmupSpan.span.setStatus({ code: SpanStatusCode.ERROR, message: 'warmup import failed' });
+      warmupSpan.span.end();
+
+      return error;
+    },
+  );
 
   const shutdownLifecycle = async (
     shutdownContext?: ReturnType<typeof startLifecycleSpan>['context'],
@@ -151,7 +173,14 @@ export async function startServer(overrides?: {
 
     if (health) {
       deactivateHealthChecks();
-      await healthServer.stop();
+
+      try {
+        await healthServer.stop();
+      } catch (err) {
+        // a startup failure can tear the health server down before it has
+        // finished binding; stopping it is best-effort
+        log.debug(err instanceof Error ? { err } : { reason: err }, 'health probe server stop failed');
+      }
     }
   };
 
@@ -178,7 +207,11 @@ export async function startServer(overrides?: {
     await failStartup(err, 'startup failed');
   }
 
-  await warmup;
+  const warmupError = await warmup;
+
+  if (warmupError !== undefined) {
+    await failStartup(warmupError, 'warmup import failed');
+  }
 
   if (health) probes.startup.enable();
 

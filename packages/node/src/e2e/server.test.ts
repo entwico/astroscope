@@ -26,6 +26,9 @@ function walkFiles(dir: string): string[] {
 const port = 20000 + (process.pid % 10000);
 const healthPort = port + 1;
 const metricsPort = port + 4;
+const fatalPort = port + 10;
+const fatalHealthPort = port + 11;
+const fatalMetricsPort = port + 14;
 const baseUrl = `http://127.0.0.1:${port}`;
 const healthUrl = `http://127.0.0.1:${healthPort}`;
 const metricsUrl = `http://127.0.0.1:${metricsPort}`;
@@ -759,5 +762,51 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
     expect(complete).toBeDefined();
     expect(complete!['drainMs']).toBeTypeOf('number');
+  });
+});
+
+describe.skipIf(skip)('e2e — warmup failure is fatal', () => {
+  let out = '';
+  let code: number | null = null;
+
+  beforeAll(async () => {
+    // reuse the build from the main suite (same worker, runs first); build only
+    // when this suite runs on its own
+    if (!existsSync(path.join(fixtureRoot, 'dist/server/entry.mjs'))) {
+      const { build } = await import('astro');
+
+      await build({ root: fixtureRoot, logLevel: 'error' });
+    }
+
+    const proc = spawn('node', ['dist/server/entry.mjs'], {
+      cwd: fixtureRoot,
+      env: {
+        ...process.env,
+        WARMUP_THROW: '1',
+        HOST: '127.0.0.1',
+        PORT: String(fatalPort),
+        HEALTH_HOST: '127.0.0.1',
+        HEALTH_PORT: String(fatalHealthPort),
+        OTEL_EXPORTER_PROMETHEUS_HOST: '127.0.0.1',
+        OTEL_EXPORTER_PROMETHEUS_PORT: String(fatalMetricsPort),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    proc.stdout!.on('data', (chunk: Buffer) => (out += chunk.toString()));
+    proc.stderr!.on('data', (chunk: Buffer) => (out += chunk.toString()));
+
+    code = await new Promise<number | null>((resolve) => {
+      proc.on('exit', (exit) => resolve(exit));
+    });
+  }, 90_000);
+
+  test('the process exits non-zero instead of serving', () => {
+    expect(code).toBe(1);
+  });
+
+  test('the failing import is logged and readiness is never reported', () => {
+    expect(out).toContain('warmup import failed');
+    expect(logLines(out).some((line) => line['msg'] === 'server ready')).toBe(false);
   });
 });
