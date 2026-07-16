@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 1.4.0
+
+### Minor Changes
+
+- 5ec1917: startup now fails when a server module cannot be imported during warmup
+
 ## 1.3.0
 
 ### Minor Changes
