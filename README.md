@@ -1,10 +1,8 @@
 # Astroscope
 
-> **Note:** This project is in active development. APIs may change between versions.
+A collection of Astro integrations for server-side needs on **Node.js** — logging, tracing, security, i18n, and more.
 
-A collection of Astro integrations for common server-side needs — logging, tracing, security, i18n, and more.
-
-**Runtime:** Node.js. Other runtimes (Bun, Deno, Cloudflare Workers) _may work_ but are not tested or officially supported.
+Node.js is the only supported runtime. Other runtimes (Bun, Deno, Cloudflare Workers) are out of scope.
 
 ## Packages
 

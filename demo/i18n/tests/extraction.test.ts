@@ -44,10 +44,14 @@ function extractManifestJson($: CheerioAPI, label: string): unknown {
 }
 
 beforeAll(async () => {
+  // astro skips mounting its dev handlers when VITEST is set — the child must not inherit it
+  const { VITEST: _vitest, ...env } = process.env;
+
   // start dev server
   devServer = spawn('npx', ['astro', 'dev', '--port', String(DEV_PORT)], {
     cwd: new URL('..', import.meta.url).pathname,
     stdio: 'pipe',
+    env,
   });
 
   // start prod server (assumes build already done)

@@ -15,6 +15,7 @@ Opinionated, cloud-friendly Node adapter for Astro: boot lifecycle, health probe
 - **Native mounts** — http-native handlers (`oidc-provider`, ACME) mounted on the adapter's server
 - **Build tweaks** — SSR sourcemaps, SSR effect stripping
 - **Dev restart machinery** — changes to the boot file or entry seams restart the dev server behind a holding page
+- **Dev island warmup** — `.astro` sources are scanned for `client:*` components; their deps are pre-optimized and their module graphs warmed at server start, preventing "504 Outdated Optimize Dep" hydration failures from vite's lazy dep discovery
 - **HTTPS for development** — `SERVER_CERT_PATH` / `SERVER_KEY_PATH` serve TLS directly for local runs of the built server ([HTTPS](#https)); in production, terminate TLS at the ingress
 
 ## What it does NOT do — beware

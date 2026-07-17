@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AstroConfig, AstroIntegration } from 'astro';
+import { createIslandWarmup } from '../dev-mode/island-warmup.js';
 import { createDevMachinery } from '../dev-mode/machinery.js';
 import { type ExcludePattern, RECOMMENDED_EXCLUDES } from '../excludes/excludes.js';
 import { serializeExcludePatterns } from '../excludes/serialize.js';
@@ -146,6 +147,9 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
           addMiddleware({ entrypoint: '@astroscope/node/dev-middleware', order: 'pre' });
         }
 
+        const islandWarmup =
+          command === 'dev' ? [createIslandWarmup({ root, srcDir: fileURLToPath(config.srcDir), logger })] : [];
+
         updateConfig({
           build: { redirects: false },
           // opinionated defaults: no trailing slashes, behind LB
@@ -167,6 +171,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
           vite: {
             plugins: [
               ...devMachinery,
+              ...islandWarmup,
               ssrSourcemapPlugin(),
               stripSsrEffectsPlugin(),
               {

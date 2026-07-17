@@ -2,7 +2,7 @@
   "name": "astroscope",
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@11.13.1",
   "scripts": {
     "build": "turbo run build",
     "lint": "turbo run lint",
@@ -16,26 +16,26 @@
     "ci:publish": "changeset publish"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.0",
+    "@changesets/cli": "^2.31.1",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.2",
-    "@types/node": "^26.0.1",
-    "@typescript-eslint/parser": "^8.62.0",
-    "@vitest/coverage-v8": "^4.1.9",
-    "astro": "^7.0.3",
-    "daisyui": "^5.6.5",
-    "eslint": "^10.6.0",
+    "@types/node": "^26.1.1",
+    "@typescript-eslint/parser": "^8.64.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "astro": "^7.0.9",
+    "daisyui": "^5.6.18",
+    "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-astro": "^2.1.1",
+    "eslint-plugin-astro": "^3.0.1",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-prettier": "^5.5.6",
-    "prettier": "^3.9.3",
+    "prettier": "^3.9.5",
     "prettier-plugin-astro": "^0.14.1",
     "tailwindcss": "^4.3.2",
-    "tsdown": "^0.22.3",
-    "turbo": "^2.10.0",
+    "tsdown": "^0.22.8",
+    "turbo": "^2.10.5",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.62.0",
-    "vitest": "^4.1.9"
+    "typescript-eslint": "^8.64.0",
+    "vitest": "^4.1.10"
   }
 }

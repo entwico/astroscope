@@ -16,8 +16,14 @@ describe.skipIf(devSkip)('dev-mode restart with in-flight requests', () => {
   let stdoutBuf: string;
   let restoreStderr: () => void;
   let restoreStdout: () => void;
+  let vitestEnv: string | undefined;
 
   beforeAll(async () => {
+    // astro skips mounting its dev handlers when VITEST is set; the guard is
+    // re-checked on every restart, so it stays unset for the whole suite
+    vitestEnv = process.env['VITEST'];
+    delete process.env['VITEST'];
+
     stderrBuf = '';
     stdoutBuf = '';
 
@@ -59,6 +65,9 @@ describe.skipIf(devSkip)('dev-mode restart with in-flight requests', () => {
 
   afterAll(async () => {
     await server?.stop().catch(() => {});
+
+    if (vitestEnv !== undefined) process.env['VITEST'] = vitestEnv;
+
     restoreStderr?.();
     restoreStdout?.();
     vi.restoreAllMocks();

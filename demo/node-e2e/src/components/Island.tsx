@@ -1,3 +1,4 @@
+import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 
 export function Island() {
@@ -10,7 +11,7 @@ export function Island() {
   }, []);
 
   return (
-    <button type="button" onClick={() => setCount((c) => c + 1)}>
+    <button type="button" className={clsx('island', count > 0 && 'clicked')} onClick={() => setCount((c) => c + 1)}>
       count: {count}
     </button>
   );
