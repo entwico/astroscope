@@ -1,5 +1,16 @@
 # @astroscope/node
 
+## 1.4.0
+
+### Minor Changes
+
+- 5ec1917: startup now fails when a server module cannot be imported during warmup
+- 42e84ba: dev server now pre-optimizes and warms hydrated island dependencies, preventing "Outdated Optimize Dep" hydration failures
+
+### Patch Changes
+
+- 42e84ba: update deps
+
 ## 1.3.0
 
 ### Minor Changes

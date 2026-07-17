@@ -1,5 +1,11 @@
 # @astroscope/eslint-plugin
 
+## 1.1.0
+
+### Minor Changes
+
+- 42e84ba: accept astro-eslint-parser v3
+
 ## 1.0.0
 
 ### Major Changes

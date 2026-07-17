@@ -1,5 +1,11 @@
 # @astroscope/i18n
 
+## 1.1.1
+
+### Patch Changes
+
+- 42e84ba: update deps
+
 ## 1.1.0
 
 ### Minor Changes

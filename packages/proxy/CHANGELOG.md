@@ -1,5 +1,11 @@
 # @astroscope/proxy
 
+## 0.4.1
+
+### Patch Changes
+
+- 42e84ba: update deps
+
 ## 0.4.0
 
 ### Minor Changes
