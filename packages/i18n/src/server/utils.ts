@@ -8,9 +8,16 @@ function indexToLetter(index: number): string {
 }
 
 /**
- * Generate short variable name using bijective base-26: 0→'a', 25→'z', 26→'aa', 27→'ab', ...
+ * Names in the bb26 sequence that are JavaScript reserved words. Emitting one
+ * as a `var` name (`var do = ...`) is a SyntaxError that kills the whole
+ * inline i18n script — every client translation on the page goes dark.
  */
-export function generateBB26(index: number): string {
+const RESERVED_NAMES = new Set(['do', 'if', 'in', 'for', 'new', 'try', 'var', 'let']);
+
+/**
+ * Raw bijective base-26 name: 0→'a', 25→'z', 26→'aa', 27→'ab', ...
+ */
+function rawBB26(index: number): string {
   let name = '';
   let remaining = index;
 
@@ -20,4 +27,27 @@ export function generateBB26(index: number): string {
   } while (remaining >= 0);
 
   return name;
+}
+
+function rawRank(name: string): number {
+  for (let i = 0; ; i++) {
+    if (rawBB26(i) === name) return i;
+  }
+}
+
+const RESERVED_RANKS = [...RESERVED_NAMES].map(rawRank).sort((a, b) => a - b);
+
+/**
+ * Generate the index-th short variable name in bijective base-26 order
+ * (0→'a', 25→'z', 26→'aa', ...), skipping reserved words so every emitted
+ * name is a valid JavaScript identifier.
+ */
+export function generateBB26(index: number): string {
+  let shifted = index;
+
+  for (const rank of RESERVED_RANKS) {
+    if (shifted >= rank) shifted++;
+  }
+
+  return rawBB26(shifted);
 }

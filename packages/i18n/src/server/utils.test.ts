@@ -16,8 +16,10 @@ describe('generateBB26', () => {
   });
 
   test('rolls over to three letters after zz', () => {
-    expect(generateBB26(701)).toBe('zz');
-    expect(generateBB26(702)).toBe('aaa');
+    // 'do', 'if' and 'in' are skipped below this point, so the sequence
+    // reaches 'zz' three indices earlier than raw bijective base-26.
+    expect(generateBB26(698)).toBe('zz');
+    expect(generateBB26(699)).toBe('aaa');
   });
 
   test('generates unique names for a contiguous range', () => {
@@ -28,5 +30,26 @@ describe('generateBB26', () => {
     }
 
     expect(names.size).toBe(1000);
+  });
+
+  test('never emits a reserved word', () => {
+    // `var do = ...` is a SyntaxError that kills the whole inline script —
+    // this regression took every client translation down in production once
+    // the chunk count reached the raw-bb26 rank of "do".
+    const reserved = new Set(['do', 'if', 'in', 'for', 'new', 'try', 'var', 'let']);
+
+    for (let i = 0; i < 20000; i++) {
+      expect(reserved.has(generateBB26(i))).toBe(false);
+    }
+  });
+
+  test('skips reserved words without gaps or duplicates', () => {
+    // raw rank of "do" is 118 ('d'=3, 'o'=14 → 26 + 3*26 + 14); the sequence
+    // must step over it and stay contiguous.
+    expect(generateBB26(117)).toBe('dn');
+    expect(generateBB26(118)).toBe('dp');
+
+    const names = new Set(Array.from({ length: 300 }, (_, i) => generateBB26(i)));
+    expect(names.size).toBe(300);
   });
 });
