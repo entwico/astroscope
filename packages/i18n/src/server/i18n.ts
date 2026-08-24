@@ -4,7 +4,7 @@ import type { ExtractionManifest } from '../extraction/types.js';
 import { compileTranslations } from '../shared/compiler.js';
 import type { CompiledTranslations, RawTranslations } from '../shared/types.js';
 import type { FallbackBehavior } from './types.js';
-import { generateBB26 } from './utils.js';
+import { generateVarName } from './utils.js';
 
 export type I18nConfig = {
   locales: string[];
@@ -267,12 +267,12 @@ class I18nSingleton {
       deps.forEach((d) => allChunks.add(d));
     }
 
-    // generate short variable names: a, b, c, ..., z, aa, ab, ...
+    // generate short variable names: _a, _b, _c, ..., _z, _aa, _ab, ...
     const chunkToVar = new Map<string, string>();
     let varIndex = 0;
 
     for (const chunk of allChunks) {
-      chunkToVar.set(chunk, generateBB26(varIndex++));
+      chunkToVar.set(chunk, generateVarName(varIndex++));
     }
 
     // build IIFE with aliases for compact output

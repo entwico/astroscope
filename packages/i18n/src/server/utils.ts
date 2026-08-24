@@ -21,3 +21,10 @@ export function generateBB26(index: number): string {
 
   return name;
 }
+
+/**
+ * Generate a JS-safe variable name for the inline i18n script.
+ */
+export function generateVarName(index: number): string {
+  return `_${generateBB26(index)}`;
+}

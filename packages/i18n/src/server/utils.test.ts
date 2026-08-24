@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { generateBB26 } from './utils';
+import { generateBB26, generateVarName } from './utils';
 
 describe('generateBB26', () => {
   test('maps 0-25 to single letters a-z', () => {
@@ -28,5 +28,29 @@ describe('generateBB26', () => {
     }
 
     expect(names.size).toBe(1000);
+  });
+});
+
+describe('generateVarName', () => {
+  test('prefixes the bijective base-26 name', () => {
+    expect(generateVarName(0)).toBe('_a');
+    expect(generateVarName(25)).toBe('_z');
+    expect(generateVarName(26)).toBe('_aa');
+  });
+
+  test('never produces a reserved word at the indexes where base-26 does', () => {
+    expect(generateBB26(118)).toBe('do');
+    expect(generateBB26(239)).toBe('if');
+    expect(generateBB26(247)).toBe('in');
+
+    expect(generateVarName(118)).toBe('_do');
+    expect(generateVarName(239)).toBe('_if');
+    expect(generateVarName(247)).toBe('_in');
+  });
+
+  test('produces a declarable identifier for a large contiguous range', () => {
+    for (let i = 0; i < 20000; i++) {
+      expect(() => new Function(`var ${generateVarName(i)}=1`)).not.toThrow();
+    }
   });
 });

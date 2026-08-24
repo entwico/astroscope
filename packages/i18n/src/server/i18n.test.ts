@@ -315,6 +315,28 @@ describe('getClientScript', () => {
     expect(script).not.toContain('Cart"}');
   });
 
+  test('emits a parseable script past the chunk counts that map to reserved words', async () => {
+    const chunkCount = 300;
+    const chunks: Record<string, string[]> = {};
+    const translations: Record<string, string> = {};
+
+    for (let i = 0; i < chunkCount; i++) {
+      chunks[`Chunk${i}.Cabc`] = [`key.${i}`];
+      translations[`key.${i}`] = `value ${i}`;
+    }
+
+    const i18n = await createConfiguredI18n({ chunks });
+
+    i18n.setTranslations('en', translations);
+
+    const script = i18n.getClientScript('en');
+
+    expect(script).toContain('_do=');
+    expect(script).toContain('_if=');
+    expect(script).toContain('_in=');
+    expect(() => new Function(script)).not.toThrow();
+  });
+
   test('caches the script per locale and invalidates on setTranslations', async () => {
     const i18n = await createConfiguredI18n();
 
