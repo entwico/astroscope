@@ -1,5 +1,11 @@
 # @astroscope/i18n
 
+## 1.1.2
+
+### Patch Changes
+
+- 0b2297d: fix broken client translations on sites with 119 or more translation chunks
+
 ## 1.1.1
 
 ### Patch Changes
