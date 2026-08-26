@@ -7,6 +7,7 @@ import { createRequestFromNodeRequest, writeResponse } from 'astro/app/node';
 import { log } from '../observability/log/index.js';
 import { getRequestRecord } from '../observability/log/store.js';
 import type { RuntimeOptions } from '../types.js';
+import { setRequestRouteData } from './route-store.js';
 
 async function readFSErrorPage(client: string, status: number): Promise<Response | undefined> {
   const filePaths = [`${status}.html`, `${status}/index.html`];
@@ -90,11 +91,15 @@ export function createAppHandler(app: BaseApp, options: RuntimeOptions, client: 
     }
 
     const routeData = app.match(request, true);
+    const matched = routeData && !(routeData.type === 'page' && routeData.prerender) ? routeData : undefined;
 
-    const response =
-      routeData && !(routeData.type === 'page' && routeData.prerender)
-        ? await app.render(request, { addCookieHeader: true, routeData, prerenderedErrorPageFetch })
-        : await app.render(request, { addCookieHeader: true, prerenderedErrorPageFetch });
+    if (matched) {
+      setRequestRouteData(request, matched);
+    }
+
+    const response = matched
+      ? await app.render(request, { addCookieHeader: true, routeData: matched, prerenderedErrorPageFetch })
+      : await app.render(request, { addCookieHeader: true, prerenderedErrorPageFetch });
 
     await writeResponse(response, res);
   };

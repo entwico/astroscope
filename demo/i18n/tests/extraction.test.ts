@@ -47,17 +47,22 @@ beforeAll(async () => {
   // astro skips mounting its dev handlers when VITEST is set — the child must not inherit it
   const { VITEST: _vitest, ...env } = process.env;
 
-  // start dev server
   devServer = spawn('npx', ['astro', 'dev', '--port', String(DEV_PORT)], {
     cwd: new URL('..', import.meta.url).pathname,
     stdio: 'pipe',
     env,
   });
 
-  // start prod server (assumes build already done)
+  // start prod server (assumes build already done); health and metrics get their
+  // own ports so parallel demo suites don't collide on the 9090/9464 defaults
   prodServer = spawn('node', ['./dist/server/entry.mjs'], {
     cwd: new URL('..', import.meta.url).pathname,
-    env: { ...process.env, PORT: String(PROD_PORT) },
+    env: {
+      ...process.env,
+      PORT: String(PROD_PORT),
+      HEALTH_PORT: String(PROD_PORT + 1),
+      OTEL_EXPORTER_PROMETHEUS_PORT: String(PROD_PORT + 2),
+    },
     stdio: 'pipe',
   });
 
@@ -94,23 +99,8 @@ describe('dev/prod parity', () => {
     const prodCount = extractBadgeCount(load(prodHtml), 'Chunk Manifest');
 
     // dev mode has no chunks (all inline), prod has chunks
-    // this is expected behavior - prod should have chunks
     expect(prodCount).toBeGreaterThan(0);
     console.log(`Dev chunks: ${devCount}, Prod chunks: ${prodCount}`);
-  });
-
-  test('same imports count', async () => {
-    const [devHtml, prodHtml] = await Promise.all([
-      fetch(`http://localhost:${DEV_PORT}/`).then((r) => r.text()),
-      fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text()),
-    ]);
-
-    const devCount = extractBadgeCount(load(devHtml), 'Imports Manifest');
-    const prodCount = extractBadgeCount(load(prodHtml), 'Imports Manifest');
-
-    // imports are only in prod (for chunk preloading)
-    expect(prodCount).toBeGreaterThan(0);
-    console.log(`Dev imports: ${devCount}, Prod imports: ${prodCount}`);
   });
 });
 
@@ -122,34 +112,10 @@ describe('manifest structure', () => {
     expect(chunks).not.toBeNull();
     expect(Object.keys(chunks).length).toBeGreaterThan(5);
 
-    // each chunk should have an array of keys
     for (const [chunkName, keys] of Object.entries(chunks)) {
       expect(chunkName).toMatch(/^[A-Za-z]+\.[A-Za-z0-9_-]+$/); // e.g. "Cart.C3sgsRVu"
       expect(Array.isArray(keys)).toBe(true);
       expect(keys.length).toBeGreaterThan(0);
-    }
-  });
-
-  test('imports manifest has valid structure', async () => {
-    const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
-    const imports = extractManifestJson(load(html), 'Imports Manifest') as Record<string, string[]>;
-
-    expect(imports).not.toBeNull();
-
-    // imports should reference valid chunk names
-    const chunks = extractManifestJson(load(html), 'Chunk Manifest') as Record<string, string[]>;
-    const chunkNames = new Set(Object.keys(chunks));
-
-    for (const [chunk, deps] of Object.entries(imports)) {
-      // chunk name might have different hash but same component name
-      const chunkBase = chunk.split('.')[0];
-      expect(chunkBase).toBeTruthy();
-
-      expect(Array.isArray(deps)).toBe(true);
-
-      for (const dep of deps) {
-        expect(chunkNames.has(dep)).toBe(true);
-      }
     }
   });
 });
@@ -168,35 +134,42 @@ describe('SSR translations', () => {
     const html = await fetch(`http://localhost:${PROD_PORT}/?locale=de`).then((r) => r.text());
     const $ = load(html);
 
-    // check SSR-rendered German content
     expect($('h3:contains("Willkommen in unserem Shop")').length).toBe(1);
     expect($('p:contains("Finden Sie hier die besten Produkte")').length).toBe(1);
   });
 });
 
-describe('I18nScript component', () => {
-  test('injects __i18n__ script in head', async () => {
+describe('client i18n state', () => {
+  test('prod pages carry per-island hash merge scripts before their islands', async () => {
     const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
-    const $ = load(html);
 
-    // I18nScript should inject a script with window.__i18n__
-    const scripts = $('head script').toArray();
-    const i18nScript = scripts.find((s) => $(s).html()?.includes('__i18n__'));
+    expect(html).toContain('window.__i18n__??=');
+    expect(html).toContain('"locale":"en"');
 
-    expect(i18nScript).toBeTruthy();
+    const merge = html.indexOf('window.__i18n__??=');
+    const island = html.indexOf('<astro-island');
+
+    expect(merge).toBeGreaterThan(-1);
+    expect(merge).toBeLessThan(island);
   });
 
-  test('__i18n__ contains locale and hashes', async () => {
+  test('prod pages preload translation chunks alongside component chunks', async () => {
     const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
 
-    // extract the __i18n__ initialization
-    const match = html.match(/window\.__i18n__\s*=\s*(\{[^}]+\})/);
+    // immediate islands get link tags, deferred islands register their links for the gate
+    expect(html).toMatch(/<link rel="modulepreload" fetchpriority="low" href="\/_i18n\/en\/[^"]+\.js">/);
+    expect(html).toMatch(/\(self\.__islands__\?\?=\{\}\)\[[^\]]+\]=\[[^\]]*\/_i18n\/en\/[^"\]]+\.js[^\]]*\]/);
+    expect(html).toContain('islands-runtime');
+  });
 
-    expect(match).toBeTruthy();
+  test('dev pages ship full translations in the head, before any island', async () => {
+    const html = await fetch(`http://localhost:${DEV_PORT}/`).then((r) => r.text());
+    const state = html.indexOf('window.__i18n__');
 
-    // should contain locale
-    expect(html).toContain('locale:');
-    expect(html).toContain('hashes:');
+    expect(state).toBeGreaterThan(-1);
+    expect(html).toContain('"home.title"');
+    // islands hydrate via dynamic import() mid-stream — the state must precede them
+    expect(state).toBeLessThan(html.indexOf('<astro-island'));
   });
 });
 
@@ -215,7 +188,6 @@ describe('key count sanity', () => {
 
     const chunkNames = Object.keys(chunks).map((c) => c.split('.')[0]);
 
-    // verify expected components have chunks
     expect(chunkNames).toContain('Cart');
     expect(chunkNames).toContain('Newsletter');
     expect(chunkNames).toContain('ProductCard');

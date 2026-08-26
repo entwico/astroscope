@@ -1,0 +1,14 @@
+---
+export const prerender = true;
+
+import { Island } from '../components/Island';
+---
+
+<html lang="en">
+  <head>
+    <title>prerendered island</title>
+  </head>
+  <body>
+    <Island client:idle />
+  </body>
+</html>

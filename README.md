@@ -13,7 +13,7 @@ Node.js is the only supported runtime. Other runtimes (Bun, Deno, Cloudflare Wor
 | [@astroscope/node](./packages/node)                   | Opinionated, cloud-friendly Node adapter: boot lifecycle, health probes, request logging, telemetry, CSRF and static serving run as plain code around `server.listen()` |
 | [@astroscope/proxy](./packages/proxy)                 | HTTP proxy for strangler fig migrations and API gateways                                                          |
 | [@astroscope/components](./packages/components)       | Reusable Astro components for common page needs                                                                   |
-| [@astroscope/wormhole](./packages/wormhole)           | Share dynamic server data with React islands and client scripts — typed, reactive                                 |
+| [@astroscope/wormhole](./packages/wormhole)           | Share dynamic server data with React islands and client scripts — typed, streamed with the HTML, sliced per island                                 |
 
 ## Development
 

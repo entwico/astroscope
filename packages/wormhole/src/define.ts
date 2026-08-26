@@ -1,51 +1,92 @@
+import { als } from './als.js';
+import { wormholeKey } from './key.js';
 import type { DeepReadonly, Wormhole } from './types.js';
 
+// name assignment must survive dual module instances (vite runner + native), so the
+// assigner rides the wormhole object itself under a Symbol.for key
+const ASSIGN = Symbol.for('@astroscope/wormhole.assign');
+
 /**
- * Define a wormhole that transfers state from server middleware to client components.
+ * Define a wormhole for the `src/wormholes.ts` registry. The wormhole's name is the
+ * registry key — it is assigned when the registry is passed to
+ * `createWormholeMiddleware()` (or `assignWormholeNames()`).
  *
  * **Security:** wormhole data is serialized into the HTML and sent to the browser.
  * Never store secrets (tokens, API keys, credentials) in a wormhole.
  */
-export function defineWormhole<T>(name: string): Wormhole<T> {
-  const listeners = new Set<(data: DeepReadonly<T>) => void>();
-  const key = `__wormhole_${name}__`;
-  let store: DeepReadonly<T> | undefined;
+export function defineWormhole<T>(): Wormhole<T> {
+  let name: string | undefined;
 
-  return {
-    name,
-    key,
+  const requireName = (): string => {
+    if (name === undefined) {
+      throw new Error('wormhole is not registered — pass its registry to createWormholeMiddleware()');
+    }
 
-    get(): DeepReadonly<T> {
-      if (store !== undefined) return store;
+    return name;
+  };
 
-      const getter = (globalThis as any)[key];
-      const value = typeof getter === 'function' ? (getter() as DeepReadonly<T> | undefined) : undefined;
+  const key = (): string => wormholeKey(requireName());
 
-      if (value === undefined) {
-        throw new Error(`wormhole "${name}" is not initialized`);
-      }
-
-      return value;
+  // methods must not rely on `this` — consumers pass them around detached
+  // (e.g. useSyncExternalStore(wormhole.subscribe, wormhole.get, wormhole.get))
+  const wormhole: Wormhole<T> & { [ASSIGN](next: string): void } = {
+    get name() {
+      return requireName();
     },
 
-    set(data: DeepReadonly<T>): void {
-      if (typeof (globalThis as any).window === 'undefined') {
+    get key() {
+      return key();
+    },
+
+    get(): DeepReadonly<T> {
+      const value = als.getStore()?.get(key());
+
+      if (value === undefined) {
         throw new Error(
-          `wormhole "${name}" set() cannot be called on the server as it is not request-scoped; use open(wormhole, data, fn) from "@astroscope/wormhole/server" instead`,
+          `wormhole "${requireName()}" is not open for this request — is it provided by the wormhole middleware?`,
         );
       }
 
-      store = data;
-
-      for (const fn of listeners) fn(data);
+      return value as DeepReadonly<T>;
     },
 
-    subscribe(fn: (data: DeepReadonly<T>) => void): () => void {
-      listeners.add(fn);
+    set(): void {
+      throw new Error(
+        `wormhole "${requireName()}" set() cannot be called on the server — values are request-scoped and provided by the middleware`,
+      );
+    },
 
-      return () => {
-        listeners.delete(fn);
-      };
+    subscribe(): () => void {
+      // server values never change within a request — nothing to notify
+      return () => {};
+    },
+
+    [ASSIGN](next: string): void {
+      if (name !== undefined && name !== next) {
+        throw new Error(`wormhole is registered under two names: "${name}" and "${next}"`);
+      }
+
+      name = next;
     },
   };
+
+  return wormhole;
+}
+
+/**
+ * Assign each wormhole its registry key as name. Called by `createWormholeMiddleware()`;
+ * exposed for setups that read wormholes on the server without the middleware.
+ */
+export function assignWormholeNames(registry: Record<string, object>): void {
+  for (const [name, wormhole] of Object.entries(registry)) {
+    const assign = (wormhole as { [ASSIGN]?: (next: string) => void })[ASSIGN];
+
+    if (typeof assign !== 'function') {
+      throw new Error(
+        `registry entry "${name}" is not a wormhole — the registry must contain defineWormhole() values only`,
+      );
+    }
+
+    assign(name);
+  }
 }

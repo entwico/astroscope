@@ -141,19 +141,17 @@ export function getManifest() { return manifestJson; }
         // this provides live access to the extraction state as files are transformed
         return `
 import { getManifest as _getManifest } from '@astroscope/i18n/extraction';
-export const manifest = { keys: [], chunks: {} };
+export const manifest = { keys: [], chunks: {}, scripts: [] };
 export function getManifest() { return _getManifest(); }
 `;
       }
     },
 
     async transform(code, filename) {
-      // only process included file types
       if (!ALL_EXTENSIONS.some((ext) => filename.endsWith(ext))) {
         return null;
       }
 
-      // skip node_modules
       if (filename.includes('node_modules')) {
         return null;
       }
@@ -200,12 +198,13 @@ export function getManifest() { return _getManifest(); }
 
       // reset for each build (server + client run separately)
       state.chunkManifest = {};
-      state.importsManifest = {};
+      state.scriptChunks = [];
 
       // first pass: collect keys, determine which chunks have i18n, and build direct imports map
       const chunksWithI18n = new Set<string>();
       const chunkNameToFileName = new Map<string, string>();
-      const directImports = new Map<string, string[]>(); // chunk → direct imports (chunks only)
+      const directImports = new Map<string, string[]>(); // chunk → direct imports incl. dynamic (chunks only)
+      const scriptEntries: string[] = [];
 
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type === 'chunk' && chunk.moduleIds) {
@@ -235,59 +234,50 @@ export function getManifest() { return _getManifest(); }
 
           chunkNameToFileName.set(chunkName, fileName);
 
-          // store direct imports for flattening later
           const imports: string[] = [];
 
-          for (const importedFile of chunk.imports) {
+          for (const importedFile of [...chunk.imports, ...chunk.dynamicImports]) {
             const baseName = importedFile.replace(/^.*\//, '').replace(/\.js$/, '');
-            const importedChunkName = chunkIdToName(baseName);
 
-            imports.push(importedChunkName);
+            imports.push(chunkIdToName(baseName));
           }
 
           directImports.set(chunkName, imports);
+
+          // astro `<script>` entries are not islands, so no island carries their
+          // hashes — collect them so the middleware can bootstrap their chunks
+          if ((chunk.isEntry || chunk.isDynamicEntry) && chunk.facadeModuleId?.includes('astro&type=script')) {
+            scriptEntries.push(chunkName);
+          }
         }
       }
 
-      // build flattened imports manifest
-      // tracks all direct and indirect imports that have i18n translations
-      // circular dependency detection
-      const flattenImports = (chunkName: string, visited: Set<string>): string[] => {
-        if (visited.has(chunkName)) return []; // circular dependency, stop
+      // i18n chunks reachable from script entries (the entry itself included)
+      const scriptChunks = new Set<string>();
+
+      const walkScripts = (chunkName: string, visited: Set<string>): void => {
+        if (visited.has(chunkName)) return;
 
         visited.add(chunkName);
 
-        const result = new Set<string>();
-        const imports = directImports.get(chunkName) ?? [];
-
-        for (const imported of imports) {
-          // add the imported chunk itself if it has i18n translations
-          if (state.chunkManifest[imported]) {
-            result.add(imported);
-          }
-
-          // recursively add all descendants with i18n
-          for (const descendant of flattenImports(imported, visited)) {
-            result.add(descendant);
-          }
+        if (state.chunkManifest[chunkName]) {
+          scriptChunks.add(chunkName);
         }
 
-        visited.delete(chunkName); // allow visiting from different paths
-
-        return Array.from(result);
+        for (const imported of directImports.get(chunkName) ?? []) {
+          walkScripts(imported, visited);
+        }
       };
 
-      // compute flattened imports for ALL chunks (not just those with i18n)
-      // because a chunk without i18n may import chunks that have i18n
-      for (const chunkName of directImports.keys()) {
-        const flattened = flattenImports(chunkName, new Set());
+      const visited = new Set<string>();
 
-        if (flattened.length > 0) {
-          state.importsManifest[chunkName] = flattened;
-        }
+      for (const entry of scriptEntries) {
+        walkScripts(entry, visited);
       }
 
-      // second pass: inject loaders (prefetch is handled by directives)
+      state.scriptChunks = [...scriptChunks];
+
+      // second pass: inject loaders (prefetching is handled by the islands emitter)
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (chunk.type !== 'chunk') continue;
 
@@ -296,7 +286,6 @@ export function getManifest() { return _getManifest(); }
         if (!chunksWithI18n.has(chunkName)) continue;
 
         // simple translation loader - just load own translations
-        // prefetching is handled by directives using the imports manifest
         const loaderCode =
           `if(typeof window!=='undefined'&&window.__i18n__){` +
           `const _=window.__i18n__,h=_.hashes[${JSON.stringify(chunkName)}];` +
@@ -323,7 +312,6 @@ export function getManifest() { return _getManifest(); }
         throw new Error(formatExtractionErrors(extractionErrors, projectRoot));
       }
 
-      // fail build if consistency check is set to 'error' and inconsistencies were found
       if (consistency === 'error' && store.hasErrors) {
         throw new Error('i18n: build failed due to translation key inconsistencies');
       }

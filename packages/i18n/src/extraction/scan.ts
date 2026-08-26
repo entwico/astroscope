@@ -70,7 +70,6 @@ export async function scan(options: ScanOptions): Promise<KeyStore> {
         astroMap = compiled.map;
       }
 
-      // extract keys
       const result = await extractKeysFromFile({
         filename: file,
         code,

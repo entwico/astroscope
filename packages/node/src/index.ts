@@ -9,6 +9,9 @@ export type {
   HealthProbePaths,
 } from './types.js';
 export type { InstrumentationContext } from './platform/prepare.js';
+export { registerIslandEmitter } from './islands/emitters.js';
+export { getRequestRouteData } from './server/route-store.js';
+export type { IslandEmission, IslandEmitter, IslandInfo } from './islands/types.js';
 export type { BootContext } from './lifecycle/types.js';
 export type { BootModule } from './lifecycle/lifecycle.js';
 export type { BootEventName, BootEventHandler } from './lifecycle/events.js';

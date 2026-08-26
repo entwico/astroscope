@@ -308,6 +308,71 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     });
   });
 
+  describe('island preloading', () => {
+    test('emits modulepreload links for an immediate island, before the island tag', async () => {
+      const body = await (await fetch(`${baseUrl}/`)).text();
+
+      expect(body).toMatch(/<link rel="modulepreload" fetchpriority="low" href="\/_astro\/Island\.[^"]+\.js">/);
+      // the island's static import is preloaded alongside it
+      expect(body).toMatch(/<link rel="modulepreload" fetchpriority="low" href="\/_astro\/react\.[^"]+\.js">/);
+      // its dynamic import stays lazy
+      expect(body).not.toMatch(/modulepreload[^>]*canary/);
+      expect(body.indexOf('<link rel="modulepreload"')).toBeLessThan(body.indexOf('<astro-island'));
+    });
+
+    test('registers preload data and injects the gate runtime for a deferred island', async () => {
+      const body = await (await fetch(`${baseUrl}/deferred`)).text();
+
+      expect(body).toMatch(/<script type="module" src="\/_astro\/islands-runtime\.[a-f0-9]+\.js"><\/script>/);
+      expect(body).toMatch(/\(self\.__islands__\?\?=\{\}\)\["\/_astro\/Island\.[^"]+\.js"\]=\[[^\]]+\]/);
+      expect(body.indexOf('__islands__')).toBeLessThan(body.indexOf('<astro-island'));
+      expect(body).not.toMatch(/<link rel="modulepreload"[^>]*Island/);
+    });
+
+    test('serves the gate runtime asset', async () => {
+      const body = await (await fetch(`${baseUrl}/deferred`)).text();
+      const src = body.match(/src="(\/_astro\/islands-runtime\.[^"]+)"/)?.[1];
+
+      expect(src).toBeDefined();
+
+      const res = await fetch(`${baseUrl}${src}`);
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain('astro-island');
+    });
+
+    test('prerendered pages got the rewrite at build time, compressed variants included', async () => {
+      const plain = await (await fetch(`${baseUrl}/static-island`)).text();
+
+      expect(plain).toContain('self.__islands__');
+      expect(plain).toContain('islands-runtime');
+
+      const compressed = await rawGet(`${baseUrl}/static-island`, { 'accept-encoding': 'br' });
+
+      expect(compressed.headers['content-encoding']).toBe('br');
+      expect(brotliDecompressSync(compressed.body).toString()).toContain('self.__islands__');
+    });
+
+    test('html returned by a non-page route passes through untouched', async () => {
+      const res = await rawGet(`${baseUrl}/legacy`);
+      const body = res.body.toString();
+
+      expect(res.headers['content-type']).toContain('text/html');
+      expect(body).toContain('<astro-island component-url="/_astro/Island.fake.js"');
+      expect(body).not.toContain('modulepreload');
+      expect(body).not.toContain('islands-runtime');
+      // the response was returned as-is — a rewrite would have dropped the length
+      expect(res.headers['content-length']).toBe(String(body.length));
+    });
+
+    test('rewritten html responses stream without a content-length', async () => {
+      const res = await rawGet(`${baseUrl}/`);
+
+      expect(res.headers['content-length']).toBeUndefined();
+      expect(res.body.toString()).toContain('modulepreload');
+    });
+  });
+
   describe('pre-compressed static serving', () => {
     test('build wrote .br/.gz variants next to the originals', () => {
       expect(existsSync(path.join(fixtureRoot, 'dist/client/hello.txt.br'))).toBe(true);

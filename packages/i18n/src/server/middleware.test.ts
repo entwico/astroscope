@@ -4,12 +4,13 @@ import type { ExtractionManifest } from '../extraction/types';
 import type { I18nContext } from './types';
 
 const mocks = vi.hoisted(() => ({
-  manifest: { keys: [], chunks: {}, imports: {} } as {
+  manifest: { keys: [], chunks: {}, scripts: [] } as {
     keys: { key: string; meta: { fallback: string }; files: string[] }[];
     chunks: Record<string, string[]>;
-    imports: Record<string, string[]>;
+    scripts: string[];
   },
   overrideRequestRoute: vi.fn(),
+  logError: vi.fn(),
 }));
 
 vi.mock('virtual:@astroscope/i18n/manifest', () => ({
@@ -18,11 +19,13 @@ vi.mock('virtual:@astroscope/i18n/manifest', () => ({
 
 vi.mock('@astroscope/node/log', () => ({
   overrideRequestRoute: mocks.overrideRequestRoute,
+  log: { error: mocks.logError },
 }));
 
 async function load(options?: { configured?: boolean; manifest?: Partial<ExtractionManifest> }) {
-  mocks.manifest = { keys: [], chunks: {}, imports: {}, ...options?.manifest };
+  mocks.manifest = { keys: [], chunks: {}, scripts: [], ...options?.manifest };
   mocks.overrideRequestRoute.mockClear();
+  mocks.logError.mockClear();
 
   vi.resetModules();
 
@@ -37,7 +40,8 @@ async function load(options?: { configured?: boolean; manifest?: Partial<Extract
   return { createI18nChunkMiddleware, createI18nMiddleware, getContext, i18n };
 }
 
-const createCtx = (path: string): APIContext => ({ url: new URL(`http://localhost${path}`) }) as APIContext;
+const createCtx = (path: string): APIContext =>
+  ({ url: new URL(`http://localhost${path}`), request: new Request(`http://localhost${path}`) }) as APIContext;
 
 async function invoke(handler: MiddlewareHandler, ctx: APIContext, next: MiddlewareNext): Promise<Response> {
   const result = await handler(ctx, next);
@@ -108,17 +112,14 @@ describe('createI18nChunkMiddleware', () => {
     expect(mocks.overrideRequestRoute).not.toHaveBeenCalled();
   });
 
-  test('warns and passes through when not configured', async () => {
+  test('logs and passes through when not configured', async () => {
     const { createI18nChunkMiddleware } = await load({ configured: false });
     const { next, response } = createNext();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = await invoke(createI18nChunkMiddleware(), createCtx('/_i18n/en/Cart.Cabc.hash.js'), next);
 
-    expect(warn).toHaveBeenCalledOnce();
+    expect(mocks.logError).toHaveBeenCalledOnce();
     expect(result).toBe(response);
-
-    warn.mockRestore();
   });
 
   test('passes through when the path has no chunk segment', async () => {
@@ -239,21 +240,31 @@ describe('createI18nMiddleware', () => {
     expect(locale).toHaveBeenCalledOnce();
   });
 
-  test('warns and passes through when not configured', async () => {
+  test('logs and passes through when not configured', async () => {
     const { createI18nMiddleware, getContext } = await load({ configured: false });
     let contextInsideNext: I18nContext | null | undefined;
     const { next, response } = createNext(() => {
       contextInsideNext = getContext();
     });
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = await invoke(createI18nMiddleware({ locale: () => 'en' }), createCtx('/page'), next);
 
-    expect(warn).toHaveBeenCalledOnce();
+    expect(mocks.logError).toHaveBeenCalledOnce();
     expect(result).toBe(response);
     expect(contextInsideNext).toBeNull();
+  });
 
-    warn.mockRestore();
+  test('returns the response untouched — delivery rides the islands middleware', async () => {
+    const { createI18nMiddleware, i18n } = await load();
+
+    i18n.setTranslations('en', { greeting: 'Hello' });
+
+    const response = new Response('<html><head></head></html>', { headers: { 'content-type': 'text/html' } });
+    const next = vi.fn(async () => response) as unknown as MiddlewareNext;
+
+    const result = await invoke(createI18nMiddleware({ locale: () => 'en' }), createCtx('/page'), next);
+
+    expect(result).toBe(response);
   });
 
   test('runs next within a context built from the resolved locale', async () => {

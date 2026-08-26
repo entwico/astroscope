@@ -3,10 +3,10 @@ import { getGlobalState } from '../extraction/manifest';
 import type { ExtractionManifest } from '../extraction/types';
 
 const mocks = vi.hoisted(() => ({
-  manifest: { keys: [], chunks: {}, imports: {} } as {
+  manifest: { keys: [], chunks: {}, scripts: [] } as {
     keys: { key: string; meta: { fallback: string }; files: string[] }[];
     chunks: Record<string, string[]>;
-    imports: Record<string, string[]>;
+    scripts: string[];
   },
 }));
 
@@ -15,7 +15,7 @@ vi.mock('virtual:@astroscope/i18n/manifest', () => ({
 }));
 
 async function createI18n(manifest?: Partial<ExtractionManifest>) {
-  mocks.manifest = { keys: [], chunks: {}, imports: {}, ...manifest };
+  mocks.manifest = { keys: [], chunks: {}, scripts: [], ...manifest };
 
   vi.resetModules();
 
@@ -33,7 +33,7 @@ async function createConfiguredI18n(manifest?: Partial<ExtractionManifest>) {
 }
 
 beforeEach(() => {
-  mocks.manifest = { keys: [], chunks: {}, imports: {} };
+  mocks.manifest = { keys: [], chunks: {}, scripts: [] };
 });
 
 describe('configure', () => {
@@ -286,69 +286,28 @@ describe('getHashes', () => {
   });
 });
 
-describe('getClientScript', () => {
-  test('inlines all translations when there are no chunks', async () => {
-    const i18n = await createConfiguredI18n();
-
-    i18n.setTranslations('en', { greeting: 'Hello' });
-
-    const script = i18n.getClientScript('en');
-
-    expect(script).toContain('window.__i18n__=');
-    expect(script).toContain('"greeting":"Hello"');
-    expect(script).toContain('"locale":"en"');
-  });
-
-  test('emits hashes and imports instead of translations when chunks exist', async () => {
+describe('getScriptChunkHashes', () => {
+  test('returns hashes only for script-entry chunks', async () => {
     const i18n = await createConfiguredI18n({
-      chunks: { 'Cart.Cabc': ['cart.title'] },
-      imports: { 'Page.Cdef': ['Cart.Cabc'] },
+      chunks: { 'Cart.Cabc': ['cart.title'], 'hoisted.Cdef': ['banner.text'] },
+      scripts: ['hoisted.Cdef'],
     });
 
-    i18n.setTranslations('en', { 'cart.title': 'Cart' });
+    i18n.setTranslations('en', { 'cart.title': 'Cart', 'banner.text': 'Hi' });
 
-    const script = i18n.getClientScript('en');
+    const hashes = i18n.getScriptChunkHashes('en');
 
-    expect(script).toContain('window.__i18n__=');
-    expect(script).toContain('"Cart.Cabc"');
-    expect(script).toContain('translations:{}');
-    expect(script).not.toContain('Cart"}');
+    expect(Object.keys(hashes)).toEqual(['hoisted.Cdef']);
+    expect(hashes['hoisted.Cdef']).toMatch(/^[0-9a-f]{8}$/);
   });
 
-  test('emits a parseable script past the chunk counts that map to reserved words', async () => {
-    const chunkCount = 300;
-    const chunks: Record<string, string[]> = {};
-    const translations: Record<string, string> = {};
+  test('skips script chunks without translations for the locale', async () => {
+    const i18n = await createConfiguredI18n({
+      chunks: { 'hoisted.Cdef': ['banner.text'] },
+      scripts: ['hoisted.Cdef', 'other.Cxyz'],
+    });
 
-    for (let i = 0; i < chunkCount; i++) {
-      chunks[`Chunk${i}.Cabc`] = [`key.${i}`];
-      translations[`key.${i}`] = `value ${i}`;
-    }
-
-    const i18n = await createConfiguredI18n({ chunks });
-
-    i18n.setTranslations('en', translations);
-
-    const script = i18n.getClientScript('en');
-
-    expect(script).toContain('_do=');
-    expect(script).toContain('_if=');
-    expect(script).toContain('_in=');
-    expect(() => new Function(script)).not.toThrow();
-  });
-
-  test('caches the script per locale and invalidates on setTranslations', async () => {
-    const i18n = await createConfiguredI18n();
-
-    i18n.setTranslations('en', { greeting: 'Hello' });
-
-    const first = i18n.getClientScript('en');
-
-    expect(i18n.getClientScript('en')).toBe(first);
-
-    i18n.setTranslations('en', { greeting: 'Hi' });
-
-    expect(i18n.getClientScript('en')).toContain('"greeting":"Hi"');
+    expect(i18n.getScriptChunkHashes('en')).toEqual({});
   });
 });
 
@@ -412,7 +371,7 @@ describe('manifest invalidation', () => {
     mocks.manifest = {
       keys: [{ key: 'greeting', meta: { fallback: 'Hello v2' }, files: [] }],
       chunks: {},
-      imports: {},
+      scripts: [],
     };
     getGlobalState().version++;
 

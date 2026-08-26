@@ -1,7 +1,7 @@
 {
   "name": "@astroscope/i18n",
   "version": "1.1.2",
-  "description": "i18n for Astro + React islands — MessageFormat 2, automatic tree-shaking, parallel loading, any translation source",
+  "description": "i18n for Astro + React islands - MessageFormat 2, automatic tree-shaking, parallel loading, any translation source",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,28 +15,9 @@
       "browser": "./dist/client/translate.js",
       "default": "./dist/server/translate.js"
     },
-    "./client-directives/load.js": {
-      "types": "./dist/client/directives/load.d.ts",
-      "import": "./dist/client/directives/load.js"
-    },
-    "./client-directives/idle.js": {
-      "types": "./dist/client/directives/idle.d.ts",
-      "import": "./dist/client/directives/idle.js"
-    },
-    "./client-directives/visible.js": {
-      "types": "./dist/client/directives/visible.d.ts",
-      "import": "./dist/client/directives/visible.js"
-    },
-    "./client-directives/media.js": {
-      "types": "./dist/client/directives/media.d.ts",
-      "import": "./dist/client/directives/media.js"
-    },
-    "./client-directives/only.js": {
-      "types": "./dist/client/directives/only.d.ts",
-      "import": "./dist/client/directives/only.js"
-    },
-    "./astro": {
-      "import": "./src/astro/index.ts"
+    "./chunk-middleware": {
+      "types": "./dist/server/chunk-middleware-entrypoint.d.ts",
+      "import": "./dist/server/chunk-middleware-entrypoint.js"
     },
     "./internal": {
       "types": "./dist/internal.d.ts",
@@ -48,11 +29,9 @@
     }
   },
   "files": [
-    "dist",
-    "src/astro"
+    "dist"
   ],
   "sideEffects": [
-    "./dist/client/directives/*.js",
     "./dist/chunk-*.js"
   ],
   "publishConfig": {
@@ -82,7 +61,7 @@
   },
   "homepage": "https://github.com/entwico/astroscope/tree/main/packages/i18n#readme",
   "scripts": {
-    "build": "tsdown src/index.ts src/internal.ts src/extraction/index.ts src/server/translate.ts src/client/translate.ts src/client/directives/load.ts src/client/directives/idle.ts src/client/directives/visible.ts src/client/directives/media.ts src/client/directives/only.ts src/client/directives/utils.ts --format esm --dts --no-fixed-extension --deps.never-bundle astro --deps.never-bundle astro/client/load.js --deps.never-bundle astro/client/idle.js --deps.never-bundle astro/client/visible.js --deps.never-bundle astro/client/media.js --deps.never-bundle astro/client/only.js --deps.never-bundle virtual:@astroscope/i18n/manifest --deps.never-bundle @babel/core",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
@@ -92,17 +71,17 @@
     "@babel/core": "^8.0.1",
     "@babel/preset-typescript": "^8.0.1",
     "@jridgewell/trace-mapping": "^0.3.31",
-    "magic-string": "^0.30.21",
+    "magic-string": "^1.2.2",
     "messageformat": "^4.0.0"
   },
   "devDependencies": {
     "@astroscope/node": "workspace:^",
     "@babel/types": "^8.0.4",
     "@types/babel__core": "^7.20.5",
-    "astro": "^7.0.9",
-    "tsdown": "^0.22.8",
+    "astro": "^7.2.6",
+    "tsdown": "^0.22.14",
     "typescript": "^6.0.3",
-    "vite": "^8.1.5"
+    "vite": "^8.2.2"
   },
   "peerDependencies": {
     "@astroscope/node": "workspace:^",

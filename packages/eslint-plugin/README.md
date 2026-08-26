@@ -1,7 +1,5 @@
 # @astroscope/eslint-plugin
 
-> **Note:** This package is in active development. APIs may change between versions.
-
 Additional ESLint rules for Astro projects. Plays well with `eslint-plugin-astro`.
 
 ## Installation
@@ -22,6 +20,9 @@ export default [
 
   // opt-in for @astroscope/i18n projects
   ...astroscope.configs.i18n,
+
+  // opt-in for @astroscope/wormhole projects
+  ...astroscope.configs.wormhole,
 ];
 ```
 
@@ -34,6 +35,7 @@ export default [
 | `@astroscope/island-not-serializable`                | error    |         | yes        | require a hydrated island's props to be directly serializable plain data          |
 | `@astroscope/no-client-directive-on-astro-component` | error    |         |            | disallow `client:*` directives on Astro components (they only hydrate frameworks) |
 | `@astroscope/no-html-comments`                       | error    | yes     |            | disallow HTML comments in `.astro` templates — they render into the output HTML   |
+| `@astroscope/no-server-action-calls`                 | error    |         |            | disallow calling actions during server rendering of `.astro` files                |
 | `@astroscope/prefer-ssr-guard`                       | error    | yes     |            | prefer `import.meta.env.SSR` over `typeof window !== 'undefined'` (and friends)   |
 
 ## Rule Details
@@ -125,6 +127,28 @@ HTML comments (`<!-- -->`) in `.astro` templates render into the served HTML and
 
 Autofix rewrites `<!-- x -->` → `{/* x */}`. Declines to autofix when the comment body contains `*/` (would terminate the JSX comment early).
 
+### `no-server-action-calls`
+
+Astro frontmatter and template expressions run during server rendering — a plain GET page render. Calling an action there fires the mutation on every render, outside the action endpoint's POST-only + origin-checked delivery, and couples the page to the controller. A direct `actions.<name>()` call also throws `ActionCalledFromServerError` at runtime; `Astro.callAction()` is Astro's escape hatch around that error and is flagged the same. When an action and astro code need the same logic, put it in its own module and import it from both.
+
+Non-call references stay legal — passing `actions.<name>` to a form or to `Astro.getActionResult()` is the intended server-side usage, and client `<script>` blocks are unaffected.
+
+```astro
+---
+import { actions } from 'astro:actions';
+
+// flagged
+const result = await actions.like({ id: postId });
+const result2 = await Astro.callAction(actions.like, { id: postId });
+
+// clean — read the submitted result
+const submitted = Astro.getActionResult(actions.like);
+---
+
+<!-- clean — the intended usage -->
+<form method="POST" action={actions.like}></form>
+```
+
 ### `prefer-ssr-guard`
 
 Unlike `typeof window !== 'undefined'`, `import.meta.env.SSR` lets the bundler tree-shake the browser-only code out of the SSR build.
@@ -143,20 +167,9 @@ if (!import.meta.env.SSR) {
 }
 ```
 
-## Compatibility
-
-- ESLint 9 and 10
-- Works alongside `eslint-plugin-astro` (order-independent), or standalone
-
-## License
-
-MIT
-
-## i18n
-
-Rules for projects using `@astroscope/i18n` ship in the same package as a second config set. They keep their own plugin namespace (`@astroscope/i18n/...`), so rule ids and inline `eslint-disable` comments are identical to the former `@astroscope/eslint-plugin-i18n` package.
-
 ## i18n Rules (`configs.i18n`)
+
+Rules for projects using `@astroscope/i18n`, opt-in alongside `recommended`. They keep their own plugin namespace, so rule ids read `@astroscope/i18n/...`.
 
 | Rule | Severity | Fixable | Description |
 |------|----------|---------|-------------|
@@ -166,7 +179,6 @@ Rules for projects using `@astroscope/i18n` ship in the same package as a second
 | `@astroscope/i18n/t-static-meta` | warn | | second argument must be statically analyzable (extraction reads it at build time) |
 | `@astroscope/i18n/t-requires-meta` | warn | | second argument (fallback/meta) should be provided for development DX |
 | `@astroscope/i18n/no-t-reassign` | error | | forbids aliasing or reassigning `t` (the extractor only recognizes `t()` calls) |
-| `@astroscope/i18n/prefer-x-directives` | error | yes | prefer `client:load-x` over `client:load` (and `visible`, `idle`, `media`, `only`) for i18n-aware hydration |
 | `@astroscope/i18n/no-raw-strings-in-jsx` | warn | | warns when raw strings appear in JSX that may need translation |
 
 ## i18n Rule Details
@@ -238,20 +250,6 @@ import { t as translate } from '@astroscope/i18n/translate';
 const translate = t;
 ```
 
-### `prefer-x-directives`
-
-The `-x` client directives preload translations before hydration. They are a strict superset of the standard directives — components without translations work identically.
-
-```astro
-<!-- good -->
-<Cart client:load-x />
-<Cart client:visible-x />
-
-<!-- bad -->
-<Cart client:load />
-<Cart client:visible />
-```
-
 ### `no-raw-strings-in-jsx`
 
 Warns when JSX contains raw string literals that may need translation. Ignores whitespace, numbers, and common non-translatable attributes (`className`, `href`, `type`, etc.).
@@ -280,7 +278,7 @@ Warns when JSX contains raw string literals that may need translation. Ignores w
 The default ignore list is exported as `DEFAULT_IGNORE_ATTRIBUTES` for consumers who want to extend it:
 
 ```js
-import i18n, { DEFAULT_IGNORE_ATTRIBUTES } from '@astroscope/eslint-plugin-i18n';
+import astroscope, { DEFAULT_IGNORE_ATTRIBUTES } from '@astroscope/eslint-plugin';
 
 // ...
 '@astroscope/i18n/no-raw-strings-in-jsx': ['warn', {
@@ -288,10 +286,65 @@ import i18n, { DEFAULT_IGNORE_ATTRIBUTES } from '@astroscope/eslint-plugin-i18n'
 }]
 ```
 
+## Wormhole Rules (`configs.wormhole`)
+
+Rules for projects using `@astroscope/wormhole`, opt-in alongside `recommended`. They keep their own plugin namespace, so rule ids read `@astroscope/wormhole/...`.
+
+| Rule | Severity | Fixable | Description |
+|------|----------|---------|-------------|
+| `@astroscope/wormhole/wormholes-static-access` | warn | | accesses on the `wormholes` proxy must be static — dynamic keys and aliasing defeat build-time payload slicing |
+| `@astroscope/wormhole/server-readonly` | error | | `set()` / `subscribe()` are client-only; astro files are server code where values are request-scoped |
+| `@astroscope/wormhole/no-use-wormhole-in-astro` | error | | the `useWormhole` react hook cannot run in astro server code — use `wormholes.<name>.get()` |
+
+## Wormhole Rule Details
+
+### `wormholes-static-access`
+
+The build-time scanner resolves `wormholes.<name>` accesses to decide which wormholes each chunk needs. Anything it cannot resolve degrades the chunk to "all open wormholes" — sound, but it defeats slicing. Astro files are exempt (server-rendered, never in the client chunk graph).
+
+```ts
+// good
+wormholes.cart.get();
+wormholes['session'].subscribe(fn);
+
+// bad
+wormholes[name].get();
+const w = wormholes;
+const { cart } = wormholes;
+```
+
+### `server-readonly`
+
+Astro frontmatter and template expressions run on the server, where wormhole values are request-scoped and read-only: `set()` throws at runtime and `subscribe()` never fires. Client `<script>` blocks are unaffected.
+
+```astro
+---
+const cart = wormholes.cart.get(); // good
+
+wormholes.cart.set({ items: [] }); // bad
+---
+```
+
+### `no-use-wormhole-in-astro`
+
+`useWormhole` is a React hook — there is no React runtime in astro server code.
+
+```astro
+---
+// bad
+import { useWormhole } from '@astroscope/wormhole/react';
+
+// good: read directly
+import { wormholes } from '@astroscope/wormhole';
+
+const cart = wormholes.cart.get();
+---
+```
+
 ## Compatibility
 
 - ESLint 9 and 10
-- Works with `eslint-plugin-astro` for `.astro` file support
+- Works alongside `eslint-plugin-astro` (order-independent), or standalone
 
 ## License
 

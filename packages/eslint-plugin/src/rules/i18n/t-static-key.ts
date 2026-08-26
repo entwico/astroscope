@@ -20,7 +20,6 @@ export const tStaticKey: Rule.RuleModule = {
 
         if (!firstArg) return; // no args — other rules handle this
 
-        // allow string literals
         if (firstArg.type === 'Literal' && typeof firstArg.value === 'string') return;
 
         // allow template literals with no expressions: `checkout.title`

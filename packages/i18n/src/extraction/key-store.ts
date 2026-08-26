@@ -139,7 +139,6 @@ export class KeyStore {
     const locA = `${a.file}:${a.line}`;
     const locB = `${b.file}:${b.line}`;
 
-    // check fallback
     if (a.meta.fallback !== b.meta.fallback) {
       result.push({
         key: a.key,
@@ -149,7 +148,6 @@ export class KeyStore {
       });
     }
 
-    // check description
     if (a.meta.description !== b.meta.description) {
       result.push({
         key: a.key,
@@ -159,7 +157,6 @@ export class KeyStore {
       });
     }
 
-    // check variables
     const varsA = this.serializeVariables(a.meta);
     const varsB = this.serializeVariables(b.meta);
 
@@ -236,12 +233,10 @@ export class KeyStore {
       const fileLocation = `${occurrence.file}:${occurrence.line}`;
 
       if (existing) {
-        // add file location if not already present
         if (!existing.files.includes(fileLocation)) {
           existing.files.push(fileLocation);
         }
 
-        // update meta (last one wins)
         existing.meta = occurrence.meta;
       } else {
         keyMap.set(occurrence.key, {
@@ -278,7 +273,6 @@ export class KeyStore {
       this.filesWithI18n.add(file);
     }
 
-    // check for inconsistencies when merging
     if (this.consistency !== 'off') {
       this.checkConsistency(other.occurrences);
     }

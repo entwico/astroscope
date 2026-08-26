@@ -1,8 +1,8 @@
+import { wormholes } from '@astroscope/wormhole';
 import { useWormhole } from '@astroscope/wormhole/react';
-import { configWormhole } from '../wormholes';
 
 export default function ConfigDisplay() {
-  const config = useWormhole(configWormhole);
+  const config = useWormhole(wormholes.config);
 
   return (
     <div>

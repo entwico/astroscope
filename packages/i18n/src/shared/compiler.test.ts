@@ -38,7 +38,6 @@ one {{{$count} item}}
     const fn1 = compileMessage('en', 'test');
     const fn2 = compileMessage('en', 'test');
 
-    // both should return the same result
     expect(fn1()).toBe(fn2());
   });
 });

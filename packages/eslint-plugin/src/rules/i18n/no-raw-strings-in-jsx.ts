@@ -232,7 +232,6 @@ export const noRawStringsInJsx: Rule.RuleModule = {
 
         if (shouldIgnore(text)) return;
 
-        // trim and check if there's actual content
         const trimmed = text.trim();
 
         if (!trimmed) return;
@@ -254,7 +253,6 @@ export const noRawStringsInJsx: Rule.RuleModule = {
         if (shouldIgnore(text)) return;
         if (isInsideIgnoredAttribute(node)) return;
 
-        // check if this attribute name is ignored
         const attrName =
           node.name?.type === 'JSXIdentifier'
             ? node.name.name

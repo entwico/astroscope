@@ -7,6 +7,12 @@ declare module 'virtual:@astroscope/node/instrumentation-entry' {
   export const register: ((ctx: { dev: boolean }) => void | Promise<void>) | undefined;
 }
 
+declare module 'virtual:@astroscope/node/islands-manifest' {
+  import type { IslandsManifest } from './islands/types.js';
+
+  export const manifest: IslandsManifest | null;
+}
+
 declare module 'virtual:@astroscope/node/log-entry' {
   import type { LoggerOptionsFactory } from './observability/log/construct.js';
 

@@ -5,7 +5,7 @@
  */
 
 import path from 'node:path';
-import type { ChunkManifest, ExtractedKey, ExtractionManifest, ImportsManifest } from './types.js';
+import type { ChunkManifest, ExtractedKey, ExtractionManifest } from './types.js';
 
 // global state for dev mode live access via globalThis
 // this allows the virtual module to access current extraction data
@@ -13,10 +13,9 @@ import type { ChunkManifest, ExtractedKey, ExtractionManifest, ImportsManifest }
 const I18N_MANIFEST_GLOBAL_KEY = '__astroscope_i18n_manifest__';
 
 export type GlobalI18nState = {
-  // actual manifest data
   extractedKeys: ExtractedKey[];
   chunkManifest: ChunkManifest;
-  importsManifest: ImportsManifest;
+  scriptChunks: string[];
 
   // project root for relative paths
   projectRoot: string;
@@ -33,7 +32,7 @@ export function getGlobalState(): GlobalI18nState {
     g[I18N_MANIFEST_GLOBAL_KEY] = {
       extractedKeys: [],
       chunkManifest: {},
-      importsManifest: {},
+      scriptChunks: [],
       projectRoot: '',
       version: 0,
     };
@@ -66,5 +65,5 @@ export function getManifest(): ExtractionManifest {
     }),
   }));
 
-  return { keys, chunks: state.chunkManifest, imports: state.importsManifest };
+  return { keys, chunks: state.chunkManifest, scripts: state.scriptChunks };
 }

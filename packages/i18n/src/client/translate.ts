@@ -33,7 +33,6 @@ export const t: TranslateFunction = ((
   const state = getI18nState();
   const locale = state?.locale ?? '';
 
-  // look up raw translation
   const raw = state?.translations[key];
 
   if (!raw) {
@@ -49,11 +48,9 @@ export const t: TranslateFunction = ((
       return compiled(values);
     }
 
-    // production: return key as-is
     return key;
   }
 
-  // check cache
   let compiled = cache.get(key);
 
   if (!compiled) {
@@ -93,7 +90,6 @@ export function rich<T = unknown>(
 
   const state = getI18nState();
 
-  // look up raw translation, fall back to meta.fallback or key
   const raw = state?.translations[key] || normalizedMeta.fallback || key;
 
   const parts = formatMessageToParts(state?.locale ?? '', raw, values);

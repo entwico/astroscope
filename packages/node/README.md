@@ -11,9 +11,11 @@ Opinionated, cloud-friendly Node adapter for Astro: boot lifecycle, health probe
 - **Telemetry** — OpenTelemetry NodeSDK, undici fetch instrumentation, runtime + host metrics, Prometheus reader
 - **CSRF protection** — origin check for unsafe methods, with path exclusions
 - **Platform entry files** — env loading → `src/config.ts` → `src/instrumentation.ts` → `src/log.ts` → boot, each picked up automatically when the file exists
+- **Island preloading** — each island's JS is preloaded in parallel instead of being discovered module by module, removing the hydration request waterfall ([Island preloading](#island-preloading))
 - **Pre-compressed static serving** — build-time brotli/gzip variants, negotiated per `Accept-Encoding`
 - **Native mounts** — http-native handlers (`oidc-provider`, ACME) mounted on the adapter's server
 - **Build tweaks** — SSR sourcemaps, SSR effect stripping
+- **Image processing off unless configured** — without an explicit `image.service`, any `astro:assets` use fails loudly instead of opening astro's on-demand sharp endpoint ([Image processing](#image-processing))
 - **Dev restart machinery** — changes to the boot file or entry seams restart the dev server behind a holding page
 - **Dev island warmup** — `.astro` sources are scanned for `client:*` components; their deps are pre-optimized and their module graphs warmed at server start, preventing "504 Outdated Optimize Dep" hydration failures from vite's lazy dep discovery
 - **HTTPS for development** — `SERVER_CERT_PATH` / `SERVER_KEY_PATH` serve TLS directly for local runs of the built server ([HTTPS](#https)); in production, terminate TLS at the ingress
@@ -25,7 +27,7 @@ The adapter assumes a container behind a load balancer / reverse proxy (Kubernet
 - **Opens `0.0.0.0:9090` in production** — the health probe server. Meant for the kubelet; do not expose it publicly.
 - **Opens `0.0.0.0:9464` in production** — the Prometheus metrics reader. Same: cluster-internal only.
 - **Trusts any `Host` / `X-Forwarded-Host`** — sets `security.allowedDomains: [{}]` (unless you set it yourself), because the reverse proxy is expected to control these headers. Without one, host header injection is possible.
-- **Overrides Astro security and config defaults** — `security.checkOrigin: false` (the embedded CSRF middleware replaces it; `csrf: false` restores Astro's check), `build.redirects: false` (redirects handled at runtime), `trailingSlash: 'never'` (only when yours is at the default `'ignore'`).
+- **Overrides Astro security and config defaults** — `security.checkOrigin: false` (the embedded CSRF middleware replaces it; `csrf: false` restores Astro's check), `build.redirects: false` (redirects handled at runtime), `trailingSlash: 'never'` (only when yours is at the default `'ignore'`), `astro:assets` disabled when `image.service` is at its default ([Image processing](#image-processing)).
 - **Standalone only.** No middleware mode — the adapter always owns the server.
 - **No session driver.** Astro sessions are unsupported unless you configure `session.driver` yourself.
 - **No health probes in dev.** The health server only exists in production and `astro preview`.
@@ -238,6 +240,12 @@ export const onRequest = withExcluded(someExternalMiddleware(), RECOMMENDED_EXCL
 
 For hot paths, compile the set once with `createMatcher` from `@entwico/dash/match` instead of scanning per request (the adapter's own request instrumentation does exactly that).
 
+## Island preloading
+
+Without it, an island's JS loads as a chain: the browser fetches the component module, parses it, discovers its imports, fetches those, and so on. In production the adapter knows each island's chunks from the build and emits preload tags next to the island, so the browser fetches everything in parallel. Deferred islands (`client:visible`, `client:idle`, `client:media`) are preloaded just ahead of their hydration.
+
+Always on in production; `islands: false` disables it.
+
 ## Pre-compressed static serving
 
 At build time, every compressible file in `dist/client` gets max-quality `.br` (brotli 11) and `.gz` (gzip 9) variants written next to it — variants that don't shrink the file are skipped. At request time the static handler negotiates `Accept-Encoding` and serves the best variant with the original's content-type, `content-encoding`, `vary: accept-encoding` and per-variant etags (304s included). Behind a caching proxy with per-encoding cache keys, the origin serves each asset once per encoding.
@@ -248,6 +256,22 @@ Always on, no configuration:
 
 - **SSR sourcemaps** — the server bundle gets sourcemaps for readable stack traces; client bundles stay unmapped so browsers can't fetch source
 - **SSR effect stripping** — `useEffect`/`useLayoutEffect`/`useInsertionEffect` callbacks are emptied in the SSR bundle (effects never run on the server), letting the bundler drop client-only dynamic imports (maplibre-gl, hls.js, …) from the server build and the docker image
+
+## Image processing
+
+In SSR, astro's default sharp service makes `/_image` an on-demand decode+encode endpoint whose transform space is attacker-controlled: every distinct query string (`w`, `h`, `q`, `fit`, `position`, `background`) costs a full sharp run and is a distinct cache key, so no fronting cache can absorb it. Most SSR apps serve pre-generated variants from a CMS/CDN anyway, so the adapter keeps processing off unless you ask for it — governed by one option:
+
+```typescript
+node({
+  imageService: 'auto', // 'on' | 'off' | 'auto'
+});
+```
+
+- `'auto'` (default) — on when the astro config sets `image.service` itself, off otherwise
+- `'on'` — astro's default sharp service, no further config needed
+- `'off'` — off even over an explicit `image.service`
+
+Off is loud, not silent: the adapter installs a service whose every method throws with an explanation, so any `astro:assets` use — `<Image>`, `<Picture>`, `getImage()`, markdown or content-collection images — fails at render/build time instead of quietly serving unoptimized bytes. The `/_image` endpoint is replaced with a 404 responder — to clients the endpoint simply doesn't exist. Apps without images never load any of it.
 
 ## Options
 
@@ -286,6 +310,13 @@ node({
     prometheus: { host: '0.0.0.0', port: 9464 }, // false disables the reader
     dev: false, // start the SDK in dev too (once per process)
   },
+
+  // island dependency preloading (production-only); false disables it
+  islands: false,
+
+  // on-demand image processing: 'auto' = on only when image.service is set
+  // in the astro config (see the Image processing section)
+  imageService: 'auto',
 
   bodySizeLimit: 1024 * 1024 * 1024, // request body limit in bytes
   shutdownTimeout: 10_000, // ms to wait for in-flight requests on shutdown

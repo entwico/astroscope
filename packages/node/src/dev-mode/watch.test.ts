@@ -590,7 +590,6 @@ describe('setupBootWatch', () => {
       expect(scheduler.scheduleFullReload).not.toHaveBeenCalled();
     });
 
-    // end-to-end: real scheduler, full-reload event → server.restart() actually fires
     test('SSR full-reload reaches server.restart() through a real scheduler', async () => {
       vi.useFakeTimers();
 

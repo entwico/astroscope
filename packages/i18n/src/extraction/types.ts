@@ -41,16 +41,15 @@ export type ExtractedKey = {
 export type ChunkManifest = Record<string, string[]>;
 
 /**
- * Chunk imports mapping: chunk name → array of imported chunk names that have i18n
- * All direct and indirect descendants are flattened into a single array
- */
-export type ImportsManifest = Record<string, string[]>;
-
-/**
  * Full extraction manifest
  */
 export type ExtractionManifest = {
   keys: ExtractedKey[];
   chunks: ChunkManifest;
-  imports: ImportsManifest;
+  /**
+   * i18n chunks reachable from astro `<script>` entries. Script modules are not
+   * islands, so no island carries their hashes — the middleware bootstraps these
+   * few page-agnostically instead.
+   */
+  scripts: string[];
 };

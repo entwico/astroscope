@@ -5,7 +5,6 @@ const clientState: I18nClientState = {
   locale: 'en',
   hashes: {},
   translations: { greeting: 'Hello' },
-  imports: {},
 };
 
 async function loadState(i18n: I18nClientState | undefined) {
@@ -43,7 +42,7 @@ describe('getI18nState', () => {
     expect(getI18nState()).toBeUndefined();
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy.mock.calls[0]?.[0]).toContain('window.__i18n__ is not defined');
-    expect(errorSpy.mock.calls[0]?.[0]).toContain('<I18nScript />');
+    expect(errorSpy.mock.calls[0]?.[0]).toContain('createI18nMiddleware');
   });
 
   test('logs the missing-state error only once', async () => {

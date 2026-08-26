@@ -144,6 +144,30 @@ export interface NodeOptions {
   csrf?: { exclude?: ExcludePattern[] | undefined } | false | undefined;
 
   /**
+   * Island dependency preloading: streams html responses through a rewriter that
+   * emits `modulepreload` links (and preload data for deferred islands, fired by a
+   * small gate runtime with the directive's own scheduling) for each island's
+   * chunk closure, removing the hydration request waterfall. Production-only —
+   * dev has no chunk graph. Set to `false` to disable the preloading; the islands
+   * middleware itself stays active for packages that registered island or document
+   * emitters (e.g. `@astroscope/i18n`, `@astroscope/wormhole`).
+   */
+  islands?: false | undefined;
+
+  /**
+   * On-demand image processing (`astro:assets` through the `/_image`
+   * endpoint). `'auto'`: enabled only when the astro config sets
+   * `image.service` itself; otherwise processing is disabled — any
+   * `<Image>`/`getImage()` use throws with an explanation and `/_image`
+   * answers 404, as if the endpoint did not exist. `'on'` keeps astro's default sharp service; `'off'` disables
+   * even over an explicit `image.service`. Off unless configured because the
+   * sharp endpoint is an on-demand decode+encode amplification surface most
+   * SSR apps (serving pre-generated variants) don't need.
+   * @default 'auto'
+   */
+  imageService?: 'on' | 'off' | 'auto' | undefined;
+
+  /**
    * Maximum request body size in bytes. `0` or `Infinity` disables the limit.
    * @default 1073741824 (1 GiB)
    */

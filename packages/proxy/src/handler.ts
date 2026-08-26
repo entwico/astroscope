@@ -194,14 +194,13 @@ async function maybeTransformResponse(
 }
 
 function safeDestroyBody(body: Dispatcher.ResponseData['body']) {
-  // destroy the body stream to free up resources (if not already closed)
   try {
     body.on('error', () => {
-      //
+      // destroy may emit late errors after teardown
     });
 
     body.destroy();
   } catch {
-    //
+    // body may already be destroyed
   }
 }

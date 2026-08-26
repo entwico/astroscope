@@ -43,17 +43,17 @@
   },
   "homepage": "https://github.com/entwico/astroscope/tree/main/packages/components#readme",
   "scripts": {
-    "build": "tsdown src/index.ts --format esm --dts --no-fixed-extension",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src --cache",
     "lint:fix": "eslint src --fix"
   },
   "devDependencies": {
-    "astro": "^7.0.9",
-    "tsdown": "^0.22.8",
+    "astro": "^7.2.6",
+    "tsdown": "^0.22.14",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "peerDependencies": {
     "astro": "^7.0.0"

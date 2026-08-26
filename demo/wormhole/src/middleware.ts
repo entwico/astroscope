@@ -1,14 +1,11 @@
-import { open } from '@astroscope/wormhole/server';
-import { defineMiddleware, sequence } from 'astro:middleware';
+import { createWormholeMiddleware } from '@astroscope/wormhole/server';
 import { getCount } from './server/store';
-import { configWormhole, counterWormhole } from './wormholes';
 
-const configMiddleware = defineMiddleware((_ctx, next) => {
-  return open(configWormhole, { siteName: 'Astroscope Demo', features: ['wormhole', 'react', 'ssr'] }, () => next());
+export const onRequest = createWormholeMiddleware({
+  values: () => ({
+    config: { siteName: 'Astroscope Demo', features: ['wormhole', 'react', 'ssr'] },
+    counter: { count: getCount() },
+    stats: { visitors: 1234 },
+    audit: { requestId: 'server-only-audit-marker' },
+  }),
 });
-
-const counterMiddleware = defineMiddleware((_ctx, next) => {
-  return open(counterWormhole, { count: getCount() }, () => next());
-});
-
-export const onRequest = sequence(configMiddleware, counterMiddleware);

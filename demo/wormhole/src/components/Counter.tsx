@@ -1,15 +1,15 @@
+import { wormholes } from '@astroscope/wormhole';
 import { useWormhole } from '@astroscope/wormhole/react';
 import { actions } from 'astro:actions';
-import { counterWormhole } from '../wormholes';
 
 export default function Counter() {
-  const { count } = useWormhole(counterWormhole);
+  const { count } = useWormhole(wormholes.counter);
 
   async function update(newCount: number) {
     const result = await actions.updateCounter({ count: newCount });
 
     if (!result.error) {
-      counterWormhole.set(result.data);
+      wormholes.counter.set(result.data);
     }
   }
 

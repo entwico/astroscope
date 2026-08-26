@@ -1,7 +1,5 @@
 # @astroscope/components
 
-> **Note:** This package is in active development. APIs may change between versions.
-
 Reusable Astro components for common client needs.
 
 ## Installation
@@ -37,7 +35,7 @@ import { Seo, JsonLd, JsonScript, WithNoBfCache, SmoothHashScroll } from '@astro
 The full page document: it owns the `<html>`/`<head>`/`<body>` structure, `charset`, `viewport`,
 font preloads, the head metadata (`<PageMetadata>`, its fields inlined into the props so
 `title`/`siteName` are required), and an optional back-forward-cache opt-out (`disableBfCache`).
-Everything else project-specific (favicons, consent/analytics, i18n scripts, schema) goes through
+Everything else project-specific (favicons, consent/analytics, schema) goes through
 the `head` slot and the body, so `<Page>` composes the other parts rather than reimplementing them.
 
 ```astro
@@ -57,7 +55,7 @@ const metadata: WebpageMetadata = { title: 'Home', description: '…', canonical
   <!-- head: the rest of your head tags -->
   <Fragment slot="head">
     <link rel="icon" href="/favicon.svg" />
-    <!-- your I18nScript, consent script, extra tags, etc. -->
+    <!-- your consent script, extra tags, etc. -->
   </Fragment>
 
   <!-- default slot: page body -->

@@ -6,6 +6,8 @@ import { createIslandWarmup } from '../dev-mode/island-warmup.js';
 import { createDevMachinery } from '../dev-mode/machinery.js';
 import { type ExcludePattern, RECOMMENDED_EXCLUDES } from '../excludes/excludes.js';
 import { serializeExcludePatterns } from '../excludes/serialize.js';
+import { createIslandsManifestPlugin } from '../islands/manifest-plugin.js';
+import type { IslandsManifest } from '../islands/types.js';
 import { createRequestInstrumentation } from '../observability/instrument.js';
 import { preparePlatform } from '../platform/prepare.js';
 import { dispatchNativeMount } from '../server/native-mount.js';
@@ -72,6 +74,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
   const bootOptions = options.boot ?? {};
   const healthOptions = options.health ?? {};
   const csrfOptions = options.csrf ?? {};
+  const islandsEnabled = options.islands !== false;
   const loggingOptions = options.logging ?? {};
   const telemetryOptions = options.telemetry ?? {};
 
@@ -99,6 +102,9 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
         if (csrfOptions) {
           addMiddleware({ order: 'pre', entrypoint: '@astroscope/node/csrf-middleware' });
         }
+
+        // registered after logging/csrf so its next() wraps the rendered response
+        addMiddleware({ order: 'pre', entrypoint: '@astroscope/node/islands-middleware' });
 
         const root = fileURLToPath(config.root);
         const watch = bootOptions === false ? false : (bootOptions.watch ?? true);
@@ -150,6 +156,11 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
         const islandWarmup =
           command === 'dev' ? [createIslandWarmup({ root, srcDir: fileURLToPath(config.srcDir), logger })] : [];
 
+        const imageService = options.imageService ?? 'auto';
+        const imageOff =
+          imageService === 'off' ||
+          (imageService === 'auto' && config.image.service.entrypoint === 'astro/assets/services/sharp');
+
         updateConfig({
           build: { redirects: false },
           // opinionated defaults: no trailing slashes, behind LB
@@ -161,17 +172,20 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
             ...(csrfOptions && { checkOrigin: false }),
           },
           image: {
+            ...(imageOff && { service: { entrypoint: '@astroscope/node/image-service', config: {} } }),
             endpoint: {
               route: config.image.endpoint.route ?? '_image',
-              entrypoint:
-                config.image.endpoint.entrypoint ??
-                (command === 'dev' ? 'astro/assets/endpoint/dev' : 'astro/assets/endpoint/node'),
+              entrypoint: imageOff
+                ? '@astroscope/node/image-endpoint'
+                : (config.image.endpoint.entrypoint ??
+                  (command === 'dev' ? 'astro/assets/endpoint/dev' : 'astro/assets/endpoint/node')),
             },
           },
           vite: {
             plugins: [
               ...devMachinery,
               ...islandWarmup,
+              createIslandsManifestPlugin({ assetsDir: config.build.assets, logger, enabled: islandsEnabled }),
               ssrSourcemapPlugin(),
               stripSsrEffectsPlugin(),
               {
@@ -308,6 +322,22 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
       },
       'astro:build:done': async ({ logger }) => {
         if (!astroConfig) return;
+
+        if (islandsEnabled) {
+          // prerendered pages never pass through the middleware — rewrite them on
+          // disk before compression, from the manifest the client build just wrote
+          const manifestPath = path.join(fileURLToPath(astroConfig.build.server), 'chunks', 'islands-manifest.json');
+
+          if (fs.existsSync(manifestPath)) {
+            const { transformPrerenderedHtml } = await import('../islands/prerendered.js');
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as IslandsManifest;
+            const transformed = await transformPrerenderedHtml(fileURLToPath(astroConfig.build.client), manifest);
+
+            if (transformed > 0) {
+              logger.info(`island preloading applied to ${transformed} prerendered page(s)`);
+            }
+          }
+        }
 
         const { compressClientDir } = await import('../compress/compress.js');
 

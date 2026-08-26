@@ -17,7 +17,7 @@ export type DeepReadonly<T> = T extends (...args: never[]) => unknown
  * Never store secrets (tokens, API keys, credentials) in a wormhole.
  *
  * The stored value is exposed as deeply readonly — the only way to change it is `set()`
- * (client) or `open()` (server) with a new value, which keeps subscribers in sync.
+ * (client) or the middleware's per-request values (server), which keeps subscribers in sync.
  */
 // `in out` forces invariance: methods are bivariant in TS, so without it a
 // Wormhole<A> unifies into Wormhole<A | B> and mismatched open() data slips through
@@ -26,9 +26,24 @@ export interface Wormhole<in out T> {
   readonly key: string;
   get(): DeepReadonly<T>;
   /**
-   * Update the wormhole value on the **client only**.
-   * Throws on the server — use `open(wormhole, data, fn)` from `@astroscope/wormhole/server` instead.
+   * Update the wormhole value on the **client only** — every subscriber on the page
+   * (islands and scripts alike) is notified. Throws on the server, where values are
+   * request-scoped and provided by the middleware.
    */
   set(data: DeepReadonly<T>): void;
   subscribe(fn: (data: DeepReadonly<T>) => void): () => void;
 }
+
+/**
+ * The project's wormhole names and value types. Empty by default — the integration
+ * generates a type stub (via `injectTypes`) that merges the `src/wormholes.ts`
+ * registry into this interface, which types the `wormholes` proxy.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface WormholeRegistry {}
+
+/** maps a registry module's `{ name: Wormhole<T> }` shape to `{ name: T }` */
+export type UnwrapWormholes<R> = { [K in keyof R]: R[K] extends Wormhole<infer T> ? T : never };
+
+/** the shape of the `wormholes` proxy: one typed accessor per registry entry */
+export type WormholeMap = { readonly [K in keyof WormholeRegistry]: Wormhole<WormholeRegistry[K]> };

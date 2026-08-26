@@ -31,13 +31,14 @@ export type CompiledTranslations = Record<string, CompiledTranslation>;
 export type RawTranslations = Record<string, string>;
 
 /**
- * Client-side i18n state injected into window.__i18n__
+ * Client-side i18n state on window.__i18n__ — bootstrapped by the middleware
+ * (script-chunk hashes in production, full translations in dev) and extended
+ * per island by the islands emitter with that island's chunk hashes.
  */
 export type I18nClientState = {
   locale: string;
   hashes: Record<string, string>;
   translations: Record<string, string>;
-  imports: Record<string, string[]>;
 };
 
 /**

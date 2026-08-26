@@ -101,7 +101,7 @@ export function stripSsrEffectsPlugin(): Plugin {
         s.overwrite(start, end, EMPTY_FN);
       }
 
-      return { code: s.toString(), map: s.generateMap({ hires: true }) };
+      return { code: s.toString(), map: s.generateMap({ hires: true }).toString() };
     },
   };
 }

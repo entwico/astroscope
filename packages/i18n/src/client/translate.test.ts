@@ -6,7 +6,6 @@ function createState(overrides?: Partial<I18nClientState>): I18nClientState {
     locale: 'en',
     hashes: {},
     translations: {},
-    imports: {},
     ...overrides,
   };
 }

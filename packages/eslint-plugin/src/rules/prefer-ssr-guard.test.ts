@@ -139,7 +139,7 @@ tester.run('prefer-ssr-guard', preferSsrGuard, {
       errors: [err('self', '!import.meta.env.SSR')],
       output: `if (!import.meta.env.SSR) { /* worker or browser */ }`,
     },
-    // inside a hook body — the original motivating case
+    // inside a hook body
     {
       filename,
       code: `

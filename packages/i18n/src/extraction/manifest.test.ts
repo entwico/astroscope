@@ -14,7 +14,7 @@ describe('getGlobalState', () => {
     expect(state).toEqual({
       extractedKeys: [],
       chunkManifest: {},
-      importsManifest: {},
+      scriptChunks: [],
       projectRoot: '',
       version: 0,
     });
@@ -39,7 +39,7 @@ describe('getGlobalState', () => {
 
 describe('getManifest', () => {
   test('returns empty manifest for fresh state', () => {
-    expect(getManifest()).toEqual({ keys: [], chunks: {}, imports: {} });
+    expect(getManifest()).toEqual({ keys: [], chunks: {}, scripts: [] });
   });
 
   test('makes file locations relative to project root and keeps line numbers', () => {
@@ -95,15 +95,15 @@ describe('getManifest', () => {
     expect(state.extractedKeys[0]?.files).toEqual(['/project/src/a.ts:1']);
   });
 
-  test('passes chunk and imports manifests through', () => {
+  test('passes chunk manifest and script chunks through', () => {
     const state = getGlobalState();
 
     state.chunkManifest = { 'Cart.abc': ['cart.title'] };
-    state.importsManifest = { 'Page.def': ['Cart.abc'] };
+    state.scriptChunks = ['hoisted.def'];
 
     const manifest = getManifest();
 
     expect(manifest.chunks).toEqual({ 'Cart.abc': ['cart.title'] });
-    expect(manifest.imports).toEqual({ 'Page.def': ['Cart.abc'] });
+    expect(manifest.scripts).toEqual(['hoisted.def']);
   });
 });

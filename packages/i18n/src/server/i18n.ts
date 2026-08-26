@@ -4,7 +4,6 @@ import type { ExtractionManifest } from '../extraction/types.js';
 import { compileTranslations } from '../shared/compiler.js';
 import type { CompiledTranslations, RawTranslations } from '../shared/types.js';
 import type { FallbackBehavior } from './types.js';
-import { generateVarName } from './utils.js';
 
 export type I18nConfig = {
   locales: string[];
@@ -34,13 +33,10 @@ class I18nSingleton {
   // locale -> chunk name -> content hash (for cache busting)
   private hashCache = new Map<string, Record<string, string>>();
 
-  // locale -> inline script for I18nScript component
-  private scriptCache = new Map<string, string>();
-
   // "locale:chunkName" -> encoded chunk response body
   private chunkCache = new Map<string, Uint8Array>();
 
-  // manifest getter (set by init module, provides live data in dev mode)
+  // manifest getter, set on configure() via the virtual module (live data in dev mode)
   private manifestGetter: (() => ExtractionManifest) | null = null;
 
   // tracks the manifest version to detect when derived caches need invalidation
@@ -85,8 +81,7 @@ class I18nSingleton {
       fallback: config.fallback ?? 'fallback',
     };
 
-    // dynamically import manifest getter from virtual module
-    // this removes the need for a separate `import '@astroscope/i18n/init'`
+    // resolved lazily so importing the singleton needs no virtual module
     if (!this.manifestGetter) {
       const m = await import('virtual:@astroscope/i18n/manifest');
       this.manifestGetter = m.getManifest;
@@ -110,7 +105,6 @@ class I18nSingleton {
     this.mergedCache.delete(locale); // invalidate merged cache
     this.compiledCache.delete(locale); // invalidate compiled cache
     this.hashCache.delete(locale); // invalidate hash cache
-    this.scriptCache.delete(locale); // invalidate script cache
 
     // invalidate chunk cache entries for this locale
     for (const key of this.chunkCache.keys()) {
@@ -137,7 +131,7 @@ class I18nSingleton {
     }
 
     const raw = this.rawCache.get(locale) ?? {};
-    const manifest = this.manifestGetter?.() ?? { keys: [], chunks: {}, imports: {} };
+    const manifest = this.manifestGetter?.() ?? { keys: [], chunks: {}, scripts: [] };
 
     if (manifest.keys.length === 0) {
       return raw;
@@ -231,75 +225,24 @@ class I18nSingleton {
   }
 
   /**
-   * Get the inline script for I18nScript component.
-   * Cached per locale, invalidated when translations change.
+   * Hashes for chunks reachable from astro `<script>` entries. Script modules are
+   * not islands, so the islands emitter never covers them — the middleware
+   * bootstraps these few into the client state on every html response.
    */
-  getClientScript(locale: string): string {
-    const cached = this.scriptCache.get(locale);
-
-    if (cached) {
-      return cached;
-    }
-
-    const script = this.createClientScript(locale);
-
-    this.scriptCache.set(locale, script);
-
-    return script;
-  }
-
-  private createClientScript(locale: string): string {
-    const { chunks, imports } = this.getManifest();
-    const hasChunks = Object.keys(chunks).length > 0;
-
-    if (!hasChunks) {
-      const raw = this.getTranslations(locale);
-
-      return `window.__i18n__=${JSON.stringify({ locale, hashes: {}, imports: {}, translations: raw })};`;
-    }
-
+  getScriptChunkHashes(locale: string): Record<string, string> {
+    const { scripts } = this.getManifest();
     const hashes = this.getHashes(locale);
+    const result: Record<string, string> = {};
 
-    // collect all unique chunk names used in hashes and imports
-    const allChunks = new Set<string>(Object.keys(hashes));
+    for (const chunk of scripts) {
+      const hash = hashes[chunk];
 
-    for (const deps of Object.values(imports)) {
-      deps.forEach((d) => allChunks.add(d));
+      if (hash) {
+        result[chunk] = hash;
+      }
     }
 
-    // generate short variable names: _a, _b, _c, ..., _z, _aa, _ab, ...
-    const chunkToVar = new Map<string, string>();
-    let varIndex = 0;
-
-    for (const chunk of allChunks) {
-      chunkToVar.set(chunk, generateVarName(varIndex++));
-    }
-
-    // build IIFE with aliases for compact output
-    const varDecls = [...chunkToVar.entries()].map(([chunk, v]) => `${v}=${JSON.stringify(chunk)}`).join(',');
-
-    const hashesObj = Object.entries(hashes)
-      .map(([chunk, hash]) => `[${chunkToVar.get(chunk)}]:${JSON.stringify(hash)}`)
-      .join(',');
-
-    // only include imports that are in our chunk set (have translations for this locale)
-    const importsObj = Object.entries(imports)
-      .filter(([chunk]) => chunkToVar.has(chunk))
-      .map(([chunk, deps]) => {
-        const validDeps = deps.filter((d) => chunkToVar.has(d));
-
-        return validDeps.length > 0
-          ? `[${chunkToVar.get(chunk)}]:[${validDeps.map((d) => chunkToVar.get(d)).join(',')}]`
-          : null;
-      })
-      .filter(Boolean)
-      .join(',');
-
-    return (
-      `(()=>{var ${varDecls};` +
-      `window.__i18n__={locale:${JSON.stringify(locale)},hashes:{${hashesObj}},imports:{${importsObj}},translations:{}};` +
-      `})();`
-    );
+    return result;
   }
 
   /**
@@ -314,7 +257,6 @@ class I18nSingleton {
       this.mergedCache.delete(locale);
       this.compiledCache.delete(locale);
       this.hashCache.delete(locale);
-      this.scriptCache.delete(locale);
 
       // clear chunk cache entries for this locale
       for (const key of this.chunkCache.keys()) {
@@ -338,7 +280,6 @@ class I18nSingleton {
     this.manifestVersion = version;
     this.mergedCache.clear();
     this.compiledCache.clear();
-    this.scriptCache.clear();
     this.chunkCache.clear();
   }
 

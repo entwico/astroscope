@@ -1,8 +1,9 @@
 import { type ExcludePattern, RECOMMENDED_EXCLUDES, shouldExclude } from '@astroscope/node/excludes';
-import { overrideRequestRoute } from '@astroscope/node/log';
+import { log, overrideRequestRoute } from '@astroscope/node/log';
 import type { APIContext, MiddlewareHandler } from 'astro';
 import { runWithContext } from './context.js';
 import { i18n } from './i18n.js';
+import { registerI18nEmitters, setRequestLocale } from './islands-emitter.js';
 import type { I18nContext } from './types.js';
 
 export type I18nMiddlewareOptions = {
@@ -47,7 +48,7 @@ function createChunkResponse(pathname: string): Response | undefined {
   }
 
   if (!i18n.isConfigured()) {
-    console.warn(`[@astroscope/i18n] not configured, passing through: ${pathname}`);
+    log.error('i18n not configured, passing through');
 
     return undefined;
   }
@@ -111,21 +112,10 @@ function createChunkResponse(pathname: string): Response | undefined {
 /**
  * Create the i18n chunk middleware that serves translation chunks at `/_i18n/` endpoints.
  *
- * Place this early in your middleware sequence (before session/auth)
- * to avoid unnecessary overhead for static translation requests.
+ * Injected by the integration as `pre` middleware (before any user middleware) —
+ * not part of the public API.
  *
- * @example
- * ```typescript
- * // src/middleware.ts
- * import { sequence } from 'astro:middleware';
- * import { createI18nChunkMiddleware, createI18nMiddleware } from '@astroscope/i18n';
- *
- * export const onRequest = sequence(
- *   createI18nChunkMiddleware(),  // early: serves /_i18n/ chunks
- *   sessionMiddleware,
- *   createI18nMiddleware({ locale: (ctx) => ... }),  // after session
- * );
- * ```
+ * @internal
  */
 export function createI18nChunkMiddleware(): MiddlewareHandler {
   return (ctx, next) => {
@@ -145,9 +135,10 @@ export function createI18nChunkMiddleware(): MiddlewareHandler {
 /**
  * Create the i18n locale middleware.
  *
- * Sets up the request context with locale and translations for use by
- * `t()` and `<I18nScript />`. Place this after session middleware if
- * your locale detection depends on session/cookies.
+ * Sets up the request context with locale and translations for `t()`, injects
+ * the client i18n state into html responses, and records the locale for the
+ * islands emitter. Place this after session middleware if your locale detection
+ * depends on session/cookies.
  *
  * @example
  * ```typescript
@@ -162,18 +153,23 @@ export function createI18nChunkMiddleware(): MiddlewareHandler {
  * ```
  */
 export function createI18nMiddleware(options: I18nMiddlewareOptions): MiddlewareHandler {
-  return (ctx, next) => {
+  registerI18nEmitters();
+
+  return async (ctx, next) => {
     if (shouldExclude(ctx, options.exclude ?? RECOMMENDED_EXCLUDES)) {
       return next();
     }
 
     if (!i18n.isConfigured()) {
-      console.warn(`[@astroscope/i18n] not configured, passing through: ${ctx.url.pathname}`);
+      log.error('i18n not configured, passing through');
 
       return next();
     }
 
     const locale = options.locale(ctx);
+
+    // the islands emitter runs while the response streams, outside this ALS scope
+    setRequestLocale(ctx.request, locale);
 
     const context: I18nContext = {
       locale,

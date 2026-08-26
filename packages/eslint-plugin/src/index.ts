@@ -11,7 +11,9 @@ import { islandReadonly } from './rules/island-readonly.js';
 import { noClientDirectiveOnAstroComponent } from './rules/no-client-directive-on-astro-component.js';
 import { noExcessJsxProps } from './rules/no-excess-jsx-props.js';
 import { noHtmlComments } from './rules/no-html-comments.js';
+import { noServerActionCalls } from './rules/no-server-action-calls.js';
 import { preferSsrGuard } from './rules/prefer-ssr-guard.js';
+import { wormholeConfigs } from './wormhole.js';
 
 const pkg = JSON.parse(
   readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8'),
@@ -29,6 +31,7 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config | Linter.C
     'island-readonly': islandReadonly as unknown as Rule.RuleModule,
     'island-not-serializable': islandNotSerializable as unknown as Rule.RuleModule,
     'no-client-directive-on-astro-component': noClientDirectiveOnAstroComponent as unknown as Rule.RuleModule,
+    'no-server-action-calls': noServerActionCalls,
   },
   configs: {},
 };
@@ -57,6 +60,7 @@ plugin.configs.recommended = [
       '@astroscope/island-readonly': 'error',
       '@astroscope/island-not-serializable': 'error',
       '@astroscope/no-client-directive-on-astro-component': 'error',
+      '@astroscope/no-server-action-calls': 'error',
     },
   },
   {
@@ -74,7 +78,11 @@ plugin.configs.recommended = [
 // i18n rules for @astroscope/i18n projects, opt-in alongside `recommended`
 plugin.configs.i18n = i18nConfigs;
 
+// wormhole rules for @astroscope/wormhole projects, opt-in alongside `recommended`
+plugin.configs.wormhole = wormholeConfigs;
+
 export { i18nPlugin } from './i18n.js';
+export { wormholePlugin } from './wormhole.js';
 export { DEFAULT_IGNORE_ATTRIBUTES } from './rules/i18n/no-raw-strings-in-jsx.js';
 
 export default plugin;

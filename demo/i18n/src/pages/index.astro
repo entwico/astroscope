@@ -1,7 +1,6 @@
 ---
 import '../styles/index.css';
 import { i18n } from '@astroscope/i18n';
-import { I18nScript } from '@astroscope/i18n/astro';
 import { rich, t } from '@astroscope/i18n/translate';
 import Layout from '../../../shared/Layout.astro';
 import AddToCartButton from '../components/AddToCartButton';
@@ -18,11 +17,10 @@ import ProductCardNested from '../components/ProductCardNested';
 import ProductList from '../components/ProductList';
 import RichTextDemo from '../components/RichTextDemo';
 
-const { keys, chunks, imports } = i18n.getManifest();
+const { keys, chunks, scripts } = i18n.getManifest();
 ---
 
 <Layout title="i18n Demo" package="@astroscope/i18n">
-  <I18nScript slot="head" />
 
   <p class="text-lg mb-6">
     This demo shows the @astroscope/i18n integration with same t() API in Astro and React.
@@ -46,39 +44,39 @@ const { keys, chunks, imports } = i18n.getManifest();
   <div class="card bg-base-100 shadow-xl mb-6">
     <div class="card-body">
       <h2 class="card-title">
-        React Island — <code class="badge badge-ghost">client:load-x</code>
+        React Island — <code class="badge badge-ghost">client:load</code>
       </h2>
       <p class="text-sm text-base-content/70 mb-4">
         Hydrates immediately on page load. Use for interactive components above the fold.
       </p>
-      <Cart client:load-x itemCount={3} total="$49.99" />
+      <Cart client:load itemCount={3} total="$49.99" />
     </div>
   </div>
 
   <div class="card bg-base-100 shadow-xl mb-6">
     <div class="card-body">
       <h2 class="card-title">
-        React Island — <code class="badge badge-ghost">client:idle-x</code>
+        React Island — <code class="badge badge-ghost">client:idle</code>
       </h2>
       <p class="text-sm text-base-content/70 mb-4">
         Hydrates when the browser is idle. Good for lower-priority interactivity.
       </p>
-      <Newsletter client:idle-x />
+      <Newsletter client:idle />
     </div>
   </div>
 
   <div class="card bg-base-100 shadow-xl mb-6">
     <div class="card-body">
       <h2 class="card-title">
-        React Island — <code class="badge badge-ghost">client:visible-x</code>
+        React Island — <code class="badge badge-ghost">client:visible</code>
       </h2>
       <p class="text-sm text-base-content/70 mb-4">
         Hydrates when scrolled into view. Perfect for content below the fold.
       </p>
       <div class="grid grid-cols-3 gap-4 mt-4">
-        <ProductCard client:visible-x name="Wireless Headphones" price="$79.99" image="#6366f1" />
-        <ProductCard client:visible-x name="Smart Watch" price="$199.99" image="#ec4899" />
-        <ProductCard client:visible-x name="USB-C Hub" price="$49.99" image="#14b8a6" />
+        <ProductCard client:visible name="Wireless Headphones" price="$79.99" image="#6366f1" />
+        <ProductCard client:visible name="Smart Watch" price="$199.99" image="#ec4899" />
+        <ProductCard client:visible name="USB-C Hub" price="$49.99" image="#14b8a6" />
       </div>
     </div>
   </div>
@@ -89,7 +87,7 @@ const { keys, chunks, imports } = i18n.getManifest();
       <p class="text-sm text-base-content/70 mb-4">
         MessageFormat 2 built-in formatters
       </p>
-      <FormattersDemo client:load-x />
+      <FormattersDemo client:load />
     </div>
   </div>
 
@@ -134,7 +132,7 @@ const { keys, chunks, imports } = i18n.getManifest();
       <p class="text-sm text-base-content/70 mb-4">
         Same <code>rich()</code> API in React components — hydrates on client
       </p>
-      <RichTextDemo client:load-x />
+      <RichTextDemo client:load />
     </div>
   </div>
 
@@ -144,7 +142,7 @@ const { keys, chunks, imports } = i18n.getManifest();
       <p class="text-sm text-base-content/70 mb-4">
         When translations are missing from CMS, the example value is used as fallback.
       </p>
-      <FallbackTest client:load-x />
+      <FallbackTest client:load />
     </div>
   </div>
 
@@ -157,35 +155,35 @@ const { keys, chunks, imports } = i18n.getManifest();
         Use <code>importx()</code> inside React components to dynamically import other components. Translations for the
         lazy chunk load in parallel with the JS bundle.
       </p>
-      <LazyLoadDemo client:load-x />
+      <LazyLoadDemo client:load />
     </div>
   </div>
 
-  <CookieBanner client:idle-x />
+  <CookieBanner client:idle />
 
   <div class="card bg-base-100 shadow-xl mb-6">
     <div class="card-body">
       <h2 class="card-title">
-        Nested Components Test — <code class="badge badge-ghost">client:visible-x</code>
+        Nested Components Test — <code class="badge badge-ghost">client:visible</code>
       </h2>
       <p class="text-sm text-base-content/70 mb-4">
         Tests translation preloading for nested components: ProductList → ProductCardNested → AddToCartButton.
         Open DevTools Network tab, filter by "i18n", and reload to see translation loading order.
       </p>
-      <ProductList client:visible-x />
+      <ProductList client:visible />
     </div>
   </div>
 
   <div class="card bg-base-100 shadow-xl mb-6">
     <div class="card-body">
       <h2 class="card-title">
-        Circular Dependency Test — <code class="badge badge-ghost">client:visible-x</code>
+        Circular Dependency Test — <code class="badge badge-ghost">client:visible</code>
       </h2>
       <p class="text-sm text-base-content/70 mb-4">
         Tests circular import handling: CircularA imports CircularB, and CircularB imports CircularA.
         The flattening algorithm should detect and handle this without infinite loops.
       </p>
-      <CircularA client:visible-x />
+      <CircularA client:visible />
     </div>
   </div>
 
@@ -211,12 +209,12 @@ const { keys, chunks, imports } = i18n.getManifest();
   <div class="collapse collapse-arrow bg-base-100 shadow-xl mb-6">
     <input type="checkbox" />
     <div class="collapse-title font-semibold">
-      Imports Manifest (Debug)
-      <span class="badge badge-neutral ml-2">{Object.keys(imports).length} chunks with deps</span>
+      Script Chunks (Debug)
+      <span class="badge badge-neutral ml-2">{scripts.length} script chunks</span>
     </div>
     <div class="collapse-content">
-      <p class="text-sm text-base-content/70 mb-2">Shows flattened import graph for translation prefetching. Circular deps are handled.</p>
-      <pre class="bg-base-300 p-4 rounded-lg overflow-x-auto text-xs"><code>{JSON.stringify(imports, null, 2)}</code></pre>
+      <p class="text-sm text-base-content/70 mb-2">i18n chunks reachable from astro script entries — bootstrapped page-agnostically, since no island covers them.</p>
+      <pre class="bg-base-300 p-4 rounded-lg overflow-x-auto text-xs"><code>{JSON.stringify(scripts, null, 2)}</code></pre>
     </div>
   </div>
 

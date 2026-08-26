@@ -73,7 +73,6 @@ export const t: TranslateFunction = ((
   const compiled = ctx.translations[key];
 
   if (!compiled) {
-    // translation missing, apply fallback
     const fallbackValue = applyFallback(key, normalizedMeta, ctx.fallback);
 
     // compile and cache the fallback for consistency
@@ -117,7 +116,6 @@ export function rich<T = unknown>(
   const ctx = getContext();
   const locale = ctx?.locale ?? i18n.getConfig().defaultLocale;
 
-  // get raw translation string - prefer from context, then fallback, then key
   const raw = ctx?.rawTranslations[key] || normalizedMeta.fallback || key;
 
   const parts = formatMessageToParts(locale, raw, values);

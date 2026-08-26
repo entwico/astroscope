@@ -1,14 +1,14 @@
 # @astroscope/wormhole
 
-> **Note:** This package is in active development. APIs may change between versions.
-
-Share dynamic server data with React islands and client scripts — typed, reactive.
+Share dynamic server data with React islands and client scripts — typed, streamed with the HTML, sliced per island.
 
 ## Why this library?
 
 Astro recommends [nanostores](https://docs.astro.build/en/recipes/sharing-state/) for sharing state between islands, but nanostores are client-only — there's no built-in way to hydrate them with server data during SSR.
 
-`@astroscope/wormhole` bridges this gap: populate data in middleware, read it in Astro frontmatter, React islands, or `<script>` blocks — same typed API on server and client. Multiple wormholes per page, reactive updates across all consumers, zero configuration.
+`@astroscope/wormhole` bridges this gap: define your wormholes in a registry, resolve their values per request in a single middleware, and read them anywhere — Astro frontmatter, React islands, `<script>` blocks — through one typed `wormholes` proxy. Client code imports nothing of yours: the data streams into the HTML exactly where it is needed.
+
+**Delivery is sliced per island.** The build scans your client code to see which wormholes each component reads; at runtime every island receives exactly those, embedded in the HTML right before it. A wormhole no client code reads ships **zero bytes**.
 
 **Typical use cases:**
 
@@ -20,9 +20,12 @@ Astro recommends [nanostores](https://docs.astro.build/en/recipes/sharing-state/
 
 ## Important notes
 
-- **No secrets in wormholes.** All wormhole data is serialized into an inline `<script>` tag and sent to the browser. Never store tokens, API keys, credentials, or any sensitive data in a wormhole.
-- **`set()` is client-only.** Calling `set()` does not work on the server. Use `open(wormhole, data, fn)` from `@astroscope/wormhole/server` to populate data in middleware.
-- **Values are deeply readonly.** `get()`, `subscribe()` and `useWormhole()` expose the value as `DeepReadonly<T>` — in-place mutation would silently bypass subscribers (and on the server would corrupt the request-scoped store). The only way to update is `set()` with a new value: `wh.set({ ...wh.get(), count: 1 })`.
+- **No secrets in wormholes.** Wormhole data is serialized into inline `<script>` tags and sent to the browser. Never store tokens, API keys, credentials, or any sensitive data in a wormhole. (In dev, *all* open wormholes ship with every page; production slicing is an optimization, not a security boundary.)
+- **Requires `@astroscope/node`** — per-island delivery uses its islands pipeline in production.
+- **The registry is server-only.** Client code must never import `src/wormholes.ts` — it accesses values through the `wormholes` proxy instead. (Importing it in client code throws at once.)
+- **`set()` is client-only.** Server values are request-scoped and come from the middleware.
+- **Values are deeply readonly.** `get()`, `subscribe()` and `useWormhole()` expose the value as `DeepReadonly<T>` — in-place mutation would silently bypass subscribers. The only way to update is `set()` with a new value: `wormholes.counter.set({ ...wormholes.counter.get(), count: 1 })`.
+- **Prerendered pages get no wormhole data** — values are per-request by definition.
 
 ## Examples
 
@@ -34,72 +37,68 @@ See the [demo/wormhole](../../demo/wormhole) directory for a working example.
 npm install @astroscope/wormhole
 ```
 
+```ts
+// astro.config.ts
+import node from '@astroscope/node';
+import wormhole from '@astroscope/wormhole';
+
+export default defineConfig({
+  output: 'server',
+  adapter: node(),
+  integrations: [wormhole()],
+});
+```
+
+The integration registers the build-time scanner and generates a type stub from your registry, so `wormholes.<name>` is fully typed everywhere.
+
 ## Usage
 
-### 1. Define a wormhole
+### 1. Define the registry
 
-Create a shared file imported by both server and client code:
+One file, one export named `wormholes` — the keys are the wormhole names (same pattern as Astro Actions' `src/actions/index.ts`):
 
 ```ts
 // src/wormholes.ts
 import { defineWormhole } from '@astroscope/wormhole';
 
-export type UserState = {
+export type Session = {
   user: string;
   role: string;
 };
 
-export const userState = defineWormhole<UserState>('user');
+export const wormholes = {
+  session: defineWormhole<Session>(),
+  cart: defineWormhole<{ items: string[] }>(),
+};
 ```
 
-### 2. Populate in middleware
+`src/wormholes/index.ts` works too.
 
-Use `open()` from the server entry point to provide data during request handling:
+### 2. Resolve values in middleware
 
 ```ts
 // src/middleware.ts
-import { open } from '@astroscope/wormhole/server';
-import { defineMiddleware } from 'astro:middleware';
-import { userState } from './wormholes';
+import { createWormholeMiddleware } from '@astroscope/wormhole/server';
 
-export const onRequest = defineMiddleware((ctx, next) => {
-  const data = { user: 'Alice', role: 'admin' };
-
-  return open(userState, data, () => next());
+export const onRequest = createWormholeMiddleware({
+  values: async (ctx) => ({
+    session: { user: 'Alice', role: 'admin' },
+    cart: await loadCart(ctx),
+  }),
 });
 ```
 
-`open()` uses `AsyncLocalStorage` under the hood — each request gets its own isolated data.
+The `values` return type is checked against your registry. Omit a key (or return `undefined` for it) to leave that wormhole closed for the request. Each request is isolated.
 
-### 3. Bridge to the client
-
-Add `<WormholeScript>` to your layout to serialize the data into an inline script:
-
-```astro
----
-import { WormholeScript } from '@astroscope/wormhole/astro';
-import { userState } from '../wormholes';
----
-
-<html>
-  <head>
-    <WormholeScript wormhole={userState} />
-  </head>
-  <body>
-    <slot />
-  </body>
-</html>
-```
-
-### 4. Read in components
+### 3. Read anywhere
 
 #### Astro frontmatter (SSR)
 
 ```astro
 ---
-import { userState } from '../wormholes';
+import { wormholes } from '@astroscope/wormhole';
 
-const { user } = userState.get();
+const { user } = wormholes.session.get();
 ---
 
 <p>Hello, {user}</p>
@@ -108,11 +107,11 @@ const { user } = userState.get();
 #### React islands
 
 ```tsx
+import { wormholes } from '@astroscope/wormhole';
 import { useWormhole } from '@astroscope/wormhole/react';
-import { userState } from '../wormholes';
 
 export function UserBadge() {
-  const { user, role } = useWormhole(userState);
+  const { user, role } = useWormhole(wormholes.session);
 
   return (
     <span>
@@ -128,34 +127,33 @@ export function UserBadge() {
 <p>User: <strong id="user">-</strong></p>
 
 <script>
-  import { userState } from '../wormholes';
+  import { wormholes } from '@astroscope/wormhole';
 
-  document.getElementById('user')!.textContent = userState.get().user;
+  document.getElementById('user')!.textContent = wormholes.session.get().user;
 
-  userState.subscribe((data) => {
+  wormholes.session.subscribe((data) => {
     document.getElementById('user')!.textContent = data.user;
   });
 </script>
 ```
 
-### 5. Update from the client
+### 4. Update from the client
 
-Call `set()` to update the wormhole — all `useWormhole()` hooks and `subscribe()` callbacks react immediately:
+Call `set()` to update the wormhole — every `useWormhole()` hook and `subscribe()` callback on the page reacts, across islands:
 
 ```tsx
+import { wormholes } from '@astroscope/wormhole';
 import { useWormhole } from '@astroscope/wormhole/react';
 import { actions } from 'astro:actions';
-import { userState } from '../wormholes';
 
 export function RoleToggle() {
-  const { user, role } = useWormhole(userState);
+  const { user, role } = useWormhole(wormholes.session);
 
   async function toggle() {
-    const newRole = role === 'admin' ? 'viewer' : 'admin';
-    const result = await actions.updateRole({ role: newRole });
+    const result = await actions.updateRole({ role: role === 'admin' ? 'viewer' : 'admin' });
 
     if (!result.error) {
-      userState.set(result.data);
+      wormholes.session.set(result.data);
     }
   }
 
@@ -169,83 +167,41 @@ export function RoleToggle() {
 
 ## API
 
-### `defineWormhole<T>(name)`
+### `wormholes` <sub>proxy, server + client</sub>
 
-Creates a typed wormhole channel. The returned object is universal — works on both server and client.
+The single access point, typed from your registry. `wormholes.cart` returns a `Wormhole<T>`:
 
-```ts
-import { defineWormhole } from '@astroscope/wormhole';
+| Method                    | Description                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| `wormholes.x.get()`       | Read the current value as `DeepReadonly<T>` (server: request scope; client: streamed data) |
+| `wormholes.x.set(data)`   | Replace the value and notify all subscribers (client only)                        |
+| `wormholes.x.subscribe(fn)` | Listen for `set()` updates, returns an unsubscribe function                     |
 
-const wh = defineWormhole<{ count: number }>('counter');
-```
+Accesses must be static (`wormholes.cart`, `wormholes['cart']`). A dynamic access (`wormholes[name]`) still works, but the build can no longer tell which wormholes that chunk needs and delivers all open ones to its islands.
 
-| Method             | Description                                                                                         |
-| ------------------ | --------------------------------------------------------------------------------------------------- |
-| `wh.get()`         | Read current value as `DeepReadonly<T>` (from `AsyncLocalStorage` on server, from `globalThis` or local store on client) |
-| `wh.set(data)`     | Replace value with a new one and notify all subscribers (client-side)                               |
-| `wh.subscribe(fn)` | Listen for changes, returns unsubscribe function                                                    |
-| `wh.name`          | The wormhole name                                                                                   |
-| `wh.key`           | The internal `globalThis` key                                                                       |
+### `defineWormhole<T>()` <sub>registry only</sub>
 
-### `DeepReadonly<T>`
+Creates a typed wormhole for the registry; the name comes from the registry key. Registry entries are full `Wormhole<T>` objects, so server code can also import `wormholes` from your own registry file directly.
 
-Exported helper type — recursively `readonly` version of `T`. Wormhole values are exposed with this type; use it in your own function signatures when passing wormhole data around:
+### `createWormholeMiddleware({ values, exclude? })` <sub>server only</sub>
 
-```ts
-import type { DeepReadonly } from '@astroscope/wormhole';
+Creates the middleware: resolves `values(ctx)` per request, opens them for server-side `get()`, and delivers them to the client. `exclude` accepts the same patterns as other astroscope middlewares (defaults to `RECOMMENDED_EXCLUDES`).
 
-function isWithinCart(cart: DeepReadonly<Cart>, id: string) {
-  return cart.items.some((item) => item.productId === id);
-}
-```
+### `openWormholes(wh, data, fn)` <sub>server only</sub>
 
-### `open(wh, data, fn)` <sub>server only</sub>
-
-Runs `fn` with `data` available via `wh.get()` for the duration of the call. Uses `AsyncLocalStorage` for request isolation.
-
-```ts
-import { open } from '@astroscope/wormhole/server';
-
-return open(myWormhole, { count: 0 }, () => next());
-```
-
-To open several wormholes at once, pass an array of `[wormhole, data]` pairs — each pair is type-checked against its own wormhole:
-
-```ts
-return open([
-  [cartStore, cart],
-  [sessionStore, session],
-], () => next());
-```
-
-Nested `open()` calls shadow only the wormholes they name; everything else stays visible.
+Provides values to server code that runs outside the request pipeline — tests, out-of-request rendering. Never delivered to the client; inside the app, the middleware is the way. Accepts a single pair or an array of `[wormhole, data]` pairs.
 
 ### `useWormhole(wh)` <sub>React only</sub>
 
-React hook that reads the wormhole and re-renders on changes. Uses `useSyncExternalStore` internally.
+React hook that reads a wormhole and re-renders on `set()`. During SSR it reads the request scope, so server and client render identically.
 
-```tsx
-import { useWormhole } from '@astroscope/wormhole/react';
+### `DeepReadonly<T>` / `UnwrapWormholes<R>`
 
-const data = useWormhole(myWormhole);
-```
-
-### `<WormholeScript wormhole={wh} />` <sub>Astro only</sub>
-
-Serializes the current wormhole value into an inline `<script>` tag for client hydration.
-
-```astro
-import {WormholeScript} from '@astroscope/wormhole/astro';
-
-<WormholeScript wormhole={myWormhole} />
-```
+Exported helper types. `DeepReadonly<T>` is the recursively-readonly value type; `UnwrapWormholes` maps a registry shape to its value types.
 
 ## How it works
 
-1. **Middleware** calls `open(wh, data, next)` — stores data in `AsyncLocalStorage` and sets `globalThis[key]` to read from it
-2. **`<WormholeScript>`** calls `wh.get()` during SSR, serializes the result into `<script is:inline>globalThis[key] = function(){return data;}</script>`
-3. **Client** calls `wh.get()` — reads from `globalThis[key]()` (the serialized getter)
-4. **`set()`** updates a local store and notifies all subscribers — `useWormhole()` hooks and `subscribe()` callbacks re-render/fire
+At build time the integration scans your client code to see which wormholes each component reads, and generates the types for the `wormholes` proxy from your registry. At runtime the middleware resolves your values once per request, and each island's data is embedded in the HTML right before it — so it is always there before the island's code runs, even while the page is still streaming. On the client, `set()` updates the shared data and notifies subscribers, keeping islands and scripts in sync.
 
 ## License
 

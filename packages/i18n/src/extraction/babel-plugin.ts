@@ -166,13 +166,11 @@ export function i18nExtractPlugin({ types: t }: { types: typeof BabelTypes }): P
         const args = path.node.arguments;
         const keyArg = args[0];
 
-        // check first arg
         if (!t.isExpression(keyArg)) return;
 
         const key = getStringValue(t, keyArg);
 
         if (key === null) return; // first arg must be string
-        // end check first arg
 
         const file = state.filename ?? '';
         const line = path.node.loc?.start.line ?? 0;
@@ -183,7 +181,6 @@ export function i18nExtractPlugin({ types: t }: { types: typeof BabelTypes }): P
         // may not exist if we're processing already-transformed code
         const meta = args.length >= 2 && t.isExpression(args[1]) ? extractMeta(t, args[1], report) : { fallback: '' };
 
-        // report extracted key
         state.opts.onKeyExtracted({ key, meta, file, line });
 
         // strip fallback in production

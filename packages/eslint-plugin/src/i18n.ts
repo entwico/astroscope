@@ -2,7 +2,6 @@ import type { ESLint, Linter } from 'eslint';
 import { noModuleLevelT } from './rules/i18n/no-module-level-t.js';
 import { noRawStringsInJsx } from './rules/i18n/no-raw-strings-in-jsx.js';
 import { noTReassign } from './rules/i18n/no-t-reassign.js';
-import { preferXDirectives } from './rules/i18n/prefer-x-directives.js';
 import { tImportSource } from './rules/i18n/t-import-source.js';
 import { tRequiresMeta } from './rules/i18n/t-requires-meta.js';
 import { tStaticKey } from './rules/i18n/t-static-key.js';
@@ -23,7 +22,6 @@ export const i18nPlugin: ESLint.Plugin = {
     't-static-key': tStaticKey,
     't-static-meta': tStaticMeta,
     't-requires-meta': tRequiresMeta,
-    'prefer-x-directives': preferXDirectives,
     'no-raw-strings-in-jsx': noRawStringsInJsx,
     'no-t-reassign': noTReassign,
   },
@@ -42,7 +40,6 @@ export const i18nConfigs: Linter.Config[] = [
       '@astroscope/i18n/t-static-meta': 'warn',
       '@astroscope/i18n/t-requires-meta': 'warn',
       '@astroscope/i18n/no-t-reassign': 'error',
-      '@astroscope/i18n/prefer-x-directives': 'error',
       '@astroscope/i18n/no-raw-strings-in-jsx': 'warn',
     },
   },

@@ -1,106 +1,84 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
-import { defineWormhole } from './define';
+import { describe, expect, test, vi } from 'vitest';
+import { assignWormholeNames, defineWormhole } from './define';
+import { openWormholes } from './server';
+
+vi.mock('virtual:@astroscope/wormhole/manifest', () => ({ manifest: null }));
+vi.mock('virtual:@astroscope/wormhole/registry', () => ({ wormholes: {} }));
 
 describe('defineWormhole', () => {
-  describe('get', () => {
-    test('throws when not initialized', () => {
-      const wh = defineWormhole('test-uninit');
+  test('name and key come from the registry key', () => {
+    const wh = defineWormhole<number>();
 
-      expect(() => wh.get()).toThrow('wormhole "test-uninit" is not initialized');
-    });
+    assignWormholeNames({ cart: wh });
 
-    test('reads from globalThis getter', () => {
-      const wh = defineWormhole('test-global');
-
-      (globalThis as any)[wh.key] = () => ({ value: 42 });
-
-      try {
-        expect(wh.get()).toEqual({ value: 42 });
-      } finally {
-        delete (globalThis as any)[wh.key];
-      }
-    });
+    expect(wh.name).toBe('cart');
+    expect(wh.key).toBe('__wormhole_cart__');
   });
 
-  describe('set', () => {
-    test('throws on server (no window)', () => {
-      const wh = defineWormhole<{ v: number }>('test-server-set');
+  test('throws on any use before registration', () => {
+    const wh = defineWormhole<number>();
 
-      expect(() => wh.set({ v: 1 })).toThrow('set() cannot be called on the server');
-    });
+    expect(() => wh.name).toThrow('wormhole is not registered');
+    expect(() => wh.get()).toThrow('wormhole is not registered');
+  });
 
-    test('works when window is defined', () => {
-      (globalThis as any).window = {};
+  test('re-assigning the same name is idempotent, a different name throws', () => {
+    const wh = defineWormhole<number>();
 
-      try {
-        const wh = defineWormhole<{ v: number }>('test-client-set');
+    assignWormholeNames({ cart: wh });
+    assignWormholeNames({ cart: wh });
 
-        wh.set({ v: 1 });
+    expect(() => assignWormholeNames({ basket: wh })).toThrow('registered under two names: "cart" and "basket"');
+  });
 
-        expect(wh.get()).toEqual({ v: 1 });
-      } finally {
-        delete (globalThis as any).window;
-      }
-    });
+  test('rejects registry entries that are not wormholes', () => {
+    expect(() => assignWormholeNames({ cart: { get: () => 1 } })).toThrow('registry entry "cart" is not a wormhole');
+  });
+
+  test('get() outside an open scope throws with the wormhole name', () => {
+    const wh = defineWormhole<number>();
+
+    assignWormholeNames({ session: wh });
+
+    expect(() => wh.get()).toThrow('wormhole "session" is not open for this request');
+  });
+
+  test('set() throws on the server', () => {
+    const wh = defineWormhole<{ v: number }>();
+
+    assignWormholeNames({ counter: wh });
+
+    expect(() => wh.set({ v: 1 })).toThrow('cannot be called on the server');
+  });
+
+  test('subscribe() is inert on the server', () => {
+    const wh = defineWormhole<number>();
+
+    assignWormholeNames({ counter: wh });
+
+    expect(wh.subscribe(() => {})).toBeTypeOf('function');
   });
 
   describe('readonly typing', () => {
-    test('exposes the stored value as deeply readonly while set() accepts mutable input', () => {
-      const wh = defineWormhole<{ cart: { items: string[] }; count: number }>('test-readonly');
+    test('exposes the stored value as deeply readonly', () => {
+      const wh = defineWormhole<{ cart: { items: string[] }; count: number }>();
+
+      assignWormholeNames({ readonlyDemo: wh });
 
       const use = (): void => {
-        const data = wh.get();
+        openWormholes(wh, { cart: { items: [] }, count: 0 }, () => {
+          const data = wh.get();
 
-        // @ts-expect-error top-level properties are readonly
-        data.count = 1;
-        // @ts-expect-error nested properties are readonly
-        data.cart.items = [];
-        // @ts-expect-error nested arrays are readonly
-        data.cart.items.push('x');
-
-        wh.set({ cart: { items: ['fresh'] }, count: 1 });
-        wh.set({ ...data, count: 2 });
-
-        wh.subscribe((next) => {
-          // @ts-expect-error subscriber payload is readonly
-          next.count = 3;
+          // @ts-expect-error top-level properties are readonly
+          data.count = 1;
+          // @ts-expect-error nested properties are readonly
+          data.cart.items = [];
+          // @ts-expect-error nested arrays are readonly
+          data.cart.items.push('x');
         });
       };
 
       expect(use).toBeTypeOf('function');
-    });
-  });
-
-  describe('subscribe', () => {
-    afterEach(() => {
-      delete (globalThis as any).window;
-    });
-
-    test('notifies listeners on set', () => {
-      (globalThis as any).window = {};
-
-      const wh = defineWormhole<number>('test-sub');
-      const handler = vi.fn(() => {});
-
-      wh.subscribe(handler);
-      wh.set(42);
-
-      expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(42);
-    });
-
-    test('unsubscribe stops notifications', () => {
-      (globalThis as any).window = {};
-
-      const wh = defineWormhole<number>('test-unsub');
-      const handler = vi.fn(() => {});
-
-      const unsub = wh.subscribe(handler);
-
-      unsub();
-      wh.set(42);
-
-      expect(handler).toHaveBeenCalledTimes(0);
     });
   });
 });

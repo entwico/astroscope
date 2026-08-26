@@ -1,7 +1,5 @@
 # @astroscope/i18n
 
-> **Note:** This package is in active development. APIs may change between versions.
-
 i18n for Astro + React islands — automatic tree-shaking, parallel loading, any translation source.
 
 ## Why this library?
@@ -10,21 +8,18 @@ i18n for Astro + React islands — automatic tree-shaking, parallel loading, any
 
 **Automatic tree-shaking** — Only the translations each component actually uses are delivered to the browser. No manual chunk splitting or configuration.
 
-**Parallel loading** — Translations load alongside component hydration via custom `client:*-x` directives, so hydration doesn't wait on a separate translation fetch.
+**Parallel loading** — Translation chunks preload alongside component code with plain `client:*` directives (via `@astroscope/node`), so hydration doesn't wait on a separate translation fetch.
 
 **Unified API** — The same `t()` function works in Astro templates and React islands.
 
 **Any translation source** — Fetch translations from any provider: JSON files, database, headless CMS, TMS, or custom API. All are chunked and optimized the same way.
-
-**Production optimized** — Fallback strings are stripped from production bundles via Babel and kept available through the manifest.
 
 ## Features
 
 - **Per-chunk translation loading** — each island gets only its translations
 - **Unicode MessageFormat 2** (MF2) support via `messageformat` v4
 - **Built-in formatters** — `:number`, `:integer`, `:percent`, `:currency`, `:date`, `:time`, `:datetime`, `:unit`
-- **Babel-based extraction** — AST parsing, source maps, production stripping
-- **Manifest fallbacks** — missing translations automatically use extracted fallbacks
+- **Fallback strings in code** — used during development, stripped from production bundles, available to translators through the manifest
 - **Full TypeScript support**
 - **Tiny client runtime** — ~8KB gzipped for translations
 
@@ -102,56 +97,32 @@ export async function onStartup() {
 
 ```ts
 // src/middleware.ts
-import { sequence } from 'astro:middleware';
-import { createI18nChunkMiddleware, createI18nMiddleware, i18n } from '@astroscope/i18n';
+import { createI18nMiddleware, i18n } from '@astroscope/i18n';
 
-export const onRequest = sequence(
-  createI18nChunkMiddleware(),  // serves /_i18n/ translation chunks
-  createI18nMiddleware({
-    locale: (ctx) =>
-      ctx.cookies.get('locale')?.value ??
-      i18n.getConfig().defaultLocale,
-  }),
-);
+export const onRequest = createI18nMiddleware({
+  locale: (ctx) =>
+    ctx.cookies.get('locale')?.value ??
+    i18n.getConfig().defaultLocale,
+});
 ```
+
+The middleware serving `/_i18n/` translation chunks is injected automatically by the integration.
 
 By default, `RECOMMENDED_EXCLUDES` (static assets like `/_astro/`) are excluded from locale context setup. To customize:
 
 ```ts
-import { sequence } from 'astro:middleware';
-import { createI18nChunkMiddleware, createI18nMiddleware, i18n } from '@astroscope/i18n';
+import { createI18nMiddleware, i18n } from '@astroscope/i18n';
 import { RECOMMENDED_EXCLUDES } from '@astroscope/node/excludes';
 
-export const onRequest = sequence(
-  createI18nChunkMiddleware(),
-  createI18nMiddleware({
-    locale: (ctx) =>
-      ctx.cookies.get('locale')?.value ??
-      i18n.getConfig().defaultLocale,
-    exclude: [...RECOMMENDED_EXCLUDES, { exact: '/health' }],
-  }),
-);
+export const onRequest = createI18nMiddleware({
+  locale: (ctx) =>
+    ctx.cookies.get('locale')?.value ??
+    i18n.getConfig().defaultLocale,
+  exclude: [...RECOMMENDED_EXCLUDES, { exact: '/health' }],
+});
 ```
 
-### 4. Add `<I18nScript />` to your layout
-
-Inject translations into the page for hydrated components:
-
-```astro
----
-import { I18nScript } from '@astroscope/i18n/astro';
----
-<html>
-  <head>
-    <I18nScript />
-  </head>
-  <body>
-    <slot />
-  </body>
-</html>
-```
-
-### 5. Use `t()` in your components
+### 4. Use `t()` in your components
 
 ```astro
 ---
@@ -177,21 +148,7 @@ export function CheckoutSummary() {
 
 > **Note:** Variables use `{$name}` syntax (with `$` prefix) per MessageFormat 2 specification.
 
-### 6. Use i18n-aware client directives
-
-**The problem:** With standard `client:*` directives, the translation chunk loads *after* the component module. This delays hydration while translations are fetched sequentially.
-
-**The solution:** Use `client:*-x` directives to load translations in parallel with the component code:
-
-```astro
----
-import Cart from '../components/Cart';
----
-<!-- translations load alongside component code -->
-<Cart client:load-x />
-<Cart client:visible-x />
-<Cart client:idle-x />
-```
+That's it — client delivery is automatic. Use plain `client:*` directives; translations are injected into the page and preloaded per island by `@astroscope/node`, no layout script or special directives needed.
 
 ## API
 
@@ -331,18 +288,16 @@ export function App() {
 
 ## How it works
 
-1. **Build time** — Babel plugin extracts all `t()` calls, maps them to chunks, strips fallbacks from production bundles
+1. **Build time** — all `t()` calls are extracted, mapped to chunks, and fallbacks are stripped from production bundles
 2. **Manifest** — Extracted keys with fallbacks are written to `i18n-manifest.json`
 3. **SSR** — Middleware provides translations to `t()`, merging manifest fallbacks for missing keys
-4. **Client** — Custom directives load only the translations needed by each chunk
+4. **Client** — each island preloads only the translation chunks its code needs, in parallel with the component code
 
 The same `import { t } from '@astroscope/i18n/translate'` works everywhere — bundler picks the correct implementation via conditional exports (`browser` vs `default`).
 
 ### Client bundle
 
-Translation chunks are served as raw MessageFormat 2 strings and compiled on the browser on first use. This keeps chunk sizes minimal — the `messageformat` runtime is ~8KB gzipped. Compiled messages are cached for subsequent renders.
-
-> **Future:** Once browsers ship native `Intl.MessageFormat`, this 8KB runtime will be replaced by the built-in API with zero bundle cost.
+Translation chunks ship as raw MessageFormat 2 strings and are compiled in the browser on first use — the whole client runtime is ~8KB gzipped.
 
 ## MessageFormat 2 Syntax
 
@@ -424,18 +379,19 @@ For `:currency` and `:unit`, the required option (`currency` or `unit`) can be:
 
 ## ESLint Plugin
 
-Use [`@astroscope/eslint-plugin-i18n`](../eslint-plugin-i18n) to enforce correct `t()` usage, catch build-time extraction issues, and ensure i18n-aware hydration directives.
+Use the `i18n` config set from [`@astroscope/eslint-plugin`](../eslint-plugin) to enforce correct `t()` usage and catch build-time extraction issues:
 
 ```bash
-npm install -D @astroscope/eslint-plugin-i18n
+npm install -D @astroscope/eslint-plugin
 ```
 
 ```js
 // eslint.config.js
-import i18n from '@astroscope/eslint-plugin-i18n';
+import astroscope from '@astroscope/eslint-plugin';
 
 export default [
-  i18n.configs.recommended,
+  ...astroscope.configs.recommended,
+  ...astroscope.configs.i18n,
 ];
 ```
 

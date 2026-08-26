@@ -1,6 +1,5 @@
 import { type RawTranslations, i18n } from '@astroscope/i18n';
 
-// mock translations
 // note: fallback.* keys are intentionally missing to test fallback behavior
 const mockTranslations: Record<string, RawTranslations> = {
   en: {
@@ -88,10 +87,6 @@ async function fetchTranslations(locale: string): Promise<RawTranslations> {
 
 export async function onStartup() {
   await new Promise((resolve) => setTimeout(resolve, 1000)); // simulate async setup work
-
-  // if (1 - 1 == 0) {
-  //   throw new Error('This error should never happen');
-  // }
 
   await i18n.configure({ locales: ['en', 'de'] });
 
