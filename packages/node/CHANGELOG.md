@@ -1,5 +1,16 @@
 # @astroscope/node
 
+## 2.0.0
+
+### Major Changes
+
+- af0a493: island dependency preloading: html responses from page routes and prerendered pages emit modulepreload links for each island's chunk closure, with deferred islands (visible/idle/media) fetched by a small gate runtime that follows the directive's own scheduling; html from endpoint routes (e.g. a proxy catch-all) passes through untouched; disable with `islands: false`
+- af0a493: image processing is now off unless configured: when the astro config leaves `image.service` at its default, any `astro:assets` use (`<Image>`, `getImage()`, markdown images) throws with an explanation and `/_image` answers 404 — in SSR the on-demand sharp endpoint is an abuse-prone amplification surface most apps don't need. Control via the new `imageService: 'on' | 'off' | 'auto'` adapter option: `'on'` keeps astro's sharp service, `'off'` forces off, `'auto'` (default) follows whether `image.service` is set
+
+### Minor Changes
+
+- af0a493: new `@astroscope/node/islands` API for integrations: `registerIslandEmitter` and `registerDocumentEmitter` contribute per-island preload links/scripts and per-document content to the html streaming pass (used by `@astroscope/i18n` and `@astroscope/wormhole`)
+
 ## 1.4.0
 
 ### Minor Changes

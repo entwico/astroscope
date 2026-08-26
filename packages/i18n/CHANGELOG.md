@@ -1,5 +1,23 @@
 # @astroscope/i18n
 
+## 2.0.0
+
+### Major Changes
+
+- af0a493: the integration now injects the `/_i18n/` chunk middleware itself; `createI18nChunkMiddleware` is removed — delete its call from `src/middleware.ts`
+- af0a493: removed the `client:*-x` directive forks and `<I18nScript />` — plain `client:*` directives are covered by `@astroscope/node` island preloading, and the middleware injects the client state into html responses automatically; migrate by stripping the `-x` suffixes and deleting the `<I18nScript />` line
+
+### Minor Changes
+
+- af0a493: the client payload is now sliced per page: each island carries only its own chunk hashes, translation chunks preload alongside component chunks, and the whole-site imports map is gone
+
+### Patch Changes
+
+- Updated dependencies [af0a493]
+- Updated dependencies [af0a493]
+- Updated dependencies [af0a493]
+  - @astroscope/node@2.0.0
+
 ## 1.1.2
 
 ### Patch Changes
