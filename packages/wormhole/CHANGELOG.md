@@ -1,5 +1,29 @@
 # @astroscope/wormhole
 
+## 2.0.0
+
+### Major Changes
+
+- af0a493: wormholes are now defined in a `src/wormholes.ts` registry and read everywhere through the typed `wormholes` proxy:
+
+  - `defineWormhole<T>()` no longer takes a name — it comes from the registry key
+  - values are provided per request via `createWormholeMiddleware({ values: (ctx) => ({...}) })`
+  - the new integration (`wormhole()` in astro.config) wires the registry into the middleware and generates the proxy types
+  - `open()` is renamed to `openWormholes()` and covers only code outside the request pipeline (tests, background rendering)
+  - removed: `defineWormhole(name)`, `<WormholeScript />`, the `./astro` export, and direct store imports in client code
+  - `@astroscope/node` and `vite` are now peer dependencies
+
+### Minor Changes
+
+- af0a493: per-island payload slicing: each island receives an inline merge script with only the wormholes its chunks can reach, emitted right before its tag; astro `<script>` consumers get theirs at stream end; wormholes no client code reads ship zero bytes (requires `@astroscope/node` in production)
+
+### Patch Changes
+
+- Updated dependencies [af0a493]
+- Updated dependencies [af0a493]
+- Updated dependencies [af0a493]
+  - @astroscope/node@2.0.0
+
 ## 1.1.0
 
 ### Minor Changes

@@ -1,5 +1,16 @@
 # @astroscope/eslint-plugin
 
+## 2.0.0
+
+### Major Changes
+
+- af0a493: removed `@astroscope/i18n/prefer-x-directives` — the `client:*-x` directives it enforced no longer exist in `@astroscope/i18n`
+
+### Minor Changes
+
+- af0a493: new `no-server-action-calls` rule (in `recommended`): forbids calling actions — directly or via `Astro.callAction()` — during server rendering of `.astro` files
+- af0a493: new opt-in `configs.wormhole` rule set for `@astroscope/wormhole` projects: `wormholes-static-access` (dynamic access/aliasing defeats payload slicing), `server-readonly` (`set`/`subscribe` in astro server code), and `no-use-wormhole-in-astro`
+
 ## 1.1.0
 
 ### Minor Changes
