@@ -1,5 +1,11 @@
 # @astroscope/i18n
 
+## 2.0.1
+
+### Patch Changes
+
+- f8e5fb6: deferred islands load their translation chunks in parallel with the component code, shared and lazy chunks included
+
 ## 2.0.0
 
 ### Major Changes

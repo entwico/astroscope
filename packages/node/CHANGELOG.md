@@ -1,5 +1,15 @@
 # @astroscope/node
 
+## 2.1.0
+
+### Minor Changes
+
+- f8e5fb6: island emitters can contribute `imports` — data-module urls the deferred gate `import()`s eagerly when a directive fires
+
+### Patch Changes
+
+- 4877152: inline the deferred-islands gate runtime — gates install at parse time instead of losing a round trip to an external script fetch
+
 ## 2.0.1
 
 ### Patch Changes
