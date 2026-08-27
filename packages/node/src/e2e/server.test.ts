@@ -351,32 +351,30 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       expect(body.indexOf('<link rel="modulepreload"')).toBeLessThan(body.indexOf('<astro-island'));
     });
 
-    test('registers preload data and injects the gate runtime for a deferred island', async () => {
+    test('registers preload data and inlines the gate runtime for a deferred island', async () => {
       const body = await (await fetch(`${baseUrl}/deferred`)).text();
 
-      expect(body).toMatch(/<script type="module" src="\/_astro\/islands-runtime\.[a-f0-9]+\.js"><\/script>/);
-      expect(body).toMatch(/\(self\.__islands__\?\?=\{\}\)\["\/_astro\/Island\.[^"]+\.js"\]=\[[^\]]+\]/);
+      // the runtime installs at parse time — an inline script, not an external
+      // module fetch astro's inline island machinery would always beat
+      expect(body).toContain('@astroscope/node.islandsRuntime');
+      expect(body).not.toMatch(/<script type="module" src="[^"]*islands-runtime/);
+      expect(body).toMatch(/\(self\.__islands__\?\?=\{\}\)\["\/_astro\/Island\.[^"]+\.js"\]=\{"l":\[[^\]]+\]\}/);
+      expect(body.indexOf('@astroscope/node.islandsRuntime')).toBeLessThan(body.indexOf('__islands__'));
       expect(body.indexOf('__islands__')).toBeLessThan(body.indexOf('<astro-island'));
       expect(body).not.toMatch(/<link rel="modulepreload"[^>]*Island/);
     });
 
-    test('serves the gate runtime asset', async () => {
-      const body = await (await fetch(`${baseUrl}/deferred`)).text();
-      const src = body.match(/src="(\/_astro\/islands-runtime\.[^"]+)"/)?.[1];
+    test('ships no gate runtime asset — the runtime is inlined', async () => {
+      const assets = walkFiles(path.join(fixtureRoot, 'dist', 'client'));
 
-      expect(src).toBeDefined();
-
-      const res = await fetch(`${baseUrl}${src}`);
-
-      expect(res.status).toBe(200);
-      expect(await res.text()).toContain('astro-island');
+      expect(assets.filter((f) => path.basename(f).startsWith('islands-runtime'))).toEqual([]);
     });
 
     test('prerendered pages got the rewrite at build time, compressed variants included', async () => {
       const plain = await (await fetch(`${baseUrl}/static-island`)).text();
 
       expect(plain).toContain('self.__islands__');
-      expect(plain).toContain('islands-runtime');
+      expect(plain).toContain('@astroscope/node.islandsRuntime');
 
       const compressed = await rawGet(`${baseUrl}/static-island`, { 'accept-encoding': 'br' });
 
@@ -391,7 +389,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       expect(res.headers['content-type']).toContain('text/html');
       expect(body).toContain('<astro-island component-url="/_astro/Island.fake.js"');
       expect(body).not.toContain('modulepreload');
-      expect(body).not.toContain('islands-runtime');
+      expect(body).not.toContain('islandsRuntime');
       // the response was returned as-is — a rewrite would have dropped the length
       expect(res.headers['content-length']).toBe(String(body.length));
     });

@@ -2,4 +2,4 @@
 '@astroscope/node': patch
 ---
 
-ship the islands gate runtime minified
+inline the deferred-islands gate runtime — gates install at parse time instead of losing a round trip to an external script fetch

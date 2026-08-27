@@ -78,6 +78,19 @@ describe('i18n islands emitter', () => {
     expect(emission?.links?.[0]).toMatch(/^\/_i18n\/en\/Cart\.Cabc\.[0-9a-f]{8}\.js$/);
   });
 
+  test('emits eager imports for the full closure, dynamic chunks included', async () => {
+    const { emitter, setRequestLocale } = await setup();
+    const context = createContext();
+
+    setRequestLocale(context.request, 'en');
+
+    const emission = emitter(createIsland(), context);
+
+    expect(emission?.imports).toHaveLength(2);
+    expect(emission?.imports?.[0]).toMatch(/^\/_i18n\/en\/Cart\.Cabc\.[0-9a-f]{8}\.js$/);
+    expect(emission?.imports?.[1]).toMatch(/^\/_i18n\/en\/Lazy\.Cddd\.[0-9a-f]{8}\.js$/);
+  });
+
   test('emits each chunk hash once per request', async () => {
     const { emitter, setRequestLocale } = await setup();
     const context = createContext();
@@ -89,8 +102,10 @@ describe('i18n islands emitter', () => {
 
     expect(first?.html).toContain('Cart.Cabc');
     expect(second?.html).toBeUndefined();
-    // links keep flowing — later islands may be the ones that trigger the preload
+    // links and imports keep flowing — every island's gate must be self-sufficient,
+    // whichever fires first covers a shared chunk
     expect(second?.links).toHaveLength(1);
+    expect(second?.imports).toHaveLength(2);
   });
 
   test('contributes nothing without a request context (prerendered pass)', async () => {

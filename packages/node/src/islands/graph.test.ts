@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { createChunkGraph } from './graph';
 
 const graph = createChunkGraph({
-  runtime: '_astro/islands-runtime.x.js',
+  runtimeSource: '/* gate runtime */',
   chunks: {
     'a.js': { i: ['b.js'], d: ['lazy.js'] },
     'b.js': { i: ['c.js', 'shared.js'] },

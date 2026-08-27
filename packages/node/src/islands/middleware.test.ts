@@ -9,7 +9,7 @@ const REGISTRY = Symbol.for('@astroscope/node.islandEmitters');
 const DOCUMENT_REGISTRY = Symbol.for('@astroscope/node.documentEmitters');
 
 const manifest: IslandsManifest = {
-  runtime: '_astro/islands-runtime.abcd1234.js',
+  runtimeSource: '/* gate runtime */',
   chunks: {
     '_astro/Cart.aaa.js': { i: ['_astro/shared.bbb.js'] },
     '_astro/shared.bbb.js': {},

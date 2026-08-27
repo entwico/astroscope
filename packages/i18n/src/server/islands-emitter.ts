@@ -15,8 +15,16 @@ import { i18n } from './i18n.js';
  *   least a network round-trip later — so each island's hashes win their race
  *   even while the rest of the document is still streaming. Chunks already
  *   covered earlier in the document are skipped.
- * - translation-chunk preload links for the static closure, riding the same
- *   immediate/deferred gate as the component chunks themselves.
+ * - translation-chunk preload links for the static closure, emitted as link tags
+ *   for immediate islands.
+ * - translation-chunk eager imports for the full closure — dynamic imports
+ *   included — fired by the deferred gate the moment a directive schedules
+ *   hydration. Translation chunks are idempotent data modules, so evaluating
+ *   them ahead of the component costs nothing, and the loader's awaited import
+ *   then hits the module cache instead of fetching serially after the component
+ *   graph evaluated. Every island carries its complete i18n set (no per-document
+ *   dedup — the gate dedups at fire time), so a chunk shared between islands is
+ *   covered by whichever gate fires first.
  *
  * The locale is recorded per request by the i18n middleware — the emitter runs
  * while the response streams, outside the middleware's AsyncLocalStorage scope.
@@ -120,16 +128,31 @@ export function registerI18nEmitters(): void {
       }
     }
 
+    const imports: string[] = [];
+
+    for (const url of island.fullClosure) {
+      const chunk = urlToChunkName(url);
+      const hash = hashes[chunk];
+
+      if (hash) {
+        imports.push(buildI18nChunkUrl(locale, chunk, hash));
+      }
+    }
+
     const init = jsonForScript({ locale, hashes: {}, translations: {} });
     const html =
       Object.keys(merge).length > 0
         ? `<script>{const i=window.__i18n__??=${init};Object.assign(i.hashes,${jsonForScript(merge)});}</script>`
         : undefined;
 
-    if (!html && links.length === 0) {
+    if (!html && links.length === 0 && imports.length === 0) {
       return null;
     }
 
-    return { html, links: links.length > 0 ? links : undefined };
+    return {
+      html,
+      links: links.length > 0 ? links : undefined,
+      imports: imports.length > 0 ? imports : undefined,
+    };
   });
 }

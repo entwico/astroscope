@@ -14,17 +14,20 @@ import type { IslandEmission, IslandInfo, IslandsManifest } from './types.js';
  *   before the tag, deduplicated per document; the browser's speculative preload
  *   scanner acts on them from raw bytes, ahead of any script.
  * - deferred directives get an inline script before the first island per
- *   component that registers the links on the preload global, keyed by
- *   `component-url`; the gate runtime fires them by the directive's own
- *   scheduling semantics. A script rather than an attribute: it takes effect at
- *   parse time and its effect survives the island element being removed — the
- *   island tag itself stays untouched.
+ *   component that registers `{l: links, i: imports}` on the preload global,
+ *   keyed by `component-url`; the gate runtime injects the links and eagerly
+ *   `import()`s the imports by the directive's own scheduling semantics. A script
+ *   rather than an attribute: it takes effect at parse time and its effect
+ *   survives the island element being removed — the island tag itself stays
+ *   untouched.
  *
- * The gate runtime script is injected once, before the first island that needs it,
- * so pages without deferred islands never load it.
+ * The gate runtime is inlined once, before the first island that needs it, so
+ * pages without deferred islands never carry it — and pages with them install
+ * the gates at parse time, without an external fetch astro's inline island
+ * machinery would always beat.
  */
 
-/** global registry of preload urls per component-url, written by the transform, read by the gate runtime */
+/** global registry of `{l, i}` entries per component-url, written by the transform, read by the gate runtime */
 export const PRELOAD_GLOBAL = '__islands__';
 
 const IMMEDIATE_DIRECTIVES = new Set(['load', 'only']);
@@ -155,13 +158,19 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
 
       registeredComponents.add(componentUrl);
 
-      const runtime = runtimeInjected
-        ? ''
-        : `<script type="module" src="${encodeAttribute(component.prefix + manifest.runtime)}"></script>`;
+      const runtime = runtimeInjected ? '' : `<script>${manifest.runtimeSource}</script>`;
 
       runtimeInjected = true;
 
-      const register = `<script>(self.${PRELOAD_GLOBAL}??={})[${jsonForScript(componentUrl)}]=${jsonForScript(links)};</script>`;
+      const imports = [...new Set(emissions.flatMap((e) => e.imports ?? []))];
+      const importSet = new Set(imports);
+      const entry: Record<string, string[]> = { l: links.filter((url) => !importSet.has(url)) };
+
+      if (imports.length > 0) {
+        entry['i'] = imports;
+      }
+
+      const register = `<script>(self.${PRELOAD_GLOBAL}??={})[${jsonForScript(componentUrl)}]=${jsonForScript(entry)};</script>`;
 
       return { prepend: runtime + register + html || undefined };
     });

@@ -6,7 +6,7 @@ import type { IslandsManifest } from './types';
 const REGISTRY = Symbol.for('@astroscope/node.islandEmitters');
 
 const manifest: IslandsManifest = {
-  runtime: '_astro/islands-runtime.abcd1234.js',
+  runtimeSource: '/* gate runtime */',
   chunks: {
     '_astro/Cart.aaa.js': { i: ['_astro/shared.bbb.js'], d: ['_astro/Lazy.ddd.js'] },
     '_astro/shared.bbb.js': {},
@@ -53,12 +53,12 @@ describe('createIslandsTransformer', () => {
     expect(out.match(/href="\/_astro\/client\.ccc\.js"/g)).toHaveLength(1);
   });
 
-  test('injects the gate runtime and registers preload data for a deferred island', async () => {
+  test('inlines the gate runtime and registers preload data for a deferred island', async () => {
     const out = await apply(island('visible'));
 
-    expect(out).toContain('<script type="module" src="/_astro/islands-runtime.abcd1234.js"></script>');
+    expect(out).toContain('<script>/* gate runtime */</script>');
     expect(out).toMatch(
-      /\(self\.__islands__\?\?=\{\}\)\["\/_astro\/Cart\.aaa\.js"\]=\[[^\]]*\/_astro\/shared\.bbb\.js[^\]]*\]/,
+      /\(self\.__islands__\?\?=\{\}\)\["\/_astro\/Cart\.aaa\.js"\]=\{"l":\[[^\]]*\/_astro\/shared\.bbb\.js[^\]]*\]\}/,
     );
     expect(out.indexOf('__islands__')).toBeLessThan(out.indexOf('<astro-island'));
     expect(out).not.toContain('<link');
@@ -66,11 +66,15 @@ describe('createIslandsTransformer', () => {
     expect(out).toContain(island('visible'));
   });
 
-  test('injects the runtime once and registers each component once', async () => {
+  test('inlines the runtime once and registers each component once', async () => {
     const out = await apply(island('visible') + island('visible') + island('idle', '/_astro/Menu.eee.js'));
 
-    expect(out.match(/islands-runtime/g)).toHaveLength(1);
+    expect(out.match(/<script>\/\* gate runtime \*\/<\/script>/g)).toHaveLength(1);
     expect(out.match(/\(self\.__islands__\?\?=\{\}\)/g)).toHaveLength(2);
+  });
+
+  test('pages without deferred islands never carry the runtime', async () => {
+    expect(await apply(island('load'))).not.toContain('/* gate runtime */');
   });
 
   test('treats -x suffixed directives like their base directive', async () => {
@@ -101,7 +105,31 @@ describe('createIslandsTransformer', () => {
 
     const deferred = await apply(island('visible'));
 
-    expect(deferred).toMatch(/\["\/_astro\/Cart\.aaa\.js"\]=\[[^\]]*\/_i18n\/de\/Cart\.aaa\.js[^\]]*\]/);
+    expect(deferred).toMatch(/\["\/_astro\/Cart\.aaa\.js"\]=\{"l":\[[^\]]*\/_i18n\/de\/Cart\.aaa\.js[^\]]*\]\}/);
+  });
+
+  test('registers emitter imports for a deferred island, subtracted from the links', async () => {
+    registerIslandEmitter(() => ({
+      links: ['/_i18n/de/Cart.aaa.js'],
+      imports: ['/_i18n/de/Cart.aaa.js', '/_i18n/de/Lazy.ddd.js'],
+    }));
+
+    const out = await apply(island('visible'));
+    const entry = /\["\/_astro\/Cart\.aaa\.js"\]=(\{.*?\});<\/script>/.exec(out)?.[1];
+
+    expect(entry).toBeDefined();
+
+    const parsed = JSON.parse(entry!) as { l: string[]; i?: string[] };
+
+    expect(parsed.i).toEqual(['/_i18n/de/Cart.aaa.js', '/_i18n/de/Lazy.ddd.js']);
+    expect(parsed.l).not.toContain('/_i18n/de/Cart.aaa.js');
+    expect(parsed.l).toContain('/_astro/shared.bbb.js');
+  });
+
+  test('immediate islands ignore emitter imports', async () => {
+    registerIslandEmitter(() => ({ imports: ['/_i18n/de/Lazy.ddd.js'] }));
+
+    expect(await apply(island('load'))).not.toContain('/_i18n/de/Lazy.ddd.js');
   });
 
   test('a throwing emitter is dropped without breaking the page', async () => {

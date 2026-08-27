@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Plugin } from 'vite';
@@ -11,8 +10,6 @@ const RESOLVED_ISLANDS_VIRTUAL_MODULE_ID = `\0${ISLANDS_VIRTUAL_MODULE_ID}`;
 const MANIFEST_FILE_NAME = 'islands-manifest.json';
 
 export type IslandsManifestPluginOptions = {
-  /** astro's `build.assets` directory name, e.g. `_astro` */
-  assetsDir: string;
   logger: { warn: (message: string) => void };
   /** `islands: false` disables the preloading — no manifest is written and the virtual module resolves to null */
   enabled: boolean;
@@ -20,9 +17,12 @@ export type IslandsManifestPluginOptions = {
 
 /**
  * Client-build side of island preloading: records the chunk import graph (direct
- * static and dynamic edges per chunk), writes the content-hashed gate runtime into
- * the client assets dir, and drops the manifest next to the server chunks — where
- * the virtual module reads it back at runtime, mirroring the i18n manifest.
+ * static and dynamic edges per chunk), embeds the gate runtime source, and drops
+ * the manifest next to the server chunks — where the virtual module reads it back
+ * at runtime, mirroring the i18n manifest. The runtime is inlined into documents
+ * rather than shipped as an asset: an external module fetch would install the
+ * gates a round-trip after astro's own inline island machinery, losing the race
+ * it exists to win.
  *
  * The client build runs after the server build, so the SSR bundle can only carry
  * code that reads the file lazily; in dev there is no manifest and the middleware
@@ -92,19 +92,15 @@ export { manifest };
         };
       }
 
-      // the sourcemap itself is not shipped, so the marker would 404 (and client
-      // bundles are deliberately map-free, see tweaks/sourcemap.ts)
-      const runtimeSource = fs
-        .readFileSync(new URL('./islands-runtime.js', import.meta.url), 'utf-8')
-        .replace(/^\/\/# sourceMappingURL=.*$/m, '')
-        .trimEnd();
-      const hash = createHash('sha256').update(runtimeSource).digest('hex').slice(0, 8);
-      const runtime = `${options.assetsDir}/islands-runtime.${hash}.js`;
+      const runtimeSource = fs.readFileSync(new URL('./islands-runtime.iife.js', import.meta.url), 'utf-8').trim();
 
-      fs.mkdirSync(path.join(outputOptions.dir, options.assetsDir), { recursive: true });
-      fs.writeFileSync(path.join(outputOptions.dir, options.assetsDir, `islands-runtime.${hash}.js`), runtimeSource);
+      // the source goes verbatim into an inline script tag — a stray closing
+      // sequence would truncate every page carrying deferred islands
+      if (runtimeSource.toLowerCase().includes('</script')) {
+        throw new Error('islands gate runtime must not contain "</script"');
+      }
 
-      const manifest: IslandsManifest = { runtime, chunks };
+      const manifest: IslandsManifest = { runtimeSource, chunks };
       const chunksDir = path.resolve(outputOptions.dir, '..', 'server', 'chunks');
 
       if (fs.existsSync(chunksDir)) {

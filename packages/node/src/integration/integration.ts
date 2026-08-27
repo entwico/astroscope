@@ -185,7 +185,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
             plugins: [
               ...devMachinery,
               ...islandWarmup,
-              createIslandsManifestPlugin({ assetsDir: config.build.assets, logger, enabled: islandsEnabled }),
+              createIslandsManifestPlugin({ logger, enabled: islandsEnabled }),
               ssrSourcemapPlugin(),
               stripSsrEffectsPlugin(),
               {

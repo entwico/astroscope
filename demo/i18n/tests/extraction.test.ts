@@ -156,10 +156,11 @@ describe('client i18n state', () => {
   test('prod pages preload translation chunks alongside component chunks', async () => {
     const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
 
-    // immediate islands get link tags, deferred islands register their links for the gate
+    // immediate islands get link tags, deferred islands register their translation
+    // chunks as eager imports for the gate
     expect(html).toMatch(/<link rel="modulepreload" fetchpriority="low" href="\/_i18n\/en\/[^"]+\.js">/);
-    expect(html).toMatch(/\(self\.__islands__\?\?=\{\}\)\[[^\]]+\]=\[[^\]]*\/_i18n\/en\/[^"\]]+\.js[^\]]*\]/);
-    expect(html).toContain('islands-runtime');
+    expect(html).toMatch(/\(self\.__islands__\?\?=\{\}\)\[[^\]]+\]=\{"l":\[[^}]*"i":\[[^\]]*\/_i18n\/en\/[^"\]]+\.js[^\]]*\]/);
+    expect(html).toContain('@astroscope/node.islandsRuntime');
   });
 
   test('dev pages ship full translations in the head, before any island', async () => {

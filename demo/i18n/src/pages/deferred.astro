@@ -1,0 +1,41 @@
+---
+import '../styles/index.css';
+import Layout from '../../../shared/Layout.astro';
+import CircularB from '../components/CircularB';
+import LazyLoadDemo from '../components/LazyLoadDemo';
+import Newsletter from '../components/Newsletter';
+---
+
+<Layout title="i18n Deferred Delivery" package="@astroscope/i18n">
+  <p class="text-lg mb-6">
+    Deferred islands only — exercises the gate runtime delivery: translation chunks for the full closure (shared and
+    lazy chunks included) ride the register scripts as eager imports.
+  </p>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">
+        Idle island — <code class="badge badge-ghost">client:idle</code>
+      </h2>
+      <Newsletter client:idle />
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">
+        Idle island with a lazy chunk — <code class="badge badge-ghost">client:idle</code>
+      </h2>
+      <LazyLoadDemo client:idle />
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">
+        Visible island with a shared chunk — <code class="badge badge-ghost">client:visible</code>
+      </h2>
+      <CircularB client:visible />
+    </div>
+  </div>
+</Layout>

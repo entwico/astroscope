@@ -11,8 +11,14 @@ type MutationCallback = (mutations: { addedNodes: Node[] }[]) => void;
 
 const INSTALLED = Symbol.for('@astroscope/node.islandsRuntime');
 
-function register(entries: Record<string, string[]>): void {
-  (globalThis as { __islands__?: Record<string, string[]> }).__islands__ = entries;
+type RegistryEntry = string[] | { l?: string[]; i?: string[] };
+
+function register(entries: Record<string, RegistryEntry>): void {
+  (globalThis as { __islands__?: Record<string, RegistryEntry> }).__islands__ = entries;
+}
+
+function importedUrls(): string[] {
+  return (globalThis as { __importedI18nUrls__?: string[] }).__importedI18nUrls__ ?? [];
 }
 
 let intersect: IntersectionCallback | undefined;
@@ -47,6 +53,7 @@ beforeEach(() => {
 
   delete (globalThis as Record<symbol, unknown>)[INSTALLED];
   delete (globalThis as { __islands__?: unknown }).__islands__;
+  delete (globalThis as { __importedI18nUrls__?: unknown }).__importedI18nUrls__;
 
   intersect = undefined;
   mutate = undefined;
@@ -93,7 +100,7 @@ beforeEach(() => {
 
 describe('islands gate runtime', () => {
   test('fires an idle island when the browser goes idle', async () => {
-    register({ '/_astro/Cart.js': ['/_astro/Cart.js', '/_astro/shared.js'] });
+    register({ '/_astro/Cart.js': { l: ['/_astro/Cart.js', '/_astro/shared.js'] } });
     document.body.append(createIsland({ 'component-url': '/_astro/Cart.js', client: 'idle', opts: '{}' }));
 
     await loadRuntime();
@@ -106,7 +113,7 @@ describe('islands gate runtime', () => {
   });
 
   test('fires a visible island when it approaches the viewport', async () => {
-    register({ '/_astro/Menu.js': ['/_astro/Menu.js'] });
+    register({ '/_astro/Menu.js': { l: ['/_astro/Menu.js'] } });
 
     const island = createIsland({ 'component-url': '/_astro/Menu.js', client: 'visible', opts: '{}' });
 
@@ -122,7 +129,7 @@ describe('islands gate runtime', () => {
   });
 
   test('fires a media island when its query matches', async () => {
-    register({ '/_astro/Nav.js': ['/_astro/Nav.js'] });
+    register({ '/_astro/Nav.js': { l: ['/_astro/Nav.js'] } });
     document.body.append(
       createIsland({
         'component-url': '/_astro/Nav.js',
@@ -141,7 +148,7 @@ describe('islands gate runtime', () => {
   });
 
   test('all instances share the registry entry and fire once', async () => {
-    register({ '/_astro/Card.js': ['/_astro/Card.js', '/_astro/shared.js'] });
+    register({ '/_astro/Card.js': { l: ['/_astro/Card.js', '/_astro/shared.js'] } });
 
     const first = createIsland({ 'component-url': '/_astro/Card.js', client: 'visible', opts: '{}' });
     const second = createIsland({ 'component-url': '/_astro/Card.js', client: 'visible', opts: '{}' });
@@ -158,7 +165,7 @@ describe('islands gate runtime', () => {
   });
 
   test('treats -x suffixed directives like their base directive', async () => {
-    register({ '/_astro/Gtm.js': ['/_astro/Gtm.js'] });
+    register({ '/_astro/Gtm.js': { l: ['/_astro/Gtm.js'] } });
 
     const island = createIsland({
       'component-url': '/_astro/Gtm.js',
@@ -181,7 +188,7 @@ describe('islands gate runtime', () => {
 
     // the fragment's registry script has executed on insertion (astro inserts
     // fragments via createContextualFragment, which runs scripts)
-    register({ '/_astro/Late.js': ['/_astro/Late.js'] });
+    register({ '/_astro/Late.js': { l: ['/_astro/Late.js'] } });
 
     const island = createIsland({ 'component-url': '/_astro/Late.js', client: 'idle', opts: '{}' });
     const wrapper = document.createElement('div');
@@ -197,7 +204,7 @@ describe('islands gate runtime', () => {
   });
 
   test('injected links carry low fetch priority', async () => {
-    register({ '/_astro/A.js': ['/_astro/A.js'] });
+    register({ '/_astro/A.js': { l: ['/_astro/A.js'] } });
     document.body.append(createIsland({ 'component-url': '/_astro/A.js', client: 'idle', opts: '{}' }));
 
     await loadRuntime();
@@ -206,5 +213,61 @@ describe('islands gate runtime', () => {
     const link = document.head.querySelector('link[rel="modulepreload"]');
 
     expect(link?.getAttribute('fetchpriority')).toBe('low');
+  });
+
+  test('eagerly imports the entry imports when the directive fires, links stay preloads', async () => {
+    register({
+      '/_astro/Cart.js': { l: ['/_astro/Cart.js'], i: ['/_i18n/en/Cart.abc.js', '/_i18n/en/Lazy.def.js'] },
+    });
+    document.body.append(createIsland({ 'component-url': '/_astro/Cart.js', client: 'idle', opts: '{}' }));
+
+    await loadRuntime();
+
+    expect(importedUrls()).toEqual([]);
+
+    idleCallbacks.forEach((cb) => cb());
+
+    await vi.waitFor(() => expect(importedUrls()).toEqual(['/_i18n/en/Cart.abc.js', '/_i18n/en/Lazy.def.js']), {
+      timeout: 5000,
+    });
+    expect(preloadedHrefs()).toEqual(['/_astro/Cart.js']);
+  });
+
+  test('an import shared between components fires only once', async () => {
+    register({
+      '/_astro/A.js': { l: [], i: ['/_i18n/en/shared.abc.js'] },
+      '/_astro/B.js': { l: [], i: ['/_i18n/en/shared.abc.js'] },
+    });
+    document.body.append(
+      createIsland({ 'component-url': '/_astro/A.js', client: 'idle', opts: '{}' }),
+      createIsland({ 'component-url': '/_astro/B.js', client: 'idle', opts: '{}' }),
+    );
+
+    await loadRuntime();
+    idleCallbacks.forEach((cb) => cb());
+
+    await vi.waitFor(() => expect(importedUrls()).toEqual(['/_i18n/en/shared.abc.js']), { timeout: 5000 });
+  });
+
+  test('a failed eager import stays silent', async () => {
+    register({ '/_astro/A.js': { l: ['/_astro/A.js'], i: ['/definitely-not-resolvable.js'] } });
+    document.body.append(createIsland({ 'component-url': '/_astro/A.js', client: 'idle', opts: '{}' }));
+
+    await loadRuntime();
+    idleCallbacks.forEach((cb) => cb());
+
+    // the rejection is swallowed and the links still land
+    expect(preloadedHrefs()).toEqual(['/_astro/A.js']);
+  });
+
+  test('treats a plain array entry from an older document as links only', async () => {
+    register({ '/_astro/Old.js': ['/_astro/Old.js', '/_astro/shared.js'] });
+    document.body.append(createIsland({ 'component-url': '/_astro/Old.js', client: 'idle', opts: '{}' }));
+
+    await loadRuntime();
+    idleCallbacks.forEach((cb) => cb());
+
+    expect(preloadedHrefs()).toEqual(['/_astro/Old.js', '/_astro/shared.js']);
+    expect(importedUrls()).toEqual([]);
   });
 });

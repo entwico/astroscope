@@ -8,8 +8,8 @@ import type { APIContext } from 'astro';
  * so base and CDN asset prefixes need no configuration.
  */
 export type IslandsManifest = {
-  /** client-dist-relative file name of the emitted gate runtime script */
-  runtime: string;
+  /** the gate runtime as a self-contained iife, inlined into documents with deferred islands */
+  runtimeSource: string;
   /** direct imports per chunk: `i` static, `d` dynamic; file names relative to client dist */
   chunks: Record<string, { i?: string[] | undefined; d?: string[] | undefined }>;
 };
@@ -34,12 +34,20 @@ export type IslandInfo = {
  * What an emitter contributes for one island. `links` are merged across emitters and
  * either emitted as `<link rel="modulepreload">` tags (immediate directives) or
  * registered on the preload global for the gate runtime (deferred directives).
- * `html` is emitted right before the island tag regardless of directive — an inline
- * script there is parsed strictly before the island connects, so it is the place
- * for data the island's chunks read at execution time.
+ * `imports` are data-module urls (safe to evaluate ahead of time, e.g. translation
+ * chunks) that the gate runtime eagerly `import()`s when a deferred island's
+ * directive fires — they land in the module loader cache so the component's own
+ * awaited import resolves instantly instead of fetching serially after the
+ * component graph evaluated; urls listed in both sets are registered as imports
+ * only. Immediate directives ignore `imports` — their hydration import fires right
+ * away and pulls the data modules itself. `html` is emitted right before the island
+ * tag regardless of directive — an inline script there is parsed strictly before
+ * the island connects, so it is the place for data the island's chunks read at
+ * execution time.
  */
 export type IslandEmission = {
   links?: string[] | undefined;
+  imports?: string[] | undefined;
   html?: string | undefined;
 };
 
