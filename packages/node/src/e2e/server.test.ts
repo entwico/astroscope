@@ -7,6 +7,7 @@ import path from 'node:path';
 import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { fixtureRoot, skip } from './fixture';
+import { findLeakedPaths } from './purity';
 
 function walkFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -98,7 +99,22 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
     const { build } = await import('astro');
 
-    await build({ root: fixtureRoot, logLevel: 'error' });
+    // vitest sets NODE_ENV=test, which flips the react plugin to the dev jsx
+    // runtime — that embeds absolute source paths into client chunks and never
+    // happens in a real `astro build`
+    const nodeEnv = process.env['NODE_ENV'];
+
+    process.env['NODE_ENV'] = 'production';
+
+    try {
+      await build({ root: fixtureRoot, logLevel: 'error' });
+    } finally {
+      if (nodeEnv === undefined) {
+        delete process.env['NODE_ENV'];
+      } else {
+        process.env['NODE_ENV'] = nodeEnv;
+      }
+    }
 
     server = spawn('node', ['dist/server/entry.mjs'], {
       cwd: fixtureRoot,
@@ -126,6 +142,10 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       server.kill('SIGKILL');
       await exited();
     }
+  });
+
+  test('build output contains no build machine paths', () => {
+    expect(findLeakedPaths(path.join(fixtureRoot, 'dist'))).toEqual([]);
   });
 
   test('onStartup ran with the production context before the port opened', () => {
@@ -227,6 +247,11 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     let previewExit: number | null | undefined;
 
     beforeAll(async () => {
+      // astro 7 preview runs as a per-project daemon: a stale one from an earlier
+      // run would answer "already running" on its old port and nothing would ever
+      // listen on ours
+      spawnSync('node_modules/.bin/astro', ['preview', 'stop'], { cwd: fixtureRoot, stdio: 'ignore' });
+
       preview = spawn('node_modules/.bin/astro', ['preview', '--port', String(previewPort), '--host', '127.0.0.1'], {
         cwd: fixtureRoot,
         env: {
@@ -258,10 +283,16 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
           }, 5000).unref();
         });
       }
+
+      // the spawned child exits after daemonizing — the daemon itself is stopped here
+      spawnSync('node_modules/.bin/astro', ['preview', 'stop'], { cwd: fixtureRoot, stdio: 'ignore' });
     });
 
     test('runs the full production path including boot', async () => {
-      expect(previewOut).toContain('[e2e] startup dev=false');
+      // boot output lands in the daemon's log, not the spawned child's stdio
+      const logs = spawnSync('node_modules/.bin/astro', ['preview', 'logs'], { cwd: fixtureRoot, encoding: 'utf-8' });
+
+      expect(`${previewOut}${logs.stdout}`).toContain('[e2e] startup dev=false');
 
       const res = await fetch(`${previewUrl}/`);
 
