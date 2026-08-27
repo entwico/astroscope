@@ -28,11 +28,15 @@ let idleCallbacks: (() => void)[];
 let mediaListeners: Map<string, () => void>;
 let mediaMatches: boolean;
 
-function createIsland(attrs: Record<string, string>): HTMLElement {
+function createIsland(attrs: Record<string, string>, childCount = 1): HTMLElement {
   const el = document.createElement('astro-island');
 
   for (const [name, value] of Object.entries(attrs)) {
     el.setAttribute(name, value);
+  }
+
+  for (let i = 0; i < childCount; i++) {
+    el.append(document.createElement('div'));
   }
 
   return el;
@@ -112,18 +116,42 @@ describe('islands gate runtime', () => {
     expect(preloadedHrefs()).toEqual(['/_astro/Cart.js', '/_astro/shared.js']);
   });
 
-  test('fires a visible island when it approaches the viewport', async () => {
+  test('fires a visible island when a child approaches the viewport, never observing the boxless island', async () => {
     register({ '/_astro/Menu.js': { l: ['/_astro/Menu.js'] } });
 
-    const island = createIsland({ 'component-url': '/_astro/Menu.js', client: 'visible', opts: '{}' });
+    const island = createIsland({ 'component-url': '/_astro/Menu.js', client: 'visible', opts: '{}' }, 2);
 
     document.body.append(island);
     await loadRuntime();
 
-    expect(observedTargets).toContain(island);
+    // astro-island is display:contents — an observer on it would never fire
+    expect(observedTargets).not.toContain(island);
+    expect(observedTargets).toEqual([...island.children]);
     expect(preloadedHrefs()).toEqual([]);
 
-    intersect?.([{ target: island, isIntersecting: true }]);
+    intersect?.([{ target: island.children[1]!, isIntersecting: true }]);
+
+    expect(preloadedHrefs()).toEqual(['/_astro/Menu.js']);
+  });
+
+  test('observes a streamed visible island once its children arrive', async () => {
+    register({ '/_astro/Menu.js': { l: ['/_astro/Menu.js'] } });
+
+    const island = createIsland({ 'component-url': '/_astro/Menu.js', client: 'visible', opts: '{}' }, 0);
+
+    document.body.append(island);
+    await loadRuntime();
+
+    expect(observedTargets).toEqual([]);
+
+    const child = document.createElement('div');
+
+    island.append(child);
+    mutate?.([{ addedNodes: [child] }]);
+
+    expect(observedTargets).toEqual([child]);
+
+    intersect?.([{ target: child, isIntersecting: true }]);
 
     expect(preloadedHrefs()).toEqual(['/_astro/Menu.js']);
   });
@@ -156,10 +184,10 @@ describe('islands gate runtime', () => {
     document.body.append(first, second);
     await loadRuntime();
 
-    expect(observedTargets).toEqual([first, second]);
+    expect(observedTargets).toEqual([first.children[0], second.children[0]]);
 
-    intersect?.([{ target: second, isIntersecting: true }]);
-    intersect?.([{ target: first, isIntersecting: true }]);
+    intersect?.([{ target: second.children[0]!, isIntersecting: true }]);
+    intersect?.([{ target: first.children[0]!, isIntersecting: true }]);
 
     expect(preloadedHrefs()).toEqual(['/_astro/Card.js', '/_astro/shared.js']);
   });

@@ -14,9 +14,10 @@
  * Executes at parse time; islands are picked up as they stream in or get
  * swapped in later, and fire by their directive's own scheduling: idle/unknown
  * → requestIdleCallback (honoring a timeout), media → matchMedia, visible →
- * IntersectionObserver with expanded rootMargin. Whichever instance's gate
- * fires first wins; injection and imports dedupe per url. A failed eager import
- * is swallowed — the component's own import retries.
+ * IntersectionObserver on the island's element children (the island itself is
+ * display:contents, boxless) with expanded rootMargin. Whichever instance's
+ * gate fires first wins; injection and imports dedupe per url. A failed eager
+ * import is swallowed — the component's own import retries.
  */
 
 // a client-router swap can pull in a second inlined runtime — only the first
@@ -31,6 +32,7 @@ const fired = new Set<string>();
 const injected = new Set<string>();
 const imported = new Set<string>();
 const observed = new Map<Element, string>();
+const awaitingChildren = new Map<Element, string>();
 
 let observer: IntersectionObserver | undefined;
 
@@ -88,17 +90,33 @@ function directiveValue(el: Element): unknown {
   }
 }
 
+function unobserve(componentUrl: string): void {
+  for (const [el, url] of observed) {
+    if (url === componentUrl) {
+      observer!.unobserve(el);
+      observed.delete(el);
+    }
+  }
+}
+
+// astro-island is display:contents — boxless, IntersectionObserver never fires
+// on it. observe the element children instead, like astro's visible directive;
+// a streamed island may have none yet, so it waits for the mutation observer
 function observe(el: Element, componentUrl: string): void {
+  if (el.children.length === 0) {
+    awaitingChildren.set(el, componentUrl);
+
+    return;
+  }
+
   observer ??= new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
           const url = observed.get(entry.target);
 
-          observer!.unobserve(entry.target);
-          observed.delete(entry.target);
-
           if (url) {
+            unobserve(url);
             fire(url);
           }
         }
@@ -107,8 +125,21 @@ function observe(el: Element, componentUrl: string): void {
     { rootMargin: '100% 0px' },
   );
 
-  observed.set(el, componentUrl);
-  observer.observe(el);
+  for (const child of el.children) {
+    observed.set(child, componentUrl);
+    observer.observe(child);
+  }
+}
+
+function observeArrivedChildren(): void {
+  for (const [el, url] of awaitingChildren) {
+    if (fired.has(url)) {
+      awaitingChildren.delete(el);
+    } else if (el.children.length > 0) {
+      awaitingChildren.delete(el);
+      observe(el, url);
+    }
+  }
 }
 
 function gate(el: Element): void {
@@ -188,6 +219,10 @@ if (!scope[INSTALLED]) {
           }
         }
       }
+    }
+
+    if (awaitingChildren.size > 0) {
+      observeArrivedChildren();
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
 }
