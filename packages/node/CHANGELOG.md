@@ -1,5 +1,12 @@
 # @astroscope/node
 
+## 2.1.1
+
+### Patch Changes
+
+- fc9307f: remove path stripping
+- fc9307f: fix `client:visible` gates
+
 ## 2.1.0
 
 ### Minor Changes
