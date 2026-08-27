@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
-import os from 'node:os';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -21,9 +20,13 @@ const demos = readdirSync(demosRoot).filter((name) => {
   );
 });
 
+// isolated outDir inside each demo: the demos' dist dirs serve parallel test
+// suites' prod servers, and a faraway outDir would make sourcemap sources
+// traverse the home directory
+const purityOutDir = (name: string): string => path.join(demosRoot, name, 'node_modules', '.astroscope-purity');
+
 describe.skipIf(demos.length === 0)('build artifact purity', () => {
   let nodeEnv: string | undefined;
-  let outRoot: string;
 
   beforeAll(() => {
     // vitest sets NODE_ENV=test, which flips the react plugin to the dev jsx
@@ -31,8 +34,6 @@ describe.skipIf(demos.length === 0)('build artifact purity', () => {
     // happens in a real `astro build`
     nodeEnv = process.env['NODE_ENV'];
     process.env['NODE_ENV'] = 'production';
-
-    outRoot = mkdtempSync(path.join(os.tmpdir(), 'astroscope-purity-'));
   });
 
   afterAll(() => {
@@ -42,22 +43,24 @@ describe.skipIf(demos.length === 0)('build artifact purity', () => {
       process.env['NODE_ENV'] = nodeEnv;
     }
 
-    rmSync(outRoot, { recursive: true, force: true });
+    for (const name of demos) {
+      rmSync(purityOutDir(name), { recursive: true, force: true });
+    }
   });
 
   test.each(demos)(
-    '%s build output contains no build machine paths',
+    '%s build — our artifacts contain no build machine paths',
     async (name) => {
       const root = path.join(demosRoot, name);
-      // an isolated outDir: the demos' own dist dirs serve the demo test suites'
-      // prod servers, which run in parallel with this file
-      const outDir = path.join(outRoot, name);
+      const outDir = purityOutDir(name);
+
+      rmSync(outDir, { recursive: true, force: true });
 
       const { build } = await import('astro');
 
       await build({ root, outDir, logLevel: 'error' });
 
-      // findLeakedPaths is vacuous on a missing dir — the build must land here
+      // findLeakedPaths is vacuous on a missing dir
       expect(readdirSync(outDir).length).toBeGreaterThan(0);
       expect(findLeakedPaths(outDir)).toEqual([]);
     },

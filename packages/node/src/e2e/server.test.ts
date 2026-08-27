@@ -144,7 +144,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     }
   });
 
-  test('build output contains no build machine paths', () => {
+  test('our build artifacts contain no build machine paths', () => {
     expect(findLeakedPaths(path.join(fixtureRoot, 'dist'))).toEqual([]);
   });
 
@@ -354,8 +354,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     test('registers preload data and inlines the gate runtime for a deferred island', async () => {
       const body = await (await fetch(`${baseUrl}/deferred`)).text();
 
-      // the runtime installs at parse time — an inline script, not an external
-      // module fetch astro's inline island machinery would always beat
+      // inlined runtime — installs at parse time, no external fetch
       expect(body).toContain('@astroscope/node.islandsRuntime');
       expect(body).not.toMatch(/<script type="module" src="[^"]*islands-runtime/);
       expect(body).toMatch(/\(self\.__islands__\?\?=\{\}\)\["\/_astro\/Island\.[^"]+\.js"\]=\{"l":\[[^\]]+\]\}/);

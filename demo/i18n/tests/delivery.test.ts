@@ -3,12 +3,10 @@ import { existsSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 /**
- * Prod delivery of translation chunks through the islands pipeline. Deferred
- * islands must not depend on low-priority preload links racing astro's own
- * high-priority hydration imports: the gate runtime is inlined (installs at
- * parse time, no external fetch to lose the race) and translation chunks for
- * each island's full closure — shared and lazy chunks included — are registered
- * as eager imports the gate fires the moment a directive schedules hydration.
+ * Prod delivery of translation chunks through the islands pipeline: the gate
+ * runtime is inlined (installs at parse time, no fetch to lose) and each
+ * island's full-closure translation chunks — shared and lazy included — ride
+ * the register scripts as eager imports.
  */
 
 const PROD_PORT = 14331;

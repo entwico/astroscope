@@ -15,16 +15,14 @@ import { i18n } from './i18n.js';
  *   least a network round-trip later — so each island's hashes win their race
  *   even while the rest of the document is still streaming. Chunks already
  *   covered earlier in the document are skipped.
- * - translation-chunk preload links for the static closure, emitted as link tags
- *   for immediate islands.
- * - translation-chunk eager imports for the full closure — dynamic imports
- *   included — fired by the deferred gate the moment a directive schedules
- *   hydration. Translation chunks are idempotent data modules, so evaluating
- *   them ahead of the component costs nothing, and the loader's awaited import
- *   then hits the module cache instead of fetching serially after the component
- *   graph evaluated. Every island carries its complete i18n set (no per-document
- *   dedup — the gate dedups at fire time), so a chunk shared between islands is
- *   covered by whichever gate fires first.
+ * - translation-chunk preload links for the static closure (link tags on
+ *   immediate islands).
+ * - translation-chunk eager imports for the full closure, dynamic chunks
+ *   included, fired by the deferred gate: the chunks are idempotent data
+ *   modules, so early evaluation is free and the loader's awaited import hits
+ *   the module cache instead of fetching after the component graph evaluated.
+ *   No per-document dedup — a shared chunk is covered by whichever island's
+ *   gate fires first.
  *
  * The locale is recorded per request by the i18n middleware — the emitter runs
  * while the response streams, outside the middleware's AsyncLocalStorage scope.

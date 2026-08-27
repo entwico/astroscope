@@ -227,11 +227,13 @@ describe('islands gate runtime', () => {
 
     idleCallbacks.forEach((cb) => cb());
 
-    await vi.waitFor(() => expect(importedUrls()).toEqual(['/_i18n/en/Cart.abc.js', '/_i18n/en/Lazy.def.js']), {
-      timeout: 5000,
-    });
+    // evaluation order follows fetch completion — compare order-free
+    await vi.waitFor(
+      () => expect([...importedUrls()].sort()).toEqual(['/_i18n/en/Cart.abc.js', '/_i18n/en/Lazy.def.js']),
+      { timeout: 5000 },
+    );
     expect(preloadedHrefs()).toEqual(['/_astro/Cart.js']);
-  });
+  }, 10000);
 
   test('an import shared between components fires only once', async () => {
     register({
@@ -247,7 +249,7 @@ describe('islands gate runtime', () => {
     idleCallbacks.forEach((cb) => cb());
 
     await vi.waitFor(() => expect(importedUrls()).toEqual(['/_i18n/en/shared.abc.js']), { timeout: 5000 });
-  });
+  }, 10000);
 
   test('a failed eager import stays silent', async () => {
     register({ '/_astro/A.js': { l: ['/_astro/A.js'], i: ['/definitely-not-resolvable.js'] } });

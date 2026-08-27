@@ -31,19 +31,15 @@ export type IslandInfo = {
 };
 
 /**
- * What an emitter contributes for one island. `links` are merged across emitters and
- * either emitted as `<link rel="modulepreload">` tags (immediate directives) or
- * registered on the preload global for the gate runtime (deferred directives).
- * `imports` are data-module urls (safe to evaluate ahead of time, e.g. translation
- * chunks) that the gate runtime eagerly `import()`s when a deferred island's
- * directive fires — they land in the module loader cache so the component's own
- * awaited import resolves instantly instead of fetching serially after the
- * component graph evaluated; urls listed in both sets are registered as imports
- * only. Immediate directives ignore `imports` — their hydration import fires right
- * away and pulls the data modules itself. `html` is emitted right before the island
- * tag regardless of directive — an inline script there is parsed strictly before
- * the island connects, so it is the place for data the island's chunks read at
- * execution time.
+ * What an emitter contributes for one island. `links` are merged across emitters
+ * and either emitted as `<link rel="modulepreload">` tags (immediate directives)
+ * or registered for the gate runtime (deferred). `imports` are data-module urls
+ * (safe to evaluate early, e.g. translation chunks) the deferred gate eagerly
+ * `import()`s on directive fire, landing them in the module cache before the
+ * component's own awaited import — urls in both sets register as imports only,
+ * and immediate directives ignore them. `html` is emitted right before the
+ * island tag regardless of directive — parsed strictly before the island
+ * connects, the place for data its chunks read at execution time.
  */
 export type IslandEmission = {
   links?: string[] | undefined;

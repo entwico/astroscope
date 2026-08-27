@@ -1,41 +1,26 @@
 /**
  * Gate runtime for deferred island preloading, inlined into the document by the
- * islands transform (built as a self-contained iife — keep this file import-free
- * so tsdown cannot split it, and free of `</script>` sequences so it can sit in
- * an inline script tag).
+ * islands transform as a self-contained iife (keep this file import-free and
+ * free of `</script>` sequences).
  *
- * The islands middleware registers each deferred island's entry on
- * `self.__islands__`, keyed by component-url, via an inline script before the
- * first island per component (`PRELOAD_GLOBAL` in `transform.ts` — keep in
- * sync); the registration takes effect at parse time and outlives the island
- * element itself. An entry is `{l, i}`: `l` urls get `<link rel="modulepreload">`
- * injected, `i` urls (data modules, e.g. translation chunks) are eagerly
- * `import()`ed so they land in the module loader cache before the component's
- * own top-level-await import asks for them — from the same instant the component
- * fetch starts, not a low-priority preload racing it. A plain array entry (the
- * pre-`{l, i}` protocol, possible across a deploy boundary when a client router
- * swaps in cached html) is treated as links only.
+ * The transform registers each deferred island's entry on `self.__islands__`,
+ * keyed by component-url (`PRELOAD_GLOBAL` in `transform.ts` — keep in sync).
+ * An entry is `{l, i}`: `l` urls get `<link rel="modulepreload">` injected, `i`
+ * urls (data modules, e.g. translation chunks) are eagerly `import()`ed so the
+ * component's own awaited import hits the module cache. A plain array entry
+ * (the old protocol, possible across a deploy boundary via a client router)
+ * means links only.
  *
- * This script executes at parse time, before any island exists — islands are
- * picked up as they stream in (MutationObserver), or swapped in later by a
- * client router — and fires a component's entry when one of its islands is about
- * to hydrate, replicating the *scheduling* of astro's client directives without
- * touching their behavior:
- *
- * - `idle` (and any unknown directive): requestIdleCallback, honoring a timeout
- * - `media`: matchMedia on the directive's own query
- * - `visible`: IntersectionObserver on the island, with an expanded rootMargin so
- *   the fetch leads the hydration decision by roughly a viewport
- *
- * Islands beyond the first share their component's entry through the registry, and
- * whichever instance's gate fires first wins; injection and imports are
- * deduplicated per url, and the browser deduplicates preloads against the module
- * loader anyway. Failure stays preload-shaped: a failed eager import is swallowed,
- * and the component's own import retries the fetch.
+ * Executes at parse time; islands are picked up as they stream in or get
+ * swapped in later, and fire by their directive's own scheduling: idle/unknown
+ * → requestIdleCallback (honoring a timeout), media → matchMedia, visible →
+ * IntersectionObserver with expanded rootMargin. Whichever instance's gate
+ * fires first wins; injection and imports dedupe per url. A failed eager import
+ * is swallowed — the component's own import retries.
  */
 
-// a client-router swap after a deploy can pull in a second inlined runtime —
-// only the first install may observe, or every island would gate twice
+// a client-router swap can pull in a second inlined runtime — only the first
+// install may observe, or every island would gate twice
 const INSTALLED = Symbol.for('@astroscope/node.islandsRuntime');
 
 type RegistryEntry = string[] | { l?: string[]; i?: string[] };

@@ -339,13 +339,6 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
           }
         }
 
-        const { stripBuildPaths } = await import('../tweaks/strip-build-paths.js');
-        const stripped = stripBuildPaths(fileURLToPath(astroConfig.build.server), fileURLToPath(astroConfig.root));
-
-        if (stripped > 0) {
-          logger.info(`build machine paths stripped from ${stripped} server file(s)`);
-        }
-
         const { compressClientDir } = await import('../compress/compress.js');
 
         await compressClientDir(fileURLToPath(astroConfig.build.client), logger);

@@ -28,8 +28,8 @@ export default defineConfig([
     onSuccess: 'cp src/dev-mode/restart-page.html dist/',
   },
   {
-    // the gate runtime is embedded into the islands manifest at consumer build
-    // time and inlined into html documents — a minified self-contained iife
+    // embedded into the islands manifest and inlined into documents — a
+    // minified self-contained iife
     entry: { 'islands-runtime': 'src/islands/runtime.ts' },
     format: ['iife'],
     minify: true,

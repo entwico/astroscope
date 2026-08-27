@@ -21,10 +21,9 @@ import type { IslandEmission, IslandInfo, IslandsManifest } from './types.js';
  *   survives the island element being removed — the island tag itself stays
  *   untouched.
  *
- * The gate runtime is inlined once, before the first island that needs it, so
- * pages without deferred islands never carry it — and pages with them install
- * the gates at parse time, without an external fetch astro's inline island
- * machinery would always beat.
+ * The gate runtime is inlined once, before the first island that needs it —
+ * pages without deferred islands never carry it, pages with them install the
+ * gates at parse time, without an external fetch to lose.
  */
 
 /** global registry of `{l, i}` entries per component-url, written by the transform, read by the gate runtime */

@@ -102,8 +102,7 @@ describe('i18n islands emitter', () => {
 
     expect(first?.html).toContain('Cart.Cabc');
     expect(second?.html).toBeUndefined();
-    // links and imports keep flowing — every island's gate must be self-sufficient,
-    // whichever fires first covers a shared chunk
+    // links and imports keep flowing — every island's gate must be self-sufficient
     expect(second?.links).toHaveLength(1);
     expect(second?.imports).toHaveLength(2);
   });

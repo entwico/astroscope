@@ -17,12 +17,10 @@ export type IslandsManifestPluginOptions = {
 
 /**
  * Client-build side of island preloading: records the chunk import graph (direct
- * static and dynamic edges per chunk), embeds the gate runtime source, and drops
- * the manifest next to the server chunks — where the virtual module reads it back
- * at runtime, mirroring the i18n manifest. The runtime is inlined into documents
- * rather than shipped as an asset: an external module fetch would install the
- * gates a round-trip after astro's own inline island machinery, losing the race
- * it exists to win.
+ * static and dynamic edges per chunk), embeds the gate runtime source (inlined
+ * into documents rather than shipped as an asset — an external fetch would
+ * install the gates a round-trip after astro's inline island machinery), and
+ * drops the manifest next to the server chunks, mirroring the i18n manifest.
  *
  * The client build runs after the server build, so the SSR bundle can only carry
  * code that reads the file lazily; in dev there is no manifest and the middleware
@@ -94,8 +92,7 @@ export { manifest };
 
       const runtimeSource = fs.readFileSync(new URL('./islands-runtime.iife.js', import.meta.url), 'utf-8').trim();
 
-      // the source goes verbatim into an inline script tag — a stray closing
-      // sequence would truncate every page carrying deferred islands
+      // the source goes verbatim into an inline script tag
       if (runtimeSource.toLowerCase().includes('</script')) {
         throw new Error('islands gate runtime must not contain "</script"');
       }

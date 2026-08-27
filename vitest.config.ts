@@ -1,8 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 
-// the islands gate runtime eagerly import()s translation-chunk urls; its unit
-// tests observe those imports by resolving /_i18n/ urls to modules that record
-// their own evaluation (see packages/node/src/islands/runtime.test.ts)
+// resolves /_i18n/ urls to modules that record their own evaluation, so the
+// gate runtime's unit tests can observe its eager imports
 const i18nImportRecorder = {
   name: 'test:i18n-import-recorder',
   resolveId(id: string) {
