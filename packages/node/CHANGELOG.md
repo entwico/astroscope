@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 2.0.1
+
+### Patch Changes
+
+- 6f15c19: fix server build leaking build machine paths
+
 ## 2.0.0
 
 ### Major Changes
