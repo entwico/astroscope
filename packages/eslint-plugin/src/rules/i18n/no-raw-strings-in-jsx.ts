@@ -9,6 +9,7 @@ const DEFAULT_IGNORE_PATTERNS = [
   /^[\s\p{P}\p{S}]+$/u, // punctuation / symbols only (e.g. "(", ",", "/ —")
   /^#[0-9a-fA-F]{3,8}$/, // hex colors (e.g. "#003366", "#fff")
   /^\d+x\d+$/, // dimensions (e.g. "180x180")
+  /^(true|false)$/, // boolean attribute values (e.g. aria-modal="true", spellcheck="false")
 ];
 
 export const DEFAULT_IGNORE_ATTRIBUTES = [
@@ -78,15 +79,6 @@ export const DEFAULT_IGNORE_ATTRIBUTES = [
   'tag',
   'tagName',
 
-  // html aria attributes (non-text)
-  'aria-hidden',
-  'aria-live',
-  'aria-atomic',
-  'aria-current',
-  'aria-disabled',
-  'aria-expanded',
-  'aria-labelledby',
-
   // astro attributes
   'class:list',
 
@@ -148,7 +140,17 @@ const DEFAULT_IGNORE_ATTRIBUTE_PATTERNS = [
   /class(names?)?$/i, // *Class, *ClassName, *classNames (e.g. bodyClass, labelClassName, classNames)
   /^data-/, // data-* attributes
   /^on[a-zA-Z]/, // event handlers (onclick, onClick, onChange, etc.)
+  /^aria-/, // aria state/relationship attributes, except the text-bearing ones below
 ];
+
+// the aria attributes whose value is user-facing text — checked despite the aria-* pattern
+const ARIA_TEXT_ATTRIBUTES = new Set([
+  'aria-label',
+  'aria-placeholder',
+  'aria-valuetext',
+  'aria-roledescription',
+  'aria-description',
+]);
 
 type Options = {
   ignorePatterns?: string[] | undefined;
@@ -196,6 +198,7 @@ export const noRawStringsInJsx: Rule.RuleModule = {
 
     function shouldIgnoreAttribute(name: string): boolean {
       if (ignoreAttributes.has(name)) return true;
+      if (ARIA_TEXT_ATTRIBUTES.has(name)) return false;
 
       return DEFAULT_IGNORE_ATTRIBUTE_PATTERNS.some((p) => p.test(name));
     }

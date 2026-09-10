@@ -89,6 +89,15 @@ tester.run('no-raw-strings-in-jsx', noRawStringsInJsx, {
     { code: `<div>{'href' in obj && <span />}</div>;` },
     // ternary inside ignored attribute
     { code: `<a target={openInNewTab ? '_blank' : undefined} />;` },
+    // aria state / relationship attributes
+    { code: '<div aria-modal="true" />;' },
+    { code: '<div aria-hidden="true" />;' },
+    { code: '<div aria-labelledby="title-id" />;' },
+    { code: '<div aria-live="polite" />;' },
+    { code: '<div aria-controls="menu-id" />;' },
+    // boolean attribute values
+    { code: '<div contentEditable="false" />;' },
+    { code: '<div spellcheck="false" />;' },
   ],
   invalid: [
     {
@@ -110,6 +119,15 @@ tester.run('no-raw-strings-in-jsx', noRawStringsInJsx, {
     },
     {
       code: `<div>{'Hello World'}</div>;`,
+      errors: [{ messageId: 'rawString' }],
+    },
+    // text-bearing aria attributes stay checked
+    {
+      code: '<button aria-label="Close dialog" />;',
+      errors: [{ messageId: 'rawString' }],
+    },
+    {
+      code: '<div aria-roledescription="slide" />;',
       errors: [{ messageId: 'rawString' }],
     },
   ],

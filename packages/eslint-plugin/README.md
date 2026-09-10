@@ -77,7 +77,8 @@ A hydrated island is a framework component (React/Vue/Svelte/…) rendered serve
 const article = await getArticle(); // a server/cache record
 ---
 
-<!-- flagged: <Reader>'s props are mutable --><!-- declared: interface Props { article: { title: string } } -->
+<!-- flagged: <Reader>'s props are mutable -->
+<!-- declared: interface Props { article: { title: string } } -->
 <Reader client:load article={article} />
 
 <!-- clean -->
@@ -92,7 +93,8 @@ Pairs with `react/prefer-read-only-props` from `eslint-plugin-react` (shallow, a
 Props passed to a hydrated island are serialized into the page HTML and rehydrated in the browser. Only plain data survives that round-trip — primitives, plain objects, and arrays. Functions, symbols, bigints, and class instances (`Date`, `URL`, `RegExp`, `Map`, …) do not. The `children` prop is ignored: children arrive as slots, not serialized props.
 
 ```astro
-<!-- flagged: 'onSelect' (function), 'createdAt' (Date) --><!-- declared: interface Props { onSelect: () => void; createdAt: Date } -->
+<!-- flagged: 'onSelect' (function), 'createdAt' (Date) -->
+<!-- declared: interface Props { onSelect: () => void; createdAt: Date } -->
 <Widget client:load onSelect={fn} createdAt={new Date()} />
 
 <!-- clean -->
@@ -122,7 +124,10 @@ import Counter from './Counter.tsx';
 HTML comments (`<!-- -->`) in `.astro` templates render into the served HTML and are visible to clients. JSX-style comments (`{/* */}`) are stripped at compile time and never reach the browser.
 
 ```astro
-<!-- flagged --><!-- debug: session={session} --><!-- clean -->{/* debug: session={session} */}
+<!-- flagged -->
+<!-- debug: session={session} -->
+<!-- clean -->
+{/* debug: session={session} */}
 ```
 
 Autofix rewrites `<!-- x -->` → `{/* x */}`. Declines to autofix when the comment body contains `*/` (would terminate the JSX comment early).
@@ -171,15 +176,15 @@ if (!import.meta.env.SSR) {
 
 Rules for projects using `@astroscope/i18n`, opt-in alongside `recommended`. They keep their own plugin namespace, so rule ids read `@astroscope/i18n/...`.
 
-| Rule | Severity | Fixable | Description |
-|------|----------|---------|-------------|
-| `@astroscope/i18n/t-import-source` | error | | `t` must be imported from `@astroscope/i18n/translate` |
-| `@astroscope/i18n/no-module-level-t` | error | | `t()` must not be called at module level (needs request context on server, hydrated translations on client) |
-| `@astroscope/i18n/t-static-key` | error | | first argument must be a static string literal (dynamic keys break build-time extraction) |
-| `@astroscope/i18n/t-static-meta` | warn | | second argument must be statically analyzable (extraction reads it at build time) |
-| `@astroscope/i18n/t-requires-meta` | warn | | second argument (fallback/meta) should be provided for development DX |
-| `@astroscope/i18n/no-t-reassign` | error | | forbids aliasing or reassigning `t` (the extractor only recognizes `t()` calls) |
-| `@astroscope/i18n/no-raw-strings-in-jsx` | warn | | warns when raw strings appear in JSX that may need translation |
+| Rule                                     | Severity | Fixable | Description                                                                                                 |
+| ---------------------------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `@astroscope/i18n/t-import-source`       | error    |         | `t` must be imported from `@astroscope/i18n/translate`                                                      |
+| `@astroscope/i18n/no-module-level-t`     | error    |         | `t()` must not be called at module level (needs request context on server, hydrated translations on client) |
+| `@astroscope/i18n/t-static-key`          | error    |         | first argument must be a static string literal (dynamic keys break build-time extraction)                   |
+| `@astroscope/i18n/t-static-meta`         | warn     |         | second argument must be statically analyzable (extraction reads it at build time)                           |
+| `@astroscope/i18n/t-requires-meta`       | warn     |         | second argument (fallback/meta) should be provided for development DX                                       |
+| `@astroscope/i18n/no-t-reassign`         | error    |         | forbids aliasing or reassigning `t` (the extractor only recognizes `t()` calls)                             |
+| `@astroscope/i18n/no-raw-strings-in-jsx` | warn     |         | warns when raw strings appear in JSX that may need translation                                              |
 
 ## i18n Rule Details
 
@@ -259,8 +264,11 @@ Warns when JSX contains raw string literals that may need translation. Ignores w
 <div>Hello World</div>
 <button>Submit</button>
 
+<button aria-label="Close dialog" />
+
 // no warning
 <div className="container" />
+<div aria-modal="true" />
 <div>{t('greeting', 'Hello World')}</div>
 ```
 
@@ -290,12 +298,12 @@ import astroscope, { DEFAULT_IGNORE_ATTRIBUTES } from '@astroscope/eslint-plugin
 
 Rules for projects using `@astroscope/wormhole`, opt-in alongside `recommended`. They keep their own plugin namespace, so rule ids read `@astroscope/wormhole/...`.
 
-| Rule | Severity | Fixable | Description |
-|------|----------|---------|-------------|
-| `@astroscope/wormhole/wormholes-static-access` | warn | | accesses on the `wormholes` proxy must be static — dynamic keys and aliasing defeat build-time payload slicing |
-| `@astroscope/wormhole/server-readonly` | error | | `set()` / `subscribe()` are client-only; astro files are server code where values are request-scoped |
-| `@astroscope/wormhole/no-use-wormhole-in-astro` | error | | the `useWormhole` react hook cannot run in astro server code — use `wormholes.<name>.get()` |
-| `@astroscope/wormhole/no-registry-import` | error | | the wormhole registry (`src/wormholes.ts`) is server-only — island code reads through the `wormholes` proxy |
+| Rule                                            | Severity | Fixable | Description                                                                                                    |
+| ----------------------------------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| `@astroscope/wormhole/wormholes-static-access`  | warn     |         | accesses on the `wormholes` proxy must be static — dynamic keys and aliasing defeat build-time payload slicing |
+| `@astroscope/wormhole/server-readonly`          | error    |         | `set()` / `subscribe()` are client-only; astro files are server code where values are request-scoped           |
+| `@astroscope/wormhole/no-use-wormhole-in-astro` | error    |         | the `useWormhole` react hook cannot run in astro server code — use `wormholes.<name>.get()`                    |
+| `@astroscope/wormhole/no-registry-import`       | error    |         | the wormhole registry (`src/wormholes.ts`) is server-only — island code reads through the `wormholes` proxy    |
 
 ## Wormhole Rule Details
 
