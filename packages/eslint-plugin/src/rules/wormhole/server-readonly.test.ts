@@ -1,7 +1,12 @@
 import tsParser from '@typescript-eslint/parser';
 import * as astroEslintParser from 'astro-eslint-parser';
 import { RuleTester } from 'eslint';
+import { describe, it } from 'vitest';
 import { serverReadonly } from './server-readonly.js';
+
+RuleTester.describe = describe;
+RuleTester.it = it;
+RuleTester.itOnly = it.only;
 
 const tester = new RuleTester({
   languageOptions: {

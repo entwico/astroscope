@@ -63,14 +63,15 @@ function isMember(node: Node | null): node is Node {
 }
 
 export function scanWormholeAccess(code: string, id: string): WormholeScan | null {
-  const isTs = id.endsWith('.ts') || id.endsWith('.tsx');
+  const isTs = id.endsWith('.ts') || id.endsWith('.tsx') || id.endsWith('.astro');
   const plugins: ('typescript' | 'jsx')[] = [];
 
   if (isTs) {
     plugins.push('typescript');
   }
 
-  if (!id.endsWith('.ts')) {
+  // compiled astro output is not jsx
+  if (!id.endsWith('.ts') && !id.endsWith('.astro')) {
     plugins.push('jsx');
   }
 

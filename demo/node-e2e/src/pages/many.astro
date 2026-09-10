@@ -1,0 +1,14 @@
+---
+import { Island } from '../components/Island';
+
+const islands = Array.from({ length: 20 }, (_, i) => i);
+---
+
+<html lang="en">
+  <head>
+    <title>twenty islands</title>
+  </head>
+  <body>
+    {islands.map(() => <Island client:load />)}
+  </body>
+</html>

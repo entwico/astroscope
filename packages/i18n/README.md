@@ -299,6 +299,15 @@ The same `import { t } from '@astroscope/i18n/translate'` works everywhere — b
 
 Translation chunks ship as raw MessageFormat 2 strings and are compiled in the browser on first use — the whole client runtime is ~8KB gzipped.
 
+### Telemetry
+
+Through the adapter's telemetry (no-op without its SDK):
+
+- `astro.i18n.missing` {`astro.i18n.locale`} — lookups that fell back. `t()` caches the fallback per locale until the next `setTranslations`, so a key counts once per translations version; `rich()` counts per call. The key itself goes to a debug log line (`missing translation`), never into the label.
+- `astro.i18n.translations.age` {`astro.i18n.locale`} — seconds since the locale's last `setTranslations`. An app that refreshes translations periodically shows a sawtooth; a stalled refresh loop shows a line going up.
+
+`/_i18n/` chunk requests are excluded from request logging and telemetry by the adapter's default excludes.
+
 ## MessageFormat 2 Syntax
 
 This library uses [Unicode MessageFormat 2](https://github.com/unicode-org/message-format-wg) (MF2), the modern standard for internationalization.

@@ -22,8 +22,18 @@ export default defineConfig({
   plugins: [i18nImportRecorder],
   test: {
     passWithNoTests: true,
+    // the react render bench imports upstream's server entry, whose
+    // `astro:react:opts` import must go through vite so vi.mock can serve it
+    server: { deps: { inline: ['@astrojs/react'] } },
     // astro component tests (`*.astro.test.ts`) need the astro vite plugin — they run from
     // packages/components/vitest.config.ts (its own `pnpm test`), not this node-environment config.
     exclude: [...configDefaults.exclude, 'deprecated/**', '**/*.astro.test.ts'],
+    benchmark: {
+      // the benches run package source through vite's module runner, where every
+      // cross-module binding is an export getter; the code under test (not the
+      // bench files) hits them per call, so the overhead is a constant the
+      // before/after comparison cancels out — absolute numbers carry it
+      suppressExportGetterWarnings: true,
+    },
   },
 });

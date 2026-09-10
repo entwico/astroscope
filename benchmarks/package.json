@@ -1,0 +1,22 @@
+{
+  "name": "benchmarks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "micro": "node micro.ts",
+    "macro": "node macro.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "astro": "^7.3.2",
+    "autocannon": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/autocannon": "^7.12.7",
+    "@types/node": "^26.5.0",
+    "typescript": "^6.0.3"
+  }
+}

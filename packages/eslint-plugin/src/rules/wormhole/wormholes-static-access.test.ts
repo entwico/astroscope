@@ -1,5 +1,10 @@
 import { RuleTester } from 'eslint';
+import { describe, it } from 'vitest';
 import { wormholesStaticAccess } from './wormholes-static-access.js';
+
+RuleTester.describe = describe;
+RuleTester.it = it;
+RuleTester.itOnly = it.only;
 
 const tester = new RuleTester({ languageOptions: { sourceType: 'module' } });
 

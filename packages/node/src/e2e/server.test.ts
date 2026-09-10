@@ -189,6 +189,25 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     expect(res.status).toBe(404);
   });
 
+  test('redirects duplicate slashes to the collapsed path, for pages, endpoints and assets alike', async () => {
+    for (const [from, to] of [
+      ['//hello.txt', '/hello.txt'],
+      ['/api//', '/api/'],
+      ['///static', '/static'],
+      ['//native//echo?x=1', '/native/echo?x=1'],
+    ]) {
+      const res = await fetch(`${baseUrl}${from}`, { redirect: 'manual' });
+
+      expect(res.status, from).toBe(301);
+      expect(res.headers.get('location'), from).toBe(to);
+    }
+
+    const posted = await fetch(`${baseUrl}//api`, { method: 'POST', redirect: 'manual' });
+
+    expect(posted.status).toBe(308);
+    expect(posted.headers.get('location')).toBe('/api');
+  });
+
   test('rejects path traversal attempts', async () => {
     const res = await fetch(`${baseUrl}/..%2f..%2fpackage.json`);
 
@@ -304,7 +323,6 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
   describe('embedded build tweaks', () => {
     const distClient = path.join(fixtureRoot, 'dist/client');
     const distServer = path.join(fixtureRoot, 'dist/server');
-    const CANARY = '__tweaks_canary_marker__';
 
     test('client bundle has no sourcemaps or sourcemap markers', () => {
       const maps = walkFiles(distClient).filter((f) => f.endsWith('.map'));
@@ -323,6 +341,12 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
       expect(maps.length).toBeGreaterThan(0);
     });
+  });
+
+  describe('@astroscope/react', () => {
+    const distClient = path.join(fixtureRoot, 'dist/client');
+    const distServer = path.join(fixtureRoot, 'dist/server');
+    const CANARY = '__tweaks_canary_marker__';
 
     test('strip-effects removes the SSR useEffect body, client keeps it', () => {
       const ssrOffenders = walkFiles(distServer)
@@ -336,6 +360,19 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
         .filter((f) => readFileSync(f, 'utf8').includes(CANARY));
 
       expect(clientHits.length).toBeGreaterThan(0);
+    });
+
+    test('renders a suspending island completely by falling back to streaming, once per component', async () => {
+      const body = await (await fetch(`${baseUrl}/suspense`)).text();
+
+      expect(body.match(/lazy content rendered on the server/g)).toHaveLength(2);
+
+      const fallbacks = logLines(stdout).filter((line) =>
+        String(line['msg']).includes('react island suspended during server render'),
+      );
+
+      expect(fallbacks).toHaveLength(1);
+      expect(String(fallbacks[0]?.['componentUrl'])).toContain('SuspendingIsland');
     });
   });
 
@@ -379,6 +416,19 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
       expect(compressed.headers['content-encoding']).toBe('br');
       expect(brotliDecompressSync(compressed.body).toString()).toContain('self.__islands__');
+    });
+
+    test('the manifest attributes islands to routes, endpoints included', () => {
+      const manifest = JSON.parse(
+        readFileSync(path.join(fixtureRoot, 'dist/server/chunks/islands-manifest.json'), 'utf8'),
+      );
+      const routes = manifest.routes as Record<string, string[]>;
+
+      expect(routes['/']).toHaveLength(1);
+      expect(routes['/']![0]).toMatch(/^_astro\/Island\.[^/]+\.js$/);
+      expect(routes['/many']).toEqual(routes['/']);
+      expect(routes['/api']).toEqual([]);
+      expect(routes['/static']).toEqual([]);
     });
 
     test('html returned by a non-page route passes through untouched', async () => {

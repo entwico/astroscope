@@ -1,3 +1,5 @@
+import { log } from '@astroscope/node/log';
+import { createCounter } from '@astroscope/node/telemetry';
 import { compileMessage, formatMessageToParts } from '../shared/compiler.js';
 import { normalizeMeta } from '../shared/meta.js';
 import { type RichComponents, partsToNodes } from '../shared/rich.js';
@@ -8,6 +10,18 @@ import type { FallbackBehavior } from './types.js';
 
 // cache for fallbacks compiled outside request context (e.g. during build)
 const fallbackCache = new Map<string, CompiledTranslation>();
+
+const missing = createCounter('astro.i18n.missing', {
+  scope: '@astroscope/i18n',
+  description: 'Translation lookups that fell back (a key once per locale and translations version for t())',
+  unit: '{lookup}',
+});
+
+// the key stays out of the metric label (unbounded) and goes to the log instead
+function reportMissing(key: string, locale: string): void {
+  missing.add(1, { 'astro.i18n.locale': locale });
+  log.debug({ key, locale }, 'missing translation');
+}
 
 /**
  * Apply fallback behavior when translation is missing
@@ -73,6 +87,8 @@ export const t: TranslateFunction = ((
   const compiled = ctx.translations[key];
 
   if (!compiled) {
+    reportMissing(key, ctx.locale);
+
     const fallbackValue = applyFallback(key, normalizedMeta, ctx.fallback);
 
     // compile and cache the fallback for consistency
@@ -116,7 +132,13 @@ export function rich<T = unknown>(
   const ctx = getContext();
   const locale = ctx?.locale ?? i18n.getConfig().defaultLocale;
 
-  const raw = ctx?.rawTranslations[key] || normalizedMeta.fallback || key;
+  const translated = ctx?.rawTranslations[key];
+
+  if (ctx && !translated) {
+    reportMissing(key, ctx.locale);
+  }
+
+  const raw = translated || normalizedMeta.fallback || key;
 
   const parts = formatMessageToParts(locale, raw, values);
 

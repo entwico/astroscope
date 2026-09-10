@@ -14,7 +14,7 @@ Opinionated, cloud-friendly Node adapter for Astro: boot lifecycle, health probe
 - **Island preloading** — each island's JS is preloaded in parallel instead of being discovered module by module, removing the hydration request waterfall ([Island preloading](#island-preloading))
 - **Pre-compressed static serving** — build-time brotli/gzip variants, negotiated per `Accept-Encoding`
 - **Native mounts** — http-native handlers (`oidc-provider`, ACME) mounted on the adapter's server
-- **Build tweaks** — SSR sourcemaps, SSR effect stripping
+- **Build tweaks** — SSR sourcemaps
 - **Image processing off unless configured** — without an explicit `image.service`, any `astro:assets` use fails loudly instead of opening astro's on-demand sharp endpoint ([Image processing](#image-processing))
 - **Dev restart machinery** — changes to the boot file or entry seams restart the dev server behind a holding page
 - **Dev island warmup** — `.astro` sources are scanned for `client:*` components; their deps are pre-optimized and their module graphs warmed at server start, preventing "504 Outdated Optimize Dep" hydration failures from vite's lazy dep discovery
@@ -174,12 +174,14 @@ The adapter itself emits exactly one info line on startup — `server ready { ho
 `node({ telemetry })` ships the standard bundle: NodeSDK, fetch instrumentation via undici (diagnostics-channel based — no `--import` needed), Node runtime + host metrics, and a Prometheus reader on `0.0.0.0:9464`. **Prod: on by default. Dev: off by default** (opt in with `telemetry: { dev: true }`).
 
 - server spans start at the native handler with W3C context extraction; the route pattern and span name are enriched by the internal middleware
-- request metrics: `http.server.request.duration`, `http.server.active_requests`, `astro.action.duration`; fetch metrics come from the undici instrumentation
+- request metrics: `http.server.request.duration`, `http.server.active_requests`, `astro.action.duration` (semconv bucket boundaries, 5 ms – 10 s); fetch metrics come from the undici instrumentation
+- `astro.render.failures` {`http.route`} counts renders that failed after the status went out. Such a response is truncated on the wire (astro's behavior — the status cannot change anymore), so the counter is the alert signal; the request log line reads `request truncated` at error level next to the failure itself, and the server span carries `astro.response.truncated`
 - the boot lifecycle gets `startup` (with `boot`/`warmup`/`listen` children) and `shutdown` (with `drain`/`onShutdown`) spans
 - trace exporters are driven by the standard `OTEL_*` env vars; without a configured OTLP endpoint, trace exporting defaults to `none` (no failing localhost exports)
 - `OTEL_SDK_DISABLED=true` turns the SDK off entirely
+- the other astroscope packages record through the same SDK, no-op without it: `astro.island.render.duration`, `astro.island.check.duration`, `astro.island.render.failures` (`@astroscope/react`); `astro.wormhole.handler.duration`, `astro.wormhole.handler.failures` and a `wormhole <name>` span per handler (`@astroscope/wormhole`); `astro.i18n.missing`, `astro.i18n.translations.age` (`@astroscope/i18n`)
 
-There is no helper for tracing server-render sections: measuring a subtree's render would require buffering it, which disables streaming. Wrap frontmatter awaits with `tracer.startActiveSpan()` instead — that's where the time lives, and it nests under the request span without touching the stream.
+There is no helper for tracing server-render sections: measuring a subtree's render would require buffering it, which disables streaming. Wrap frontmatter awaits with `tracer.startActiveSpan()` from `@opentelemetry/api` instead — that's where the time lives, and it nests under the request span without touching the stream.
 
 ## Health checks
 
@@ -228,7 +230,7 @@ export function onStartup() {
 ```typescript
 import { RECOMMENDED_EXCLUDES, shouldExclude, withExcluded } from '@astroscope/node/excludes';
 
-// pre-defined sets: DEV_EXCLUDES (vite dev paths), ASTRO_STATIC_EXCLUDES (/_astro/, /_image),
+// pre-defined sets: DEV_EXCLUDES (vite dev paths), ASTRO_STATIC_EXCLUDES (/_astro/, /_image, /_i18n/),
 // STATIC_EXCLUDES (favicon, robots.txt, ...), RECOMMENDED_EXCLUDES (dev + astro internals)
 
 // in your own middleware
@@ -255,7 +257,8 @@ At build time, every compressible file in `dist/client` gets max-quality `.br` (
 Always on, no configuration:
 
 - **SSR sourcemaps** — the server bundle gets sourcemaps for readable stack traces; client bundles stay unmapped so browsers can't fetch source
-- **SSR effect stripping** — `useEffect`/`useLayoutEffect`/`useInsertionEffect` callbacks are emptied in the SSR bundle (effects never run on the server), letting the bundler drop client-only dynamic imports (maplibre-gl, hls.js, …) from the server build and the docker image
+
+SSR effect stripping for React islands lives in [`@astroscope/react`](../react).
 
 ## Image processing
 

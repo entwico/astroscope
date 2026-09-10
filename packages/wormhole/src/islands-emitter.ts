@@ -1,7 +1,14 @@
-import { type DocumentEmitter, registerDocumentEmitter, registerIslandEmitter } from '@astroscope/node/islands';
+import {
+  type DocumentEmitter,
+  type IslandInfo,
+  registerDocumentEmitter,
+  registerIslandEmitter,
+} from '@astroscope/node/islands';
 import { log } from '@astroscope/node/log';
 import { createWormholeMergeScript } from './client-state.js';
+import type { WormholeManifest } from './extraction/types.js';
 import { getWormholeManifest } from './manifest.js';
+import { namesInClosure } from './reachable.js';
 import { getRequestWormholes } from './request-store.js';
 
 /**
@@ -19,9 +26,32 @@ const IS_DEV = !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
 let registered = false;
 let warnedMissingManifest = false;
 
-/** public url of a chunk → manifest chunk name, e.g. `…/_astro/Counter.abc.js` → `Counter.abc` */
-function urlToChunkName(url: string): string {
-  return url.slice(url.lastIndexOf('/') + 1).replace(/\.js$/, '');
+/** the wormhole names an island's full closure can reach; `null` when a chunk reads dynamically (all open) */
+type Reachable = string[] | null;
+
+// islands arrive as the same object per component/renderer/directive and the
+// manifest is loaded once, so the intersection is computed once per island
+const reachableByManifest = new WeakMap<WormholeManifest, WeakMap<IslandInfo, Reachable>>();
+
+function reachableFor(island: IslandInfo, manifest: WormholeManifest): Reachable {
+  let byIsland = reachableByManifest.get(manifest);
+
+  if (!byIsland) {
+    byIsland = new WeakMap();
+    reachableByManifest.set(manifest, byIsland);
+  }
+
+  const cached = byIsland.get(island);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const reachable = namesInClosure(island.fullClosure, manifest);
+
+  byIsland.set(island, reachable);
+
+  return reachable;
 }
 
 /**
@@ -99,23 +129,11 @@ export function registerWormholeEmitters(): void {
       return null;
     }
 
-    let all = false;
-    const reachable = new Set<string>();
-
-    for (const url of island.fullClosure) {
-      for (const name of manifest.chunks[urlToChunkName(url)] ?? []) {
-        if (name === '*') {
-          all = true;
-        } else {
-          reachable.add(name);
-        }
-      }
-    }
-
+    const reachable = reachableFor(island, manifest);
     const entries: Record<string, unknown> = {};
     let count = 0;
 
-    for (const name of all ? request.values.keys() : reachable) {
+    for (const name of reachable ?? request.values.keys()) {
       if (!request.values.has(name) || request.emitted.has(name)) {
         continue;
       }

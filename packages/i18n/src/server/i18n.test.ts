@@ -14,6 +14,16 @@ vi.mock('virtual:@astroscope/i18n/manifest', () => ({
   getManifest: () => mocks.manifest,
 }));
 
+const gauge = vi.hoisted(() => ({
+  observe: undefined as ((result: { observe: (value: number, attributes: unknown) => void }) => void) | undefined,
+}));
+
+vi.mock('@astroscope/node/telemetry', () => ({
+  createObservableGauge: (_name: string, _options: unknown, observe: typeof gauge.observe) => {
+    gauge.observe = observe;
+  },
+}));
+
 async function createI18n(manifest?: Partial<ExtractionManifest>) {
   mocks.manifest = { keys: [], chunks: {}, scripts: [], ...manifest };
 
@@ -379,5 +389,30 @@ describe('manifest invalidation', () => {
 
     expect(before).toEqual({ greeting: 'Hello' });
     expect(after).toEqual({ greeting: 'Hello v2' });
+  });
+});
+
+describe('translations age', () => {
+  test('is tracked per locale from setTranslations until clear', async () => {
+    const i18n = await createConfiguredI18n();
+    const before = Date.now();
+
+    i18n.setTranslations('en', { greeting: 'Hello' });
+
+    expect(i18n.getTranslationsAge(before + 5000)).toEqual([{ locale: 'en', seconds: expect.closeTo(5, 0) }]);
+
+    i18n.clear('en');
+
+    expect(i18n.getTranslationsAge()).toEqual([]);
+  });
+
+  test('is reported through the observable gauge', async () => {
+    const i18n = await createConfiguredI18n();
+    const observe = vi.fn();
+
+    i18n.setTranslations('de', { greeting: 'Hallo' });
+    gauge.observe!({ observe });
+
+    expect(observe).toHaveBeenCalledWith(expect.any(Number), { 'astro.i18n.locale': 'de' });
   });
 });

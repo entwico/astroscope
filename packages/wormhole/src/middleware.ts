@@ -1,83 +1,132 @@
 import { type ExcludePattern, RECOMMENDED_EXCLUDES, shouldExclude } from '@astroscope/node/excludes';
-import type { APIContext, MiddlewareHandler } from 'astro';
+import { getRouteIslands } from '@astroscope/node/islands';
+import { maybeAll, maybeThen } from '@entwico/dash';
+import type { MiddlewareHandler } from 'astro';
 import { wormholes as registry } from 'virtual:@astroscope/wormhole/registry';
 import { als } from './als.js';
-import { assignWormholeNames } from './define.js';
+import { type WormholeSource, assignWormholeNames, getWormholeSource } from './define.js';
 import { registerWormholeEmitters } from './islands-emitter.js';
+import { getWormholeManifest } from './manifest.js';
+import { namesInClosure } from './reachable.js';
 import { setRequestWormholes } from './request-store.js';
-import type { DeepReadonly, WormholeRegistry } from './types.js';
-
-/**
- * Per-request values keyed by registry name — omit a key (or pass undefined) to
- * leave that wormhole closed. Typed from the `WormholeRegistry` interface the
- * integration generates from `src/wormholes.ts`.
- */
-export type WormholeValues = {
-  [K in keyof WormholeRegistry]?: DeepReadonly<WormholeRegistry[K]> | undefined;
-};
+import { measureHandler } from './telemetry.js';
+import type { WormholeHandler } from './types.js';
 
 export type WormholeMiddlewareOptions = {
-  /** resolve the request's wormhole values */
-  values: (context: APIContext) => WormholeValues | Promise<WormholeValues>;
-  /**
-   * Patterns to exclude from wormhole setup. Defaults to RECOMMENDED_EXCLUDES.
-   */
-  exclude?: ExcludePattern[] | ((context: APIContext) => boolean) | undefined;
+  /** patterns to exclude from wormhole loading; defaults to RECOMMENDED_EXCLUDES */
+  exclude?: ExcludePattern[] | undefined;
 };
 
 /**
- * Create the wormhole middleware: resolves the per-request values, makes them
- * readable on the server (frontmatter, endpoints, SSR islands) for the duration of
- * the request, and delivers them to the client — sliced per island through the
- * `@astroscope/node` islands pipeline, at stream end for astro `<script>` consumers,
- * and in full in dev. The registry comes from `src/wormholes.ts` via the
- * integration, so values are simply keyed by name.
- *
- * @example
- * ```typescript
- * // src/middleware.ts
- * import { createWormholeMiddleware } from '@astroscope/wormhole/server';
- *
- * export const onRequest = createWormholeMiddleware({
- *   values: (ctx) => ({
- *     session: { loggedIn: ctx.locals.user !== undefined },
- *   }),
- * });
- * ```
+ * The wormhole middleware, injected by the integration after the project's own
+ * middleware: runs the handlers of the wormholes the request's route can read —
+ * server and `<script>` reads from the manifest, island reads through the route's
+ * islands from `@astroscope/node`, and eager wormholes — makes the values
+ * readable on the server for the duration of the request, and hands them to the
+ * islands pipeline for delivery. Routes the build could not attribute (dev, no
+ * manifest, astro's own routes) load everything.
  */
-export function createWormholeMiddleware(options: WormholeMiddlewareOptions): MiddlewareHandler {
+export function createWormholeMiddleware(options: WormholeMiddlewareOptions = {}): MiddlewareHandler {
   assignWormholeNames(registry);
   registerWormholeEmitters();
 
-  return async (ctx, next) => {
+  const sources = new Map<string, WormholeSource>();
+
+  for (const [name, wormhole] of Object.entries(registry)) {
+    const source = getWormholeSource(wormhole);
+
+    if (!source) {
+      throw new Error(`wormhole "${name}" has no handler — define it with defineWormhole({ handler: (ctx) => ... })`);
+    }
+
+    sources.set(name, source);
+  }
+
+  const everything = [...sources.keys()];
+  const eager = everything.filter((name) => sources.get(name)!.eager);
+
+  // what a route opens, resolved once per route: the name, the handler and the ALS key
+  type Entry = { name: string; key: string; handler: WormholeHandler<unknown> };
+
+  const entriesByRoute = new Map<string, Entry[]>();
+
+  // null: the route's readers are unknown, load everything
+  const routeNames = (pattern: string): string[] | null => {
+    const manifest = getWormholeManifest();
+
+    if (!manifest) {
+      return null;
+    }
+
+    const server = manifest.routes[pattern];
+    const islands = getRouteIslands(pattern);
+
+    if (!server || !islands || server.includes('*')) {
+      return null;
+    }
+
+    const names = new Set([...eager, ...server]);
+
+    for (const island of islands) {
+      const reachable = namesInClosure(island.fullClosure, manifest);
+
+      if (!reachable) {
+        return null;
+      }
+
+      reachable.forEach((name) => names.add(name));
+    }
+
+    return [...names].filter((name) => sources.has(name));
+  };
+
+  const entriesFor = (pattern: string): Entry[] => {
+    let entries = entriesByRoute.get(pattern);
+
+    if (!entries) {
+      entries = (routeNames(pattern) ?? everything).map((name) => ({
+        name,
+        key: registry[name]!.key,
+        handler: sources.get(name)!.handler,
+      }));
+      entriesByRoute.set(pattern, entries);
+    }
+
+    return entries;
+  };
+
+  return (ctx, next) => {
     if (shouldExclude(ctx, options.exclude ?? RECOMMENDED_EXCLUDES)) {
       return next();
     }
 
-    const resolved = await options.values(ctx);
-    const open = new Map<string, unknown>();
-    const scope = new Map<string, unknown>(als.getStore());
+    const entries = entriesFor(ctx.routePattern);
 
-    for (const [name, data] of Object.entries(resolved as Record<string, unknown>)) {
-      if (data === undefined) {
-        continue;
-      }
+    // synchronous handlers — the common case — open the scope without a promise
+    // allocation or a microtask hop; async ones settle together
+    return maybeThen(
+      maybeAll(entries.map((entry) => measureHandler(entry.name, () => entry.handler(ctx)))),
+      (loaded) => {
+        const open = new Map<string, unknown>();
+        const scope = new Map<string, unknown>(als.getStore());
 
-      const wormhole = registry[name];
+        for (let i = 0; i < entries.length; i++) {
+          const data = loaded[i];
 
-      if (!wormhole) {
-        throw new Error(`wormhole "${name}" is not in the src/wormholes.ts registry`);
-      }
+          if (data === undefined) {
+            continue;
+          }
 
-      open.set(name, data);
-      scope.set(wormhole.key, data);
-    }
+          open.set(entries[i]!.name, data);
+          scope.set(entries[i]!.key, data);
+        }
 
-    // the islands emitter and the stream-end script run while the response streams,
-    // outside this ALS scope — the request object carries the values to them
-    setRequestWormholes(ctx.request, { values: open, emitted: new Set() });
+        // the islands emitter and the stream-end script run while the response streams,
+        // outside this ALS scope — the request object carries the values to them
+        setRequestWormholes(ctx.request, { values: open, emitted: new Set() });
 
-    // nothing to transform here
-    return als.run(scope, () => next());
+        return als.run(scope, () => next());
+      },
+    );
   };
 }

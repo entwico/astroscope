@@ -18,6 +18,7 @@ function requestRecord(overrides: Partial<RequestRecord> = {}): RequestRecord {
     route: undefined,
     routeOverride: false,
     actionName: undefined,
+    truncated: false,
     ...overrides,
   };
 }

@@ -1,5 +1,10 @@
 import { RuleTester } from 'eslint';
+import { describe, it } from 'vitest';
 import { tStaticKey } from './t-static-key.js';
+
+RuleTester.describe = describe;
+RuleTester.it = it;
+RuleTester.itOnly = it.only;
 
 const tester = new RuleTester();
 

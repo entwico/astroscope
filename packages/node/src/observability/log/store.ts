@@ -25,6 +25,7 @@ export interface RequestRecord {
   route: string | undefined;
   routeOverride: boolean;
   actionName: string | undefined;
+  truncated: boolean;
 }
 
 export interface LogStore {

@@ -7,3 +7,8 @@ declare module 'virtual:@astroscope/wormhole/registry' {
   import type { Wormhole } from './types.js';
   export const wormholes: Record<string, Wormhole<unknown>>;
 }
+
+declare module 'virtual:@astroscope/wormhole/config' {
+  import type { ExcludePattern } from '@astroscope/node/excludes';
+  export const exclude: ExcludePattern[] | null;
+}

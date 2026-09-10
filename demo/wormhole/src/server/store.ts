@@ -10,3 +10,13 @@ export function setCount(value: number): number {
 
   return count;
 }
+
+const loads: Record<string, number> = {};
+
+export function recordLoad(name: string): void {
+  loads[name] = (loads[name] ?? 0) + 1;
+}
+
+export function getLoads(): Record<string, number> {
+  return { ...loads };
+}

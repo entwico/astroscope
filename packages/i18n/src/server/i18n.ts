@@ -1,3 +1,4 @@
+import { createObservableGauge } from '@astroscope/node/telemetry';
 import { computeAllChunkHashes } from '../extraction/hash.js';
 import { getGlobalState } from '../extraction/manifest.js';
 import type { ExtractionManifest } from '../extraction/types.js';
@@ -35,6 +36,9 @@ class I18nSingleton {
 
   // "locale:chunkName" -> encoded chunk response body
   private chunkCache = new Map<string, Uint8Array>();
+
+  // locale -> epoch ms of the last setTranslations, for the age gauge
+  private updatedAt = new Map<string, number>();
 
   // manifest getter, set on configure() via the virtual module (live data in dev mode)
   private manifestGetter: (() => ExtractionManifest) | null = null;
@@ -102,6 +106,7 @@ class I18nSingleton {
 
   setTranslations(locale: string, raw: RawTranslations): void {
     this.rawCache.set(locale, raw);
+    this.updatedAt.set(locale, Date.now());
     this.mergedCache.delete(locale); // invalidate merged cache
     this.compiledCache.delete(locale); // invalidate compiled cache
     this.hashCache.delete(locale); // invalidate hash cache
@@ -254,6 +259,7 @@ class I18nSingleton {
 
     for (const locale of targets) {
       this.rawCache.delete(locale);
+      this.updatedAt.delete(locale);
       this.mergedCache.delete(locale);
       this.compiledCache.delete(locale);
       this.hashCache.delete(locale);
@@ -265,6 +271,11 @@ class I18nSingleton {
         }
       }
     }
+  }
+
+  /** seconds since each locale's translations were last set */
+  getTranslationsAge(now = Date.now()): { locale: string; seconds: number }[] {
+    return [...this.updatedAt].map(([locale, at]) => ({ locale, seconds: (now - at) / 1000 }));
   }
 
   /**
@@ -297,3 +308,15 @@ class I18nSingleton {
 }
 
 export const i18n = new I18nSingleton();
+
+// the one signal for a stalled refresh loop: an app that reloads translations
+// periodically shows a sawtooth here, a stuck one a line going up
+createObservableGauge(
+  'astro.i18n.translations.age',
+  { scope: '@astroscope/i18n', description: 'Seconds since the translations of a locale were last set', unit: 's' },
+  (result) => {
+    for (const { locale, seconds } of i18n.getTranslationsAge()) {
+      result.observe(seconds, { 'astro.i18n.locale': locale });
+    }
+  },
+);

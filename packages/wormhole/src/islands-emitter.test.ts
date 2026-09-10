@@ -54,7 +54,7 @@ async function setup(manifest: WormholeManifest | null, values: Record<string, u
 
 describe('registerWormholeEmitters', () => {
   test('registers exactly once', async () => {
-    const { emitter } = await setup({ chunks: {}, scripts: [] }, {});
+    const { emitter } = await setup({ chunks: {}, scripts: [], routes: {} }, {});
     const { registerWormholeEmitters } = await import('./islands-emitter');
 
     registerWormholeEmitters();
@@ -65,7 +65,10 @@ describe('registerWormholeEmitters', () => {
   });
 
   test('contributes nothing without a request context (prerendered pass)', async () => {
-    const { emitter } = await setup({ chunks: { 'Counter.Cabc': ['counter'] }, scripts: [] }, { counter: 1 });
+    const { emitter } = await setup(
+      { chunks: { 'Counter.Cabc': ['counter'] }, scripts: [], routes: {} },
+      { counter: 1 },
+    );
 
     expect(emitter(createIsland(), undefined)).toBeNull();
   });
@@ -75,18 +78,25 @@ describe('registerWormholeEmitters', () => {
 
     expect(noManifest.emitter(createIsland(), noManifest.context)).toBeNull();
 
-    const noValues = await setup({ chunks: { 'Counter.Cabc': ['counter'] }, scripts: [] }, {});
+    const noValues = await setup({ chunks: { 'Counter.Cabc': ['counter'] }, scripts: [], routes: {} }, {});
 
     expect(noValues.emitter(createIsland(), noValues.context)).toBeNull();
 
-    const unknownRequest = await setup({ chunks: { 'Counter.Cabc': ['counter'] }, scripts: [] }, { counter: 1 });
+    const unknownRequest = await setup(
+      { chunks: { 'Counter.Cabc': ['counter'] }, scripts: [], routes: {} },
+      { counter: 1 },
+    );
 
     expect(unknownRequest.emitter(createIsland(), createContext())).toBeNull();
   });
 
   test('emits a merge script for reachable open wormholes only', async () => {
     const { emitter, context } = await setup(
-      { chunks: { 'Counter.Cabc': ['counter'], 'Lazy.Cddd': ['lazy'], 'Other.Ceee': ['other'] }, scripts: [] },
+      {
+        chunks: { 'Counter.Cabc': ['counter'], 'Lazy.Cddd': ['lazy'], 'Other.Ceee': ['other'] },
+        scripts: [],
+        routes: {},
+      },
       { counter: { count: 5 }, lazy: 'l', audit: 'server-only' },
     );
 
@@ -101,7 +111,10 @@ describe('registerWormholeEmitters', () => {
   });
 
   test('skips names already emitted for this request', async () => {
-    const { emitter, context } = await setup({ chunks: { 'Counter.Cabc': ['counter'] }, scripts: [] }, { counter: 1 });
+    const { emitter, context } = await setup(
+      { chunks: { 'Counter.Cabc': ['counter'] }, scripts: [], routes: {} },
+      { counter: 1 },
+    );
 
     expect(emitter(createIsland(), context)?.html).toContain('"counter":1');
     expect(emitter(createIsland(), context)).toBeNull();
@@ -109,7 +122,7 @@ describe('registerWormholeEmitters', () => {
 
   test('a * chunk emits all open wormholes', async () => {
     const { emitter, context } = await setup(
-      { chunks: { 'Counter.Cabc': ['*'] }, scripts: [] },
+      { chunks: { 'Counter.Cabc': ['*'] }, scripts: [], routes: {} },
       { counter: 1, audit: 2 },
     );
 
@@ -121,7 +134,7 @@ describe('registerWormholeEmitters', () => {
 
   test('islands with no reachable wormholes contribute nothing', async () => {
     const { emitter, context } = await setup(
-      { chunks: { 'Unrelated.Cfff': ['counter'] }, scripts: [] },
+      { chunks: { 'Unrelated.Cfff': ['counter'] }, scripts: [], routes: {} },
       { counter: 1 },
     );
 
@@ -131,11 +144,11 @@ describe('registerWormholeEmitters', () => {
 
 describe('createWormholeDocumentEmitter', () => {
   test('contributes nothing when nothing is open or the request is unknown', async () => {
-    const empty = await setup({ chunks: {}, scripts: [] }, {});
+    const empty = await setup({ chunks: {}, scripts: [], routes: {} }, {});
 
     expect(empty.createWormholeDocumentEmitter(false)(empty.context)).toBeNull();
 
-    const unknownRequest = await setup({ chunks: {}, scripts: [] }, { counter: 1 });
+    const unknownRequest = await setup({ chunks: {}, scripts: [], routes: {} }, { counter: 1 });
 
     expect(unknownRequest.createWormholeDocumentEmitter(false)(createContext())).toBeNull();
   });
@@ -160,7 +173,7 @@ describe('createWormholeDocumentEmitter', () => {
 
   test('prod delivers only script-reachable open wormholes at stream end', async () => {
     const { createWormholeDocumentEmitter, context } = await setup(
-      { chunks: {}, scripts: ['stats', 'closed'] },
+      { chunks: {}, scripts: ['stats', 'closed'], routes: {} },
       { cart: 1, stats: 2, audit: 3 },
     );
 
@@ -175,14 +188,17 @@ describe('createWormholeDocumentEmitter', () => {
   });
 
   test('prod with no script consumers contributes nothing', async () => {
-    const { createWormholeDocumentEmitter, context } = await setup({ chunks: {}, scripts: [] }, { cart: 1 });
+    const { createWormholeDocumentEmitter, context } = await setup(
+      { chunks: {}, scripts: [], routes: {} },
+      { cart: 1 },
+    );
 
     expect(createWormholeDocumentEmitter(false)(context)).toBeNull();
   });
 
   test('a * script entry delivers all open wormholes', async () => {
     const { createWormholeDocumentEmitter, context } = await setup(
-      { chunks: {}, scripts: ['*'] },
+      { chunks: {}, scripts: ['*'], routes: {} },
       { cart: 1, audit: 2 },
     );
 
@@ -194,7 +210,7 @@ describe('createWormholeDocumentEmitter', () => {
 
   test('the end factory skips names the islands emitter already wrote', async () => {
     const { emitter, createWormholeDocumentEmitter, context } = await setup(
-      { chunks: { 'Counter.Cabc': ['counter'] }, scripts: ['counter', 'stats'] },
+      { chunks: { 'Counter.Cabc': ['counter'] }, scripts: ['counter', 'stats'], routes: {} },
       { counter: 1, stats: 2 },
     );
 
@@ -211,7 +227,7 @@ describe('createWormholeDocumentEmitter', () => {
 
   test('the end factory contributes nothing when every name was already written', async () => {
     const { emitter, createWormholeDocumentEmitter, context } = await setup(
-      { chunks: { 'Counter.Cabc': ['counter'] }, scripts: ['counter'] },
+      { chunks: { 'Counter.Cabc': ['counter'] }, scripts: ['counter'], routes: {} },
       { counter: 1 },
     );
 

@@ -1,14 +1,5 @@
-/**
- * Recursively marks all properties of `T` as `readonly`.
- *
- * Wormhole data is JSON-serializable by design (it is inlined into a `<script>` tag),
- * so only plain objects, arrays, and primitives need to be handled.
- */
-export type DeepReadonly<T> = T extends (...args: never[]) => unknown
-  ? T
-  : T extends object
-    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
-    : T;
+import type { ReadonlyDeep } from '@entwico/dash';
+import type { APIContext } from 'astro';
 
 /**
  * A wormhole transfers state from server middleware to client-side components.
@@ -16,7 +7,7 @@ export type DeepReadonly<T> = T extends (...args: never[]) => unknown
  * **Security:** wormhole data is serialized into an inline `<script>` tag and sent to the browser.
  * Never store secrets (tokens, API keys, credentials) in a wormhole.
  *
- * The stored value is exposed as deeply readonly — the only way to change it is `set()`
+ * The stored value is exposed as deeply readonly (`ReadonlyDeep` of `@entwico/dash`) — the only way to change it is `set()`
  * (client) or the middleware's per-request values (server), which keeps subscribers in sync.
  */
 // `in out` forces invariance: methods are bivariant in TS, so without it a
@@ -24,15 +15,33 @@ export type DeepReadonly<T> = T extends (...args: never[]) => unknown
 export interface Wormhole<in out T> {
   readonly name: string;
   readonly key: string;
-  get(): DeepReadonly<T>;
+  get(): ReadonlyDeep<T>;
   /**
    * Update the wormhole value on the **client only** — every subscriber on the page
    * (islands and scripts alike) is notified. Throws on the server, where values are
    * request-scoped and provided by the middleware.
    */
-  set(data: DeepReadonly<T>): void;
-  subscribe(fn: (data: DeepReadonly<T>) => void): () => void;
+  set(data: ReadonlyDeep<T>): void;
+  subscribe(fn: (data: ReadonlyDeep<T>) => void): () => void;
 }
+
+/**
+ * Resolves a wormhole's value for one request — called by the wormhole middleware
+ * for every request whose route can read the wormhole. Return `undefined` to
+ * leave it closed for the request.
+ */
+export type WormholeHandler<T> = (context: APIContext) => T | undefined | Promise<T | undefined>;
+
+/** what `defineWormhole()` takes — the actions-style definition object */
+export type WormholeDefinition<T> = {
+  handler: WormholeHandler<T>;
+  /**
+   * Load on every request instead of only where the build found a reader — for
+   * wormholes read by components the build cannot attribute to a route (islands
+   * chosen dynamically at render time).
+   */
+  eager?: boolean | undefined;
+};
 
 /**
  * The project's wormhole names and value types. Empty by default — the integration

@@ -1,6 +1,11 @@
 import tsParser from '@typescript-eslint/parser';
 import { RuleTester } from 'eslint';
+import { describe, it } from 'vitest';
 import { noRawStringsInJsx } from './no-raw-strings-in-jsx.js';
+
+RuleTester.describe = describe;
+RuleTester.it = it;
+RuleTester.itOnly = it.only;
 
 const tester = new RuleTester({
   languageOptions: {

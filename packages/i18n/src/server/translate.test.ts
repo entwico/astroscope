@@ -6,6 +6,15 @@ vi.mock('virtual:@astroscope/i18n/manifest', () => ({
   getManifest: () => ({ keys: [], chunks: {}, imports: {} }),
 }));
 
+const { missingAdd, logDebug } = vi.hoisted(() => ({ missingAdd: vi.fn(), logDebug: vi.fn() }));
+
+vi.mock('@astroscope/node/telemetry', () => ({
+  createCounter: () => ({ add: missingAdd }),
+  createObservableGauge: () => undefined,
+}));
+
+vi.mock('@astroscope/node/log', () => ({ log: { debug: logDebug } }));
+
 async function createTranslate() {
   vi.resetModules();
 
@@ -194,5 +203,44 @@ describe('rich', () => {
     runWithContext(createContext('de', { tos: '' }), () => {
       expect(rich('tos', 'Read our terms')).toEqual(['Read our terms']);
     });
+  });
+});
+
+describe('missing translations', () => {
+  test('a t() lookup that falls back is counted per locale and logged with its key', async () => {
+    const { runWithContext, t } = await createTranslate();
+
+    missingAdd.mockClear();
+    logDebug.mockClear();
+
+    runWithContext(createContext('de', { present: 'Da' }), () => {
+      expect(t('present', 'Here')).toBe('Da');
+      expect(t('absent', 'Gone')).toBe('Gone');
+    });
+
+    expect(missingAdd).toHaveBeenCalledTimes(1);
+    expect(missingAdd).toHaveBeenCalledWith(1, { 'astro.i18n.locale': 'de' });
+    expect(logDebug).toHaveBeenCalledWith({ key: 'absent', locale: 'de' }, 'missing translation');
+  });
+
+  test('a rich() lookup that falls back is counted too', async () => {
+    const { rich, runWithContext } = await createTranslate();
+
+    missingAdd.mockClear();
+
+    runWithContext(createContext('en', {}), () => {
+      expect(rich('absent', 'Gone')).toEqual(['Gone']);
+    });
+
+    expect(missingAdd).toHaveBeenCalledWith(1, { 'astro.i18n.locale': 'en' });
+  });
+
+  test('nothing is counted outside a request context', async () => {
+    const { t } = await createTranslate();
+
+    missingAdd.mockClear();
+
+    expect(t('absent', 'Gone')).toBe('Gone');
+    expect(missingAdd).not.toHaveBeenCalled();
   });
 });

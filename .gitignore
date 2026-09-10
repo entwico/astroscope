@@ -19,4 +19,6 @@ dist/
 coverage/
 .eslintcache
 
-IDEAS.md
+
+benchmarks/results/
+demo/node-e2e/.bench/

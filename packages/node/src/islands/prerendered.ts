@@ -20,14 +20,14 @@ function* walkHtmlFiles(dir: string): Generator<string> {
  * once, at build time, before the client dir is compressed. Runs without a request
  * context, so registered emitters that need one contribute nothing here.
  */
-export async function transformPrerenderedHtml(clientDir: string, manifest: IslandsManifest): Promise<number> {
+export function transformPrerenderedHtml(clientDir: string, manifest: IslandsManifest): number {
   const transformer = createIslandsTransformer(manifest);
   let transformed = 0;
 
   for (const file of walkHtmlFiles(clientDir)) {
     const html = fs.readFileSync(file, 'utf-8');
     const rewriter = transformer.createDocumentRewriter();
-    const result = rewriter.write(html) + (await rewriter.end());
+    const result = rewriter.write(html) + rewriter.end();
 
     if (result !== html) {
       fs.writeFileSync(file, result);

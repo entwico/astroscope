@@ -1,9 +1,9 @@
 import { createReadStream } from 'node:fs';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { IncomingMessage, OutgoingHttpHeaders, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import type { BaseApp } from 'astro/app';
-import { createRequestFromNodeRequest, writeResponse } from 'astro/app/node';
+import { createRequestFromNodeRequest, getAbortControllerCleanup } from 'astro/app/node';
 import { log } from '../observability/log/index.js';
 import { getRequestRecord } from '../observability/log/store.js';
 import type { RuntimeOptions } from '../types.js';
@@ -33,6 +33,93 @@ async function readFSErrorPage(client: string, status: number): Promise<Response
   }
 
   return undefined;
+}
+
+function createOutgoingHttpHeaders(headers: Headers): OutgoingHttpHeaders | undefined {
+  const nodeHeaders: OutgoingHttpHeaders = Object.fromEntries(headers.entries());
+
+  if (Object.keys(nodeHeaders).length === 0) {
+    return undefined;
+  }
+
+  // the entries iterator joins set-cookie values with a comma; node needs them as an array
+  const cookies = headers.getSetCookie();
+
+  if (cookies.length > 1) {
+    nodeHeaders['set-cookie'] = cookies;
+  }
+
+  return nodeHeaders;
+}
+
+/**
+ * Streams the web response into the node response. A render failing after the
+ * first chunk cannot change the status anymore, so it is logged through the
+ * request logger and marked on the request record — the completion line, the
+ * span and `astro.render.failures` reflect it. On the wire it behaves like
+ * astro's own writer: an `Internal server error` marker, then the socket is
+ * destroyed.
+ */
+export async function writeResponse(response: Response, res: ServerResponse): Promise<void> {
+  res.statusMessage = response.statusText;
+  res.writeHead(response.status, createOutgoingHttpHeaders(response.headers));
+
+  // astro parks the socket listener behind the request's abort signal on the node
+  // request; releasing it once the response is done keeps keep-alive sockets from
+  // accumulating one listener per request
+  const cleanupAbort = getAbortControllerCleanup(res.req);
+
+  if (cleanupAbort) {
+    const runCleanup = (): void => {
+      cleanupAbort();
+      res.off('finish', runCleanup);
+      res.off('close', runCleanup);
+    };
+
+    res.on('finish', runCleanup);
+    res.on('close', runCleanup);
+  }
+
+  if (!response.body) {
+    res.end();
+
+    return;
+  }
+
+  const reader = response.body.getReader();
+
+  // a client going away stops the render; on a failed stream the cancel rejects
+  // with the render error, which the catch below has already reported
+  res.on('close', () => {
+    reader.cancel().catch(() => undefined);
+  });
+
+  try {
+    for (let result = await reader.read(); !result.done; result = await reader.read()) {
+      res.write(result.value);
+    }
+
+    res.end();
+  } catch (err) {
+    const record = getRequestRecord();
+
+    if (record) {
+      record.truncated = true;
+    }
+
+    log.error(
+      {
+        ...(err instanceof Error ? { err } : { reason: err }),
+        ...(record?.route && { route: record.route }),
+        ...(!record?.logger && { url: record?.url ?? res.req.url }),
+      },
+      'render failed after the response started, response truncated',
+    );
+
+    res.write('Internal server error', () => {
+      res.destroy(err instanceof Error ? err : undefined);
+    });
+  }
 }
 
 /**

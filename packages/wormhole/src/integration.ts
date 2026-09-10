@@ -1,34 +1,60 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AstroIntegration } from 'astro';
+import type { ExcludePattern } from '@astroscope/node/excludes';
+import { routeEntrypoints } from '@astroscope/node/islands';
+import type { AstroIntegration, IntegrationResolvedRoute } from 'astro';
 import { wormholeVitePlugin } from './extraction/vite-plugin.js';
 
+export type WormholeIntegrationOptions = {
+  /** patterns the middleware skips — no handler runs, nothing is delivered; defaults to RECOMMENDED_EXCLUDES */
+  exclude?: ExcludePattern[] | undefined;
+};
+
 /**
- * Astro integration for wormholes with per-island payload slicing.
+ * Astro integration for wormholes with per-route loading and per-island delivery.
  *
  * Resolves the `src/wormholes.ts` registry and exposes it to the middleware as a
- * virtual module, registers the vite plugin that scans client code for
- * `wormholes.<name>` accesses and maps them onto the emitted chunks, and generates
- * the registry type stub that types the `wormholes` proxy. Delivery happens at
- * runtime: the wormhole middleware opens per-request values, and the islands
- * emitter (via `@astroscope/node`) writes each island's slice before its tag.
+ * virtual module, injects the middleware after the project's own (so handlers see
+ * everything earlier middleware put on `locals`), registers the vite plugin that
+ * scans server and client code for `wormholes.<name>` accesses and maps them onto
+ * routes and chunks, and generates the registry type stub that types the
+ * `wormholes` proxy. Delivery happens at runtime: the middleware runs the handlers
+ * the route needs, and the islands emitter (via `@astroscope/node`) writes each
+ * island's slice before its tag.
  */
-export default function wormholeIntegration(): AstroIntegration {
+export default function wormholeIntegration(options: WormholeIntegrationOptions = {}): AstroIntegration {
   const resolveRegistryPath = (srcDir: URL): string | null =>
     ['wormholes.ts', path.join('wormholes', 'index.ts')]
       .map((candidate) => path.join(fileURLToPath(srcDir), candidate))
       .find((candidate) => fs.existsSync(candidate)) ?? null;
 
+  let root = '';
+  let resolvedRoutes: IntegrationResolvedRoute[] = [];
+
   return {
     name: '@astroscope/wormhole',
     hooks: {
-      'astro:config:setup': ({ config, updateConfig }) => {
+      'astro:config:setup': ({ config, updateConfig, addMiddleware }) => {
+        root = fileURLToPath(config.root);
+
+        addMiddleware({ order: 'post', entrypoint: '@astroscope/wormhole/middleware' });
+
         updateConfig({
           vite: {
-            plugins: [wormholeVitePlugin({ registryPath: resolveRegistryPath(config.srcDir) })],
+            plugins: [
+              wormholeVitePlugin({
+                registryPath: resolveRegistryPath(config.srcDir),
+                exclude: options.exclude ?? null,
+                pages: () => routeEntrypoints(root, resolvedRoutes),
+              }),
+            ],
           },
         });
+      },
+
+      'astro:routes:resolved': ({ routes }) => {
+        resolvedRoutes = routes;
       },
 
       'astro:config:done': ({ config, injectTypes, logger }) => {

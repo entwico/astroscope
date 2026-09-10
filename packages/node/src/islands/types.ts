@@ -12,6 +12,13 @@ export type IslandsManifest = {
   runtimeSource: string;
   /** direct imports per chunk: `i` static, `d` dynamic; file names relative to client dist */
   chunks: Record<string, { i?: string[] | undefined; d?: string[] | undefined }>;
+  /**
+   * island entry chunks per route pattern, from the server build's module graph —
+   * a page's own hydrated components plus those of every component it reaches.
+   * Routes whose page the server build did not see are absent (unknown), a page
+   * without islands is an empty list
+   */
+  routes?: Record<string, string[]> | undefined;
 };
 
 /**

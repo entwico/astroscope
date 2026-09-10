@@ -9,7 +9,7 @@ vi.mock('virtual:@astroscope/wormhole/registry', () => ({ wormholes: {} }));
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function named<T>(name: string): Wormhole<T> {
-  const wormhole = defineWormhole<T>();
+  const wormhole = defineWormhole<T>({ handler: () => undefined });
 
   assignWormholeNames({ [name]: wormhole });
 

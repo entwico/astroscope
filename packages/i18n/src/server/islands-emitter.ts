@@ -1,4 +1,9 @@
-import { type DocumentEmitter, registerDocumentEmitter, registerIslandEmitter } from '@astroscope/node/islands';
+import {
+  type DocumentEmitter,
+  type IslandInfo,
+  registerDocumentEmitter,
+  registerIslandEmitter,
+} from '@astroscope/node/islands';
 import type { APIContext } from 'astro';
 import { buildI18nChunkUrl } from '../shared/url.js';
 import { createFullStateScript, createScriptHashesScript, jsonForScript } from './client-state.js';
@@ -44,6 +49,74 @@ export function setRequestLocale(request: Request, locale: string): void {
 /** public url of a chunk → manifest chunk name, e.g. `…/_astro/Cart.abc.js` → `Cart.abc` */
 function urlToChunkName(url: string): string {
   return url.slice(url.lastIndexOf('/') + 1).replace(/\.js$/, '');
+}
+
+/** an island's translated chunks and their urls for one locale */
+type IslandSlice = {
+  /** full closure: what the merge script covers */
+  chunks: [name: string, hash: string][];
+  /** static closure: preload links */
+  links: string[];
+  /** full closure: eager imports */
+  imports: string[];
+};
+
+// islands arrive as the same object per component/renderer/directive and the
+// hashes object is replaced whenever translations change, so keying on both
+// caches each slice for exactly as long as it is valid
+const slices = new WeakMap<Record<string, string>, WeakMap<IslandInfo, IslandSlice>>();
+const inits = new Map<string, string>();
+
+function sliceFor(island: IslandInfo, locale: string, hashes: Record<string, string>): IslandSlice {
+  let byIsland = slices.get(hashes);
+
+  if (!byIsland) {
+    byIsland = new WeakMap();
+    slices.set(hashes, byIsland);
+  }
+
+  let slice = byIsland.get(island);
+
+  if (slice) {
+    return slice;
+  }
+
+  const translated = (urls: string[]): [string, string][] => {
+    const result: [string, string][] = [];
+
+    for (const url of urls) {
+      const chunk = urlToChunkName(url);
+      const hash = hashes[chunk];
+
+      if (hash) {
+        result.push([chunk, hash]);
+      }
+    }
+
+    return result;
+  };
+
+  const chunks = translated(island.fullClosure);
+
+  slice = {
+    chunks,
+    links: translated(island.staticClosure).map(([chunk, hash]) => buildI18nChunkUrl(locale, chunk, hash)),
+    imports: chunks.map(([chunk, hash]) => buildI18nChunkUrl(locale, chunk, hash)),
+  };
+  byIsland.set(island, slice);
+
+  return slice;
+}
+
+function initFor(locale: string): string {
+  let init = inits.get(locale);
+
+  if (init === undefined) {
+    init = jsonForScript({ locale, hashes: {}, translations: {} });
+    inits.set(locale, init);
+  }
+
+  return init;
 }
 
 /**
@@ -95,6 +168,7 @@ export function registerI18nEmitters(): void {
     }
 
     const hashes = i18n.getHashes(locale);
+    const { chunks, links, imports } = sliceFor(island, locale, hashes);
 
     let emitted = emittedByContext.get(context);
 
@@ -104,44 +178,19 @@ export function registerI18nEmitters(): void {
     }
 
     const merge: Record<string, string> = {};
+    let fresh = false;
 
-    for (const url of island.fullClosure) {
-      const chunk = urlToChunkName(url);
-      const hash = hashes[chunk];
-
-      if (hash && !emitted.has(chunk)) {
+    for (const [chunk, hash] of chunks) {
+      if (!emitted.has(chunk)) {
         emitted.add(chunk);
         merge[chunk] = hash;
+        fresh = true;
       }
     }
 
-    const links: string[] = [];
-
-    for (const url of island.staticClosure) {
-      const chunk = urlToChunkName(url);
-      const hash = hashes[chunk];
-
-      if (hash) {
-        links.push(buildI18nChunkUrl(locale, chunk, hash));
-      }
-    }
-
-    const imports: string[] = [];
-
-    for (const url of island.fullClosure) {
-      const chunk = urlToChunkName(url);
-      const hash = hashes[chunk];
-
-      if (hash) {
-        imports.push(buildI18nChunkUrl(locale, chunk, hash));
-      }
-    }
-
-    const init = jsonForScript({ locale, hashes: {}, translations: {} });
-    const html =
-      Object.keys(merge).length > 0
-        ? `<script>{const i=window.__i18n__??=${init};Object.assign(i.hashes,${jsonForScript(merge)});}</script>`
-        : undefined;
+    const html = fresh
+      ? `<script>{const i=window.__i18n__??=${initFor(locale)};Object.assign(i.hashes,${jsonForScript(merge)});}</script>`
+      : undefined;
 
     if (!html && links.length === 0 && imports.length === 0) {
       return null;

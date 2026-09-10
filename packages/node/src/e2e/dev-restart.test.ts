@@ -87,6 +87,13 @@ describe.skipIf(devSkip)('dev-mode restart with in-flight requests', () => {
     expect(await res.json()).toEqual({ native: true, url: '/native/echo' });
   });
 
+  test('duplicate slashes redirect in dev, ahead of native mounts', async () => {
+    const res = await fetch(`${getBaseUrl()}//native//echo?x=1`, { redirect: 'manual' });
+
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('/native/echo?x=1');
+  });
+
   test('getBootContext() is stamped before onStartup across the vite-runner boundary', () => {
     expect(stripAnsi(stdoutBuf)).toContain('[dev-e2e] startup ctx=ok');
   });

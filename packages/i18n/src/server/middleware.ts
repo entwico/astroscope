@@ -155,7 +155,7 @@ export function createI18nChunkMiddleware(): MiddlewareHandler {
 export function createI18nMiddleware(options: I18nMiddlewareOptions): MiddlewareHandler {
   registerI18nEmitters();
 
-  return async (ctx, next) => {
+  return (ctx, next) => {
     if (shouldExclude(ctx, options.exclude ?? RECOMMENDED_EXCLUDES)) {
       return next();
     }

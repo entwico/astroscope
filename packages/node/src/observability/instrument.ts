@@ -5,7 +5,12 @@ import type { Logger } from 'pino';
 import type { ExcludePattern } from '../excludes/excludes.js';
 import { generateReqId } from './log/index.js';
 import { type RequestRecord, getLogStore } from './log/store.js';
-import { recordActionDuration, recordHttpRequestDuration, recordHttpRequestStart } from './telemetry/metrics.js';
+import {
+  recordActionDuration,
+  recordHttpRequestDuration,
+  recordHttpRequestStart,
+  recordRenderFailure,
+} from './telemetry/metrics.js';
 
 const LIB_NAME = '@astroscope/node';
 const ACTIONS_PREFIX = '/_actions/';
@@ -109,6 +114,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
       route: undefined,
       routeOverride: false,
       actionName: isAction ? pathname.slice(ACTIONS_PREFIX.length).replace(/\/$/, '') : undefined,
+      truncated: false,
     };
 
     let span: ReturnType<typeof tracer.startSpan> | undefined;
@@ -183,11 +189,12 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
       finalized = true;
 
       const status = res.statusCode;
+      const truncated = record.truncated;
       const responseTime = performance.now() - startTime;
       const ttfb = roundTime((firstByteTime ?? performance.now()) - startTime);
 
       if (requestLogger) {
-        const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
+        const level = truncated || status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
 
         requestLogger[level](
           {
@@ -197,8 +204,9 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
             responseSize,
             ...(record.route && { route: record.route }),
             ...(aborted && { aborted: true }),
+            ...(truncated && { truncated: true }),
           },
-          aborted ? 'request aborted' : 'request completed',
+          truncated ? 'request truncated' : aborted ? 'request aborted' : 'request completed',
         );
       }
 
@@ -212,7 +220,10 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
         span.setAttribute('http.response.body.size', responseSize);
         span.setAttribute('ttfb', ttfb);
 
-        if (aborted || status >= 400) {
+        if (truncated) {
+          span.setAttribute('astro.response.truncated', true);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: 'response truncated' });
+        } else if (aborted || status >= 400) {
           span.setStatus({ code: SpanStatusCode.ERROR, message: aborted ? 'request aborted' : `HTTP ${status}` });
         } else {
           span.setStatus({ code: SpanStatusCode.OK });
@@ -227,6 +238,10 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
 
         if (record.actionName) {
           recordActionDuration({ name: record.actionName, status }, responseTime);
+        }
+
+        if (truncated) {
+          recordRenderFailure(record.route);
         }
       }
     };

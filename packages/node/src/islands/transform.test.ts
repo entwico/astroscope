@@ -23,7 +23,7 @@ function island(client: string, componentUrl = '/_astro/Cart.aaa.js'): string {
 async function apply(html: string): Promise<string> {
   const rewriter = createIslandsTransformer(manifest).createDocumentRewriter();
 
-  return rewriter.write(html) + (await rewriter.end());
+  return rewriter.write(html) + rewriter.end();
 }
 
 beforeEach(() => {

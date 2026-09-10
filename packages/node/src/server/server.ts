@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
+import { defined } from '@entwico/dash';
 import { checks, server as healthServer, probes } from '@entwico/health-probes';
 import { SpanStatusCode } from '@opentelemetry/api';
 import { createApp } from 'astro/app/entrypoint';
@@ -14,11 +15,12 @@ import type { BootContext } from '../lifecycle/types.js';
 import { createRequestInstrumentation } from '../observability/instrument.js';
 import { dumpEarlyLogs } from '../observability/log/construct.js';
 import { log } from '../observability/log/index.js';
-import { startLifecycleSpan, withLifecycleSpan } from '../observability/telemetry/lifecycle.js';
 import { shutdownTelemetry } from '../observability/telemetry/sdk.js';
+import { type StartedSpan, startSpan, withSpan } from '../observability/telemetry/telemetry.js';
 import { preparePlatform } from '../platform/prepare.js';
 import type { RuntimeOptions } from '../types.js';
 import { resolveClientDir } from './client-dir.js';
+import { redirectDuplicateSlashes } from './duplicate-slashes.js';
 import { clearNativeMounts, dispatchNativeMount } from './native-mount.js';
 import { createAppHandler } from './serve-app.js';
 import { createStaticHandler } from './serve-static.js';
@@ -42,7 +44,7 @@ async function warmupModules(): Promise<void> {
     app.manifest.actions,
     app.manifest.sessionDriver,
     app.manifest.serverIslandMappings,
-  ].filter((load) => load !== undefined);
+  ].filter(defined);
 
   const results = await Promise.allSettled(loaders.map((load) => load()));
   const failures = results.filter((result) => result.status === 'rejected');
@@ -125,7 +127,7 @@ export async function startServer(overrides?: {
     log.debug('health probes listening');
   }
 
-  const startup = startLifecycleSpan('startup');
+  const startup = startSpan('startup');
 
   log.info({ host, port }, 'starting');
 
@@ -139,7 +141,7 @@ export async function startServer(overrides?: {
   // to the failure (if any) instead of rejecting, so a warmup error landing
   // before the join below is never seen as an unhandled rejection
   const warmupStartedAt = performance.now();
-  const warmupSpan = startLifecycleSpan('warmup', startup.context);
+  const warmupSpan = startSpan('warmup', { parent: startup.context });
   const warmup = warmupModules().then(
     () => {
       warmupMs = roundMs(performance.now() - warmupStartedAt);
@@ -156,12 +158,10 @@ export async function startServer(overrides?: {
     },
   );
 
-  const shutdownLifecycle = async (
-    shutdownContext?: ReturnType<typeof startLifecycleSpan>['context'],
-  ): Promise<void> => {
+  const shutdownLifecycle = async (shutdownContext?: StartedSpan['context']): Promise<void> => {
     try {
       if (shutdownContext) {
-        await withLifecycleSpan('onShutdown', shutdownContext, () => runShutdown(bootModule, context));
+        await withSpan('onShutdown', { parent: shutdownContext }, () => runShutdown(bootModule, context));
       } else {
         await runShutdown(bootModule, context);
       }
@@ -200,7 +200,7 @@ export async function startServer(overrides?: {
     // @ts-expect-error virtual module provided by the integration
     bootModule = (await import('virtual:@astroscope/node/boot')) as BootModule;
 
-    await withLifecycleSpan('boot', startup.context, () => runStartup(bootModule, context));
+    await withSpan('boot', { parent: startup.context }, () => runStartup(bootModule, context));
 
     bootMs = roundMs(performance.now() - bootStartedAt);
   } catch (err) {
@@ -242,6 +242,7 @@ export async function startServer(overrides?: {
     }
 
     instrument(req, res, () => {
+      if (redirectDuplicateSlashes(req, res)) return;
       if (dispatchNativeMount(req, res)) return;
 
       staticHandler(req, res, () => void appHandler(req, res));
@@ -251,7 +252,7 @@ export async function startServer(overrides?: {
   const server = tls ? https.createServer(tls, listener) : http.createServer(listener);
 
   try {
-    await withLifecycleSpan('listen', startup.context, () => {
+    await withSpan('listen', { parent: startup.context }, () => {
       return new Promise<void>((resolve, reject) => {
         server.once('error', reject);
         server.listen(port, host, resolve);
@@ -292,9 +293,9 @@ export async function startServer(overrides?: {
     log.info('shutdown initiated');
 
     const drainStartedAt = performance.now();
-    const shutdown = startLifecycleSpan('shutdown');
+    const shutdown = startSpan('shutdown');
 
-    await withLifecycleSpan('drain', shutdown.context, async () => {
+    await withSpan('drain', { parent: shutdown.context }, async () => {
       const closed = new Promise<void>((resolve) => server.close(() => resolve()));
 
       server.closeIdleConnections();

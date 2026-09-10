@@ -38,6 +38,7 @@ describe('getRequestRecord', () => {
       route: undefined,
       routeOverride: false,
       actionName: undefined,
+      truncated: false,
     };
 
     getLogStore().requestStorage.run(record, () => {

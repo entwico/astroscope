@@ -58,7 +58,9 @@ afterAll(() => {
   prodServer?.kill();
 });
 
-const page = (port: number) => fetch(`http://localhost:${port}/`).then((r) => r.text());
+const page = (port: number, path = '/') => fetch(`http://localhost:${port}${path}`).then((r) => r.text());
+const loads = (port: number) =>
+  fetch(`http://localhost:${port}/api/loads`).then((r) => r.json() as Promise<Record<string, number>>);
 
 describe('server-side reads', () => {
   test('frontmatter renders wormhole values', async () => {
@@ -100,6 +102,77 @@ describe('prod delivery (sliced)', () => {
 
     expect(html).not.toContain('server-only-audit-marker');
     expect(html).not.toContain('"audit"');
+  });
+});
+
+describe('prod loading (per route)', () => {
+  test('a page loads only the wormholes its route reads', async () => {
+    const before = await loads(PROD_PORT);
+
+    await page(PROD_PORT);
+
+    const after = await loads(PROD_PORT);
+
+    // config and counter: frontmatter + islands; stats: the page script; audit: no reader
+    expect((after['config'] ?? 0) - (before['config'] ?? 0)).toBe(1);
+    expect((after['counter'] ?? 0) - (before['counter'] ?? 0)).toBe(1);
+    expect((after['stats'] ?? 0) - (before['stats'] ?? 0)).toBe(1);
+    expect(after['audit']).toBeUndefined();
+  });
+
+  test('an action loads only what its handler reads', async () => {
+    const before = await loads(PROD_PORT);
+
+    const res = await fetch(`http://localhost:${PROD_PORT}/_actions/updateCounter`, {
+      method: 'POST',
+      // the node adapter's csrf check wants a same-site origin on mutating requests
+      headers: { 'content-type': 'application/json', origin: `http://localhost:${PROD_PORT}` },
+      body: JSON.stringify({ count: 3 }),
+    });
+
+    expect(res.ok).toBe(true);
+
+    const after = await loads(PROD_PORT);
+
+    expect((after['counter'] ?? 0) - (before['counter'] ?? 0)).toBe(1);
+    expect(after['config']).toBe(before['config']);
+    expect(after['stats']).toBe(before['stats']);
+  });
+
+  test('a page without readers runs no handler', async () => {
+    const before = await loads(PROD_PORT);
+
+    await page(PROD_PORT, '/plain');
+
+    expect(await loads(PROD_PORT)).toEqual(before);
+  });
+
+  test('the build records the server reads per route', async () => {
+    const { readFileSync } = await import('node:fs');
+    const manifest = JSON.parse(
+      readFileSync(new URL('../dist/server/chunks/wormhole-manifest.json', import.meta.url), 'utf8'),
+    ) as { routes: Record<string, string[]>; scripts: string[] };
+
+    // frontmatter reads plus the page script's
+    expect(manifest.routes['/']?.toSorted()).toEqual(['config', 'counter', 'stats']);
+    expect(manifest.routes['/plain']).toEqual([]);
+    expect(manifest.routes['/api/loads']).toEqual([]);
+    expect(manifest.routes['/_actions/[...path]']).toEqual(['counter']);
+    expect(manifest.scripts.toSorted()).toEqual(['counter', 'stats']);
+  });
+});
+
+describe('dev loading (everything)', () => {
+  test('every handler runs on every page', async () => {
+    const before = await loads(DEV_PORT);
+
+    await page(DEV_PORT, '/plain');
+
+    const after = await loads(DEV_PORT);
+
+    for (const name of ['config', 'counter', 'stats', 'audit']) {
+      expect((after[name] ?? 0) - (before[name] ?? 0)).toBe(1);
+    }
   });
 });
 

@@ -1,7 +1,13 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/index.browser.ts', 'src/server.ts', 'src/react/index.ts'],
+  entry: {
+    index: 'src/index.ts',
+    'index.browser': 'src/index.browser.ts',
+    server: 'src/server.ts',
+    'middleware-entrypoint': 'src/middleware-entrypoint.ts',
+    'react/index': 'src/react/index.ts',
+  },
   format: ['esm'],
   dts: true,
   fixedExtension: false,
@@ -10,6 +16,7 @@ export default defineConfig({
       'astro',
       'virtual:@astroscope/wormhole/manifest',
       'virtual:@astroscope/wormhole/registry',
+      'virtual:@astroscope/wormhole/config',
       '@astroscope/node',
     ],
   },

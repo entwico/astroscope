@@ -1,20 +1,47 @@
+import type { ReadonlyDeep } from '@entwico/dash';
 import { als } from './als.js';
 import { wormholeKey } from './key.js';
-import type { DeepReadonly, Wormhole } from './types.js';
+import type { Wormhole, WormholeDefinition, WormholeHandler } from './types.js';
 
-// name assignment must survive dual module instances (vite runner + native), so the
-// assigner rides the wormhole object itself under a Symbol.for key
+// name assignment and the handler must survive dual module instances (vite runner +
+// native), so both ride the wormhole object itself under Symbol.for keys
 const ASSIGN = Symbol.for('@astroscope/wormhole.assign');
+const SOURCE = Symbol.for('@astroscope/wormhole.source');
+
+/** how the middleware opens a wormhole: its handler and whether every route loads it */
+export type WormholeSource = { handler: WormholeHandler<unknown>; eager: boolean };
+
+type Internal = Wormhole<unknown> & { [ASSIGN](next: string): void; [SOURCE]?: WormholeSource | undefined };
 
 /**
- * Define a wormhole for the `src/wormholes.ts` registry. The wormhole's name is the
- * registry key — it is assigned when the registry is passed to
- * `createWormholeMiddleware()` (or `assignWormholeNames()`).
+ * Define a wormhole for the `src/wormholes.ts` registry, actions-style. The
+ * handler resolves the value per request; the middleware calls it only for routes
+ * the build found a reader on (frontmatter, islands, scripts) — or on every
+ * request with `eager: true`. The wormhole's name is the registry key, assigned
+ * when the registry is passed to `createWormholeMiddleware()` (or
+ * `assignWormholeNames()`).
  *
  * **Security:** wormhole data is serialized into the HTML and sent to the browser.
  * Never store secrets (tokens, API keys, credentials) in a wormhole.
+ *
+ * @example
+ * ```typescript
+ * export const wormholes = {
+ *   cart: defineWormhole({ handler: (ctx) => ctx.locals.cart }),
+ *   config: defineWormhole({ handler: () => loadConfig(), eager: true }),
+ * };
+ * ```
  */
-export function defineWormhole<T>(): Wormhole<T> {
+export function defineWormhole<T>(definition: WormholeDefinition<T>): Wormhole<T> {
+  const wormhole = createWormhole() as Internal;
+
+  wormhole[SOURCE] = { handler: definition.handler as WormholeHandler<unknown>, eager: definition.eager ?? false };
+
+  return wormhole as Wormhole<T>;
+}
+
+/** the server-side wormhole object without a handler — the `wormholes` proxy stubs (internal) */
+export function createWormhole<T>(): Wormhole<T> {
   let name: string | undefined;
 
   const requireName = (): string => {
@@ -38,7 +65,7 @@ export function defineWormhole<T>(): Wormhole<T> {
       return key();
     },
 
-    get(): DeepReadonly<T> {
+    get(): ReadonlyDeep<T> {
       const value = als.getStore()?.get(key());
 
       if (value === undefined) {
@@ -47,7 +74,7 @@ export function defineWormhole<T>(): Wormhole<T> {
         );
       }
 
-      return value as DeepReadonly<T>;
+      return value as ReadonlyDeep<T>;
     },
 
     set(): void {
@@ -71,6 +98,11 @@ export function defineWormhole<T>(): Wormhole<T> {
   };
 
   return wormhole;
+}
+
+/** the definition a registry entry was created with — undefined for proxy stubs */
+export function getWormholeSource<T>(wormhole: Wormhole<T>): WormholeSource | undefined {
+  return (wormhole as unknown as Internal)[SOURCE];
 }
 
 /**

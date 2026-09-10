@@ -27,7 +27,15 @@ function sinkLogger(): Logger {
 }
 
 function requestRecord(logger: Logger): RequestRecord {
-  return { logger, url: '/x', method: 'GET', route: undefined, routeOverride: false, actionName: undefined };
+  return {
+    logger,
+    url: '/x',
+    method: 'GET',
+    route: undefined,
+    routeOverride: false,
+    actionName: undefined,
+    truncated: false,
+  };
 }
 
 afterEach(() => {

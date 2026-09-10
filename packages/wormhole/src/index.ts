@@ -1,9 +1,17 @@
-import { assignWormholeNames, defineWormhole } from './define.js';
+import { assignWormholeNames, createWormhole } from './define.js';
 import type { Wormhole, WormholeMap } from './types.js';
 
 export { default } from './integration.js';
+export type { WormholeIntegrationOptions } from './integration.js';
 export { defineWormhole, assignWormholeNames } from './define.js';
-export type { DeepReadonly, UnwrapWormholes, Wormhole, WormholeMap, WormholeRegistry } from './types.js';
+export type {
+  UnwrapWormholes,
+  Wormhole,
+  WormholeDefinition,
+  WormholeHandler,
+  WormholeMap,
+  WormholeRegistry,
+} from './types.js';
 
 const stubs = new Map<string, Wormhole<unknown>>();
 
@@ -11,7 +19,7 @@ function stub(name: string): Wormhole<unknown> {
   let wormhole = stubs.get(name);
 
   if (!wormhole) {
-    wormhole = defineWormhole();
+    wormhole = createWormhole();
 
     assignWormholeNames({ [name]: wormhole });
     stubs.set(name, wormhole);

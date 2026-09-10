@@ -57,22 +57,98 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
       return cached;
     }
 
-    let resolved: ResolvedChunk | null = null;
-
     for (const fileName of fileNames) {
       if (url.endsWith(fileName)) {
         const boundary = url.length - fileName.length;
 
         if (boundary === 0 || url[boundary - 1] === '/') {
-          resolved = { prefix: url.slice(0, boundary), fileName };
-          break;
+          const resolved = { prefix: url.slice(0, boundary), fileName };
+
+          // only hits are cached
+          resolveCache.set(url, resolved);
+
+          return resolved;
         }
       }
     }
 
-    resolveCache.set(url, resolved);
+    return null;
+  };
 
-    return resolved;
+  // islands repeat across requests: closures with the prefix applied, the link
+  // tags and the emitter-free register script are computed once per island and
+  // shared — bounded by the manifest, since only resolvable islands are cached
+  const islands = new Map<string, IslandInfo>();
+  const linkTags = new Map<string, string>();
+  const registerScripts = new WeakMap<IslandInfo, string>();
+
+  const resolveIsland = (
+    componentUrl: string,
+    rendererUrl: string | null,
+    client: string | null,
+  ): IslandInfo | null => {
+    const key = `${componentUrl}\n${rendererUrl ?? ''}\n${client ?? ''}`;
+    const cached = islands.get(key);
+
+    if (cached) {
+      return cached;
+    }
+
+    const component = resolve(componentUrl);
+
+    if (!component) {
+      return null;
+    }
+
+    const renderer = rendererUrl ? resolve(rendererUrl) : null;
+
+    const closureUrls = (closure: (fileName: string) => string[]): string[] => {
+      const urls = new Set([componentUrl, ...closure(component.fileName).map((f) => component.prefix + f)]);
+
+      if (rendererUrl) {
+        urls.add(rendererUrl);
+
+        for (const f of renderer ? closure(renderer.fileName) : []) {
+          urls.add(renderer!.prefix + f);
+        }
+      }
+
+      return [...urls];
+    };
+
+    const island: IslandInfo = {
+      componentUrl,
+      rendererUrl,
+      client,
+      staticClosure: closureUrls(graph.staticClosure),
+      fullClosure: closureUrls(graph.fullClosure),
+    };
+
+    islands.set(key, island);
+
+    return island;
+  };
+
+  const linkTag = (url: string): string => {
+    let tag = linkTags.get(url);
+
+    if (tag === undefined) {
+      tag = `<link rel="modulepreload" fetchpriority="low" href="${encodeAttribute(url)}">`;
+      linkTags.set(url, tag);
+    }
+
+    return tag;
+  };
+
+  const registerScript = (componentUrl: string, links: readonly string[], imports: readonly string[]): string => {
+    const importSet = new Set(imports);
+    const entry: Record<string, readonly string[]> = { l: links.filter((url) => !importSet.has(url)) };
+
+    if (imports.length > 0) {
+      entry['i'] = imports;
+    }
+
+    return `<script>(self.${PRELOAD_GLOBAL}??={})[${jsonForScript(componentUrl)}]=${jsonForScript(entry)};</script>`;
   };
 
   const createDocumentRewriter = (context?: APIContext | undefined): IslandRewriter => {
@@ -87,66 +163,49 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
         return null;
       }
 
-      const component = resolve(componentUrl);
+      const island = resolveIsland(componentUrl, attrs['renderer-url'] || null, attrs['client'] || null);
 
-      if (!component) {
+      if (!island) {
         return null;
       }
 
-      const rendererUrl = attrs['renderer-url'] || null;
-      const renderer = rendererUrl ? resolve(rendererUrl) : null;
+      const emitters = getIslandEmitters();
+      let links: readonly string[] = island.staticClosure;
+      let imports: readonly string[] = [];
+      let html = '';
 
-      const closureUrls = (closure: (fileName: string) => string[]): string[] => {
-        const urls = new Set([componentUrl, ...closure(component.fileName).map((f) => component.prefix + f)]);
+      if (emitters.length > 0) {
+        const emissions: IslandEmission[] = [{ links: island.staticClosure }];
 
-        if (rendererUrl) {
-          urls.add(rendererUrl);
+        for (const emitter of emitters) {
+          try {
+            const emission = emitter(island, context);
 
-          for (const f of renderer ? closure(renderer.fileName) : []) {
-            urls.add(renderer!.prefix + f);
+            if (emission) {
+              emissions.push(emission);
+            }
+          } catch (error) {
+            // an emitter must never break the page — its contribution is dropped
+            log.error({ err: error, componentUrl }, 'island emitter failed');
           }
         }
 
-        return [...urls];
-      };
-
-      const island: IslandInfo = {
-        componentUrl,
-        rendererUrl,
-        client: attrs['client'] || null,
-        staticClosure: closureUrls(graph.staticClosure),
-        fullClosure: closureUrls(graph.fullClosure),
-      };
-
-      const emissions: IslandEmission[] = [{ links: island.staticClosure }];
-
-      for (const emitter of getIslandEmitters()) {
-        try {
-          const emission = emitter(island, context);
-
-          if (emission) {
-            emissions.push(emission);
-          }
-        } catch (error) {
-          // an emitter must never break the page — its contribution is dropped
-          log.error({ err: error, componentUrl }, 'island emitter failed');
-        }
+        links = [...new Set(emissions.flatMap((e) => e.links ?? []))];
+        imports = [...new Set(emissions.flatMap((e) => e.imports ?? []))];
+        html = emissions.map((e) => e.html ?? '').join('');
       }
 
-      const links = [...new Set(emissions.flatMap((e) => e.links ?? []))];
-      const html = emissions.map((e) => e.html ?? '').join('');
       const directive = (island.client ?? '').replace(/-x$/, '');
 
       if (IMMEDIATE_DIRECTIVES.has(directive)) {
-        const fresh = links.filter((url) => !emittedLinks.has(url));
+        let prepend = html;
 
-        for (const url of fresh) {
-          emittedLinks.add(url);
+        for (const url of links) {
+          if (!emittedLinks.has(url)) {
+            emittedLinks.add(url);
+            prepend += linkTag(url);
+          }
         }
-
-        const prepend =
-          html +
-          fresh.map((url) => `<link rel="modulepreload" fetchpriority="low" href="${encodeAttribute(url)}">`).join('');
 
         return { prepend: prepend || undefined };
       }
@@ -161,15 +220,14 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
 
       runtimeInjected = true;
 
-      const imports = [...new Set(emissions.flatMap((e) => e.imports ?? []))];
-      const importSet = new Set(imports);
-      const entry: Record<string, string[]> = { l: links.filter((url) => !importSet.has(url)) };
+      let register: string;
 
-      if (imports.length > 0) {
-        entry['i'] = imports;
+      if (emitters.length > 0) {
+        register = registerScript(componentUrl, links, imports);
+      } else {
+        register = registerScripts.get(island) ?? registerScript(componentUrl, links, imports);
+        registerScripts.set(island, register);
       }
-
-      const register = `<script>(self.${PRELOAD_GLOBAL}??={})[${jsonForScript(componentUrl)}]=${jsonForScript(entry)};</script>`;
 
       return { prepend: runtime + register + html || undefined };
     });
@@ -220,11 +278,11 @@ export function createPageTransformStream(options: PageTransformOptions): Transf
         enqueue(controller, text);
       }
     },
-    async flush(controller) {
+    flush(controller) {
       let tail = decoder.decode();
 
       if (rewriter) {
-        tail = (tail ? rewriter.write(tail) : '') + (await rewriter.end());
+        tail = (tail ? rewriter.write(tail) : '') + rewriter.end();
       }
 
       if (buffered) {

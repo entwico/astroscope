@@ -1,18 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AstroConfig, AstroIntegration } from 'astro';
+import { defined } from '@entwico/dash';
+import type { AstroConfig, AstroIntegration, IntegrationResolvedRoute } from 'astro';
 import { createIslandWarmup } from '../dev-mode/island-warmup.js';
 import { createDevMachinery } from '../dev-mode/machinery.js';
 import { type ExcludePattern, RECOMMENDED_EXCLUDES } from '../excludes/excludes.js';
 import { serializeExcludePatterns } from '../excludes/serialize.js';
 import { createIslandsManifestPlugin } from '../islands/manifest-plugin.js';
+import { routeEntrypoints } from '../islands/route-islands.js';
 import type { IslandsManifest } from '../islands/types.js';
 import { createRequestInstrumentation } from '../observability/instrument.js';
 import { preparePlatform } from '../platform/prepare.js';
+import { redirectDuplicateSlashes } from '../server/duplicate-slashes.js';
 import { dispatchNativeMount } from '../server/native-mount.js';
 import { ssrSourcemapPlugin } from '../tweaks/sourcemap.js';
-import { stripSsrEffectsPlugin } from '../tweaks/strip-effects.js';
 import type { NodeOptions, RuntimeOptions } from '../types.js';
 
 export const CONFIG_VIRTUAL_MODULE_ID = 'virtual:@astroscope/node/config';
@@ -82,6 +84,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
   const telemetryExclude = telemetryOptions ? (telemetryOptions.exclude ?? DEFAULT_REQUEST_EXCLUDES) : [];
 
   let astroConfig: AstroConfig | null = null;
+  let resolvedRoutes: IntegrationResolvedRoute[] = [];
   let bootEntry: string | undefined;
   let configSeam: string | undefined;
   let instrumentationSeam: string | undefined;
@@ -124,9 +127,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
                 watch,
                 // instrumentation runs once per process — watching it would
                 // restart generations that can't re-apply it
-                watchEntries: [relativeSeam(configSeam), relativeSeam(logSeam)].filter(
-                  (entry): entry is string => !!entry,
-                ),
+                watchEntries: [relativeSeam(configSeam), relativeSeam(logSeam)].filter(defined),
                 prepare: (importModule) =>
                   preparePlatform({
                     dev: true,
@@ -185,9 +186,12 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
             plugins: [
               ...devMachinery,
               ...islandWarmup,
-              createIslandsManifestPlugin({ logger, enabled: islandsEnabled }),
+              createIslandsManifestPlugin({
+                logger,
+                enabled: islandsEnabled,
+                pages: () => routeEntrypoints(root, resolvedRoutes),
+              }),
               ssrSourcemapPlugin(),
-              stripSsrEffectsPlugin(),
               {
                 name: '@astroscope/node',
 
@@ -288,6 +292,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
 
         server.middlewares.use((req, res, next) => {
           const inner = (): void => {
+            if (redirectDuplicateSlashes(req, res)) return;
             if (!dispatchNativeMount(req, res)) next();
           };
 
@@ -320,6 +325,10 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
           },
         });
       },
+      // fires before `astro:config:done` — the pages map is derived on demand
+      'astro:routes:resolved': ({ routes }) => {
+        resolvedRoutes = routes;
+      },
       'astro:build:done': async ({ logger }) => {
         if (!astroConfig) return;
 
@@ -331,7 +340,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
           if (fs.existsSync(manifestPath)) {
             const { transformPrerenderedHtml } = await import('../islands/prerendered.js');
             const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as IslandsManifest;
-            const transformed = await transformPrerenderedHtml(fileURLToPath(astroConfig.build.client), manifest);
+            const transformed = transformPrerenderedHtml(fileURLToPath(astroConfig.build.client), manifest);
 
             if (transformed > 0) {
               logger.info(`island preloading applied to ${transformed} prerendered page(s)`);

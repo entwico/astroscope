@@ -295,6 +295,7 @@ Rules for projects using `@astroscope/wormhole`, opt-in alongside `recommended`.
 | `@astroscope/wormhole/wormholes-static-access` | warn | | accesses on the `wormholes` proxy must be static — dynamic keys and aliasing defeat build-time payload slicing |
 | `@astroscope/wormhole/server-readonly` | error | | `set()` / `subscribe()` are client-only; astro files are server code where values are request-scoped |
 | `@astroscope/wormhole/no-use-wormhole-in-astro` | error | | the `useWormhole` react hook cannot run in astro server code — use `wormholes.<name>.get()` |
+| `@astroscope/wormhole/no-registry-import` | error | | the wormhole registry (`src/wormholes.ts`) is server-only — island code reads through the `wormholes` proxy |
 
 ## Wormhole Rule Details
 
@@ -339,6 +340,19 @@ import { wormholes } from '@astroscope/wormhole';
 
 const cart = wormholes.cart.get();
 ---
+```
+
+### `no-registry-import`
+
+The registry carries the handlers, and with them server code — a client build that includes it fails. Island code (`.tsx`/`.jsx`) reads through the proxy; type imports of the registry module are fine.
+
+```tsx
+// bad
+import { wormholes } from '@/wormholes';
+
+// good
+import { wormholes } from '@astroscope/wormhole';
+import type { Cart } from '@/wormholes';
 ```
 
 ## Compatibility

@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - demo/*
+  - benchmarks
 
 overrides:
   vite: ^8

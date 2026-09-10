@@ -1,7 +1,15 @@
+import type { ReadonlyDeep } from '@entwico/dash';
 import { wormholeKey } from './key.js';
-import type { DeepReadonly, Wormhole, WormholeMap } from './types.js';
+import type { Wormhole, WormholeMap } from './types.js';
 
-export type { DeepReadonly, UnwrapWormholes, Wormhole, WormholeMap, WormholeRegistry } from './types.js';
+export type {
+  UnwrapWormholes,
+  Wormhole,
+  WormholeDefinition,
+  WormholeHandler,
+  WormholeMap,
+  WormholeRegistry,
+} from './types.js';
 
 /**
  * Browser side of the `wormholes` proxy. Values live on `self.__wormholes__` — written
@@ -30,7 +38,7 @@ function stub(name: string): Wormhole<unknown> {
     name,
     key: wormholeKey(name),
 
-    get(): DeepReadonly<unknown> {
+    get(): ReadonlyDeep<unknown> {
       const value = entry().v;
 
       if (value === undefined) {

@@ -11,6 +11,7 @@ export default defineConfig([
       boot: 'src/lifecycle/boot.ts',
       excludes: 'src/excludes/excludes.ts',
       'log/index': 'src/observability/log/index.ts',
+      telemetry: 'src/observability/telemetry/telemetry.ts',
       'lifecycle/events': 'src/lifecycle/events.ts',
       'csrf-middleware-entrypoint': 'src/csrf/middleware-entrypoint.ts',
       'route-middleware-entrypoint': 'src/observability/route-middleware-entrypoint.ts',

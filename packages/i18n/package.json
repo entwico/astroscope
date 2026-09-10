@@ -71,15 +71,15 @@
     "@babel/core": "^8.0.1",
     "@babel/preset-typescript": "^8.0.1",
     "@jridgewell/trace-mapping": "^0.3.31",
-    "magic-string": "^1.2.2",
+    "magic-string": "^1.2.3",
     "messageformat": "^4.0.0"
   },
   "devDependencies": {
     "@astroscope/node": "workspace:^",
     "@babel/types": "^8.0.4",
     "@types/babel__core": "^7.20.5",
-    "astro": "^7.2.6",
-    "tsdown": "^0.22.14",
+    "astro": "^7.3.2",
+    "tsdown": "^0.23.0",
     "typescript": "^6.0.3",
     "vite": "^8.2.2"
   },

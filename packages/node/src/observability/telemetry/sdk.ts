@@ -1,4 +1,5 @@
 import { log } from '../log/index.js';
+import { bindGauges } from './gauges.js';
 
 /**
  * Platform-owned telemetry bundle: NodeSDK with undici (fetch) and node
@@ -77,6 +78,7 @@ export async function startTelemetry(options: TelemetrySdkOptions): Promise<void
   });
 
   sdk.start();
+  bindGauges();
 
   const hostMetrics = new HostMetrics();
 

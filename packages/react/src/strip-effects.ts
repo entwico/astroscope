@@ -20,7 +20,7 @@ const EMPTY_FN = '(()=>{})';
  */
 export function stripSsrEffectsPlugin(): Plugin {
   return {
-    name: '@astroscope/node/tweaks/strip-effects',
+    name: '@astroscope/react/strip-effects',
     enforce: 'post',
     transform(code, id, options) {
       if (!options?.ssr) return null;

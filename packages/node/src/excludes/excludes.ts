@@ -8,6 +8,8 @@ import type { APIContext, MiddlewareHandler } from 'astro';
  */
 export type ExcludePattern = Exclude<StringPattern, (value: string) => boolean>;
 
+export { serializeExcludePatterns } from './serialize.js';
+
 /**
  * Vite/Astro dev server paths - only relevant in development.
  */
@@ -20,9 +22,14 @@ export const DEV_EXCLUDES: ExcludePattern[] = [
 ];
 
 /**
- * Astro internal paths for static assets and image optimization.
+ * Astro internal paths for static assets and image optimization, plus the
+ * platform's own asset routes (`/_i18n/` translation chunks).
  */
-export const ASTRO_STATIC_EXCLUDES: ExcludePattern[] = [{ prefix: '/_astro/' }, { prefix: '/_image' }];
+export const ASTRO_STATIC_EXCLUDES: ExcludePattern[] = [
+  { prefix: '/_astro/' },
+  { prefix: '/_image' },
+  { prefix: '/_i18n/' },
+];
 
 /**
  * Common static asset paths.

@@ -1,12 +1,10 @@
+import type { ReadonlyDeep } from '@entwico/dash';
 import { als } from './als.js';
-import type { DeepReadonly, Wormhole } from './types.js';
-
-export { createWormholeMiddleware } from './middleware.js';
-export type { WormholeMiddlewareOptions, WormholeValues } from './middleware.js';
+import type { Wormhole } from './types.js';
 
 /** One [wormhole, data] pair per element — data is checked against its own wormhole's T. */
 type WormholeEntries<Ts extends readonly unknown[]> = {
-  [K in keyof Ts]: readonly [Wormhole<Ts[K]>, DeepReadonly<Ts[K]>];
+  [K in keyof Ts]: readonly [Wormhole<Ts[K]>, ReadonlyDeep<Ts[K]>];
 };
 
 /**
@@ -15,7 +13,7 @@ type WormholeEntries<Ts extends readonly unknown[]> = {
  * returns `data` anywhere in the async execution rooted at `fn`. Inside the app,
  * the middleware is the way; values opened here are never delivered to the client.
  */
-export function openWormholes<T, R>(wormhole: Wormhole<T>, data: DeepReadonly<T>, fn: () => R): R;
+export function openWormholes<T, R>(wormhole: Wormhole<T>, data: ReadonlyDeep<T>, fn: () => R): R;
 /**
  * Open several wormholes at once for the duration of `fn` — pass an array of
  * `[wormhole, data]` pairs, each checked against its own wormhole.

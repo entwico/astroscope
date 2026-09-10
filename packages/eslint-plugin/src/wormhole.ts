@@ -1,4 +1,5 @@
 import type { ESLint, Linter } from 'eslint';
+import { noRegistryImport } from './rules/wormhole/no-registry-import.js';
 import { noUseWormholeInAstro } from './rules/wormhole/no-use-wormhole-in-astro.js';
 import { serverReadonly } from './rules/wormhole/server-readonly.js';
 import { wormholesStaticAccess } from './rules/wormhole/wormholes-static-access.js';
@@ -16,6 +17,7 @@ export const wormholePlugin: ESLint.Plugin = {
     'wormholes-static-access': wormholesStaticAccess,
     'server-readonly': serverReadonly,
     'no-use-wormhole-in-astro': noUseWormholeInAstro,
+    'no-registry-import': noRegistryImport,
   },
 };
 
@@ -29,6 +31,7 @@ export const wormholeConfigs: Linter.Config[] = [
       '@astroscope/wormhole/wormholes-static-access': 'warn',
       '@astroscope/wormhole/server-readonly': 'error',
       '@astroscope/wormhole/no-use-wormhole-in-astro': 'error',
+      '@astroscope/wormhole/no-registry-import': 'error',
     },
   },
 ];
