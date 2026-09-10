@@ -1,5 +1,29 @@
 # @astroscope/wormhole
 
+## 3.0.0
+
+### Major Changes
+
+- b936e21: the `DeepReadonly` type is no longer exported — values are typed with `ReadonlyDeep` from `@entwico/dash`
+- b936e21: wormholes are defined with their handler in the registry (`defineWormhole({ handler: (ctx) => ..., eager? })`) and the middleware is injected by the integration — `createWormholeMiddleware` and its `values` callback are gone, `exclude` moves to `wormhole({ exclude })`
+
+### Minor Changes
+
+- b936e21: every handler runs under its own `wormhole <name>` span and records `astro.wormhole.handler.duration`; a throwing handler is counted on `astro.wormhole.handler.failures` and logged with its name
+- b936e21: only the handlers a request's route can reach run (frontmatter and endpoint reads, the page's islands and `<script>` blocks)
+
+### Patch Changes
+
+- b936e21: the wormholes each island can reach are computed once per island
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+  - @astroscope/node@3.0.0
+
 ## 2.0.0
 
 ### Major Changes

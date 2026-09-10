@@ -1,5 +1,23 @@
 # @astroscope/node
 
+## 3.0.0
+
+### Major Changes
+
+- b936e21: SSR effect stripping removed — use `@astroscope/react` in place of `@astrojs/react` to keep it
+
+### Minor Changes
+
+- b936e21: `/_i18n/` translation chunk requests are excluded from request logging, telemetry and the platform middlewares by default (`ASTRO_STATIC_EXCLUDES`)
+- b936e21: a render that fails after the response started is logged with its route, the completion line reads `request truncated`, the server span carries `astro.response.truncated` and `astro.render.failures` counts it
+- b936e21: the islands manifest records which islands each route hydrates
+
+### Patch Changes
+
+- b936e21: requests whose path carries duplicate slashes (`//weine`, `/seminare///x`) redirect to the collapsed path (301, 308 for non-GET)
+- b936e21: `http.server.request.duration` and `astro.action.duration` use the semconv bucket boundaries (5 ms – 10 s) — latency panels built on them will read differently
+- b936e21: island preloading: html rewriting is faster
+
 ## 2.1.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @astroscope/eslint-plugin
 
+## 2.1.0
+
+### Minor Changes
+
+- b936e21: new wormhole rule `no-registry-import`: island code must not import the wormhole registry
+
 ## 2.0.0
 
 ### Major Changes

@@ -1,5 +1,23 @@
 # @astroscope/i18n
 
+## 2.1.0
+
+### Minor Changes
+
+- b936e21: `astro.i18n.missing` counts lookups that fell back (the key goes to a debug log line) and `astro.i18n.translations.age` reports seconds since each locale's `setTranslations`
+
+### Patch Changes
+
+- b936e21: per-island translation slices (hashes, preload links, eager imports) are cached per island and locale
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+- Updated dependencies [b936e21]
+  - @astroscope/node@3.0.0
+
 ## 2.0.1
 
 ### Patch Changes
