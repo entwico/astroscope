@@ -180,13 +180,16 @@ export function createAppHandler(app: BaseApp, options: RuntimeOptions, client: 
     const routeData = app.match(request, true);
     const matched = routeData && !(routeData.type === 'page' && routeData.prerender) ? routeData : undefined;
 
+    // the one object astro keeps for the whole request, whatever rewrites replace `context.request` with
+    const locals = {};
+
     if (matched) {
-      setRequestRouteData(request, matched);
+      setRequestRouteData(request, locals, matched);
     }
 
     const response = matched
-      ? await app.render(request, { addCookieHeader: true, routeData: matched, prerenderedErrorPageFetch })
-      : await app.render(request, { addCookieHeader: true, prerenderedErrorPageFetch });
+      ? await app.render(request, { addCookieHeader: true, locals, routeData: matched, prerenderedErrorPageFetch })
+      : await app.render(request, { addCookieHeader: true, locals, prerenderedErrorPageFetch });
 
     await writeResponse(response, res);
   };

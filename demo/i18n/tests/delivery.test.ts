@@ -129,6 +129,18 @@ describe('deferred islands — translation chunks as eager imports', () => {
   });
 });
 
+describe('rewritten pages', () => {
+  test('a page served through next(url) gets its translation chunks like a direct one', async () => {
+    const res = await fetch(`${BASE}/rewritten`);
+    const html = await res.text();
+    const registers = parseRegisters(html);
+
+    expect(res.status).toBe(200);
+    expect(html).toContain('window.__i18n__');
+    expect(registerFor(registers, 'Newsletter').i).toContainEqual(expect.stringMatching(/\/_i18n\/en\/Newsletter\./));
+  });
+});
+
 describe('immediate islands — untouched ideal path', () => {
   test('static-closure translations stay server-emitted preload links', async () => {
     const html = await fetch(`${BASE}/`).then((r) => r.text());

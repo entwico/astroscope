@@ -55,9 +55,9 @@ function island(index: number): IslandInfo {
 const islands = Array.from({ length: 20 }, (_, i) => island(i));
 
 function createContext(): APIContext {
-  const context = { request: new Request('http://bench.local/') } as APIContext;
+  const context = { request: new Request('http://bench.local/'), locals: {} } as APIContext;
 
-  setRequestLocale(context.request, 'en');
+  setRequestLocale(context, 'en');
 
   return context;
 }

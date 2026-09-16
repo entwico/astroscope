@@ -26,7 +26,7 @@ function createIsland(overrides: Partial<IslandInfo> = {}): IslandInfo {
 }
 
 function createContext(): APIContext {
-  return { request: new Request('http://localhost/') } as APIContext;
+  return { request: new Request('http://localhost/'), locals: {} } as APIContext;
 }
 
 async function setup(manifest?: Partial<ExtractionManifest>) {
@@ -65,7 +65,7 @@ describe('i18n islands emitter', () => {
     const { emitter, setRequestLocale } = await setup();
     const context = createContext();
 
-    setRequestLocale(context.request, 'en');
+    setRequestLocale(context, 'en');
 
     const emission = emitter(createIsland(), context);
 
@@ -82,7 +82,7 @@ describe('i18n islands emitter', () => {
     const { emitter, setRequestLocale } = await setup();
     const context = createContext();
 
-    setRequestLocale(context.request, 'en');
+    setRequestLocale(context, 'en');
 
     const emission = emitter(createIsland(), context);
 
@@ -95,7 +95,7 @@ describe('i18n islands emitter', () => {
     const { emitter, setRequestLocale } = await setup();
     const context = createContext();
 
-    setRequestLocale(context.request, 'en');
+    setRequestLocale(context, 'en');
 
     const first = emitter(createIsland(), context);
     const second = emitter(createIsland(), context);
@@ -119,11 +119,23 @@ describe('i18n islands emitter', () => {
     expect(emitter(createIsland(), createContext())).toBeNull();
   });
 
+  test('keeps the locale when a rewrite replaced the request', async () => {
+    const { emitter, setRequestLocale } = await setup();
+    const context = createContext();
+
+    setRequestLocale(context, 'en');
+
+    // astro copies the request on every `next(url)` rewrite — locals stay the same object
+    context.request = new Request('http://localhost/rewritten');
+
+    expect(emitter(createIsland(), context)?.html).toContain('"locale":"en"');
+  });
+
   test('ignores chunks without translations', async () => {
     const { emitter, setRequestLocale } = await setup();
     const context = createContext();
 
-    setRequestLocale(context.request, 'en');
+    setRequestLocale(context, 'en');
 
     const emission = emitter(
       createIsland({
@@ -143,7 +155,7 @@ describe('createI18nDocumentEmitter', () => {
     const { createI18nDocumentEmitter, setRequestLocale } = await setup();
     const context = createContext();
 
-    setRequestLocale(context.request, 'en');
+    setRequestLocale(context, 'en');
 
     const emission = createI18nDocumentEmitter(true)(context);
 
@@ -156,7 +168,7 @@ describe('createI18nDocumentEmitter', () => {
     const { createI18nDocumentEmitter, setRequestLocale } = await setup({ scripts: ['Cart.Cabc'] });
     const context = createContext();
 
-    setRequestLocale(context.request, 'en');
+    setRequestLocale(context, 'en');
 
     const emission = createI18nDocumentEmitter(false)(context);
 
@@ -168,7 +180,7 @@ describe('createI18nDocumentEmitter', () => {
     const { createI18nDocumentEmitter, setRequestLocale } = await setup({ chunks: {} });
     const context = createContext();
 
-    setRequestLocale(context.request, 'en');
+    setRequestLocale(context, 'en');
 
     expect(createI18nDocumentEmitter(false)(context)).toBeNull();
   });

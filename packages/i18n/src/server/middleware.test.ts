@@ -41,7 +41,11 @@ async function load(options?: { configured?: boolean; manifest?: Partial<Extract
 }
 
 const createCtx = (path: string): APIContext =>
-  ({ url: new URL(`http://localhost${path}`), request: new Request(`http://localhost${path}`) }) as APIContext;
+  ({
+    url: new URL(`http://localhost${path}`),
+    request: new Request(`http://localhost${path}`),
+    locals: {},
+  }) as APIContext;
 
 async function invoke(handler: MiddlewareHandler, ctx: APIContext, next: MiddlewareNext): Promise<Response> {
   const result = await handler(ctx, next);

@@ -26,7 +26,7 @@ export function createIslandsMiddleware(manifest: IslandsManifest | null): Middl
       return response;
     }
 
-    const route = getRequestRouteData(context.request);
+    const route = getRequestRouteData(context);
 
     if (route && route.type !== 'page') {
       return response;

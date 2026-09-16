@@ -169,7 +169,7 @@ export function createI18nMiddleware(options: I18nMiddlewareOptions): Middleware
     const locale = options.locale(ctx);
 
     // the islands emitter runs while the response streams, outside this ALS scope
-    setRequestLocale(ctx.request, locale);
+    setRequestLocale(ctx, locale);
 
     const context: I18nContext = {
       locale,

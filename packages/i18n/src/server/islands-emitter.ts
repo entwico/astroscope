@@ -31,10 +31,14 @@ import { i18n } from './i18n.js';
  *
  * The locale is recorded per request by the i18n middleware — the emitter runs
  * while the response streams, outside the middleware's AsyncLocalStorage scope.
+ * It is keyed on `context.locals`, the one object astro keeps for the whole
+ * request: `context.request` is replaced by every `next(url)` rewrite, once per
+ * nesting level of `sequence`, so the request the middleware saw is not the one
+ * the islands middleware holds when the emitters run.
  */
 
-const requestLocales = new WeakMap<Request, string>();
-const emittedByContext = new WeakMap<APIContext, Set<string>>();
+const requestLocales = new WeakMap<object, string>();
+const emittedByRequest = new WeakMap<object, Set<string>>();
 
 // vite defines import.meta.env when bundling the middleware; typed structurally
 // so the package compiles without vite's global client types
@@ -42,8 +46,8 @@ const IS_DEV = !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
 
 let registered = false;
 
-export function setRequestLocale(request: Request, locale: string): void {
-  requestLocales.set(request, locale);
+export function setRequestLocale(context: APIContext, locale: string): void {
+  requestLocales.set(context.locals, locale);
 }
 
 /** public url of a chunk → manifest chunk name, e.g. `…/_astro/Cart.abc.js` → `Cart.abc` */
@@ -128,7 +132,7 @@ export function createI18nDocumentEmitter(dev: boolean = IS_DEV): DocumentEmitte
       return null;
     }
 
-    const locale = requestLocales.get(context.request);
+    const locale = requestLocales.get(context.locals);
 
     if (locale === undefined) {
       return null;
@@ -161,7 +165,7 @@ export function registerI18nEmitters(): void {
       return null;
     }
 
-    const locale = requestLocales.get(context.request);
+    const locale = requestLocales.get(context.locals);
 
     if (locale === undefined) {
       return null;
@@ -170,11 +174,11 @@ export function registerI18nEmitters(): void {
     const hashes = i18n.getHashes(locale);
     const { chunks, links, imports } = sliceFor(island, locale, hashes);
 
-    let emitted = emittedByContext.get(context);
+    let emitted = emittedByRequest.get(context.locals);
 
     if (!emitted) {
       emitted = new Set();
-      emittedByContext.set(context, emitted);
+      emittedByRequest.set(context.locals, emitted);
     }
 
     const merge: Record<string, string> = {};

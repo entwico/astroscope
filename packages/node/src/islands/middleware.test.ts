@@ -25,12 +25,13 @@ function htmlResponse(body: string, headers: Record<string, string> = {}): Respo
 
 function createContext(routeType?: RouteData['type']): APIContext {
   const request = new Request('http://localhost/page');
+  const locals = {};
 
   if (routeType) {
-    setRequestRouteData(request, { type: routeType } as RouteData);
+    setRequestRouteData(request, locals, { type: routeType } as RouteData);
   }
 
-  return { request } as APIContext;
+  return { request, locals } as APIContext;
 }
 
 async function run(
@@ -88,6 +89,17 @@ describe('createIslandsMiddleware', () => {
     const result = await run(middleware, htmlResponse(HTML), createContext('page'));
 
     expect(await result.text()).toContain('modulepreload');
+  });
+
+  test('keeps the route type when a rewrite replaced the request', async () => {
+    const middleware = createIslandsMiddleware(manifest);
+    const context = createContext('endpoint');
+    const response = htmlResponse(HTML);
+
+    // astro copies the request on every `next(url)` rewrite — locals stay the same object
+    context.request = new Request('http://localhost/rewritten');
+
+    expect(await run(middleware, response, context)).toBe(response);
   });
 
   test('is inert without a manifest and without document emitters', async () => {
