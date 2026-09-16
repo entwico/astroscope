@@ -1,5 +1,14 @@
 # @astroscope/i18n
 
+## 2.1.1
+
+### Patch Changes
+
+- 8aa494d: deliver translations to islands on pages served through a `next(url)` rewrite — they rendered raw keys in production
+- Updated dependencies [8aa494d]
+- Updated dependencies [8aa494d]
+  - @astroscope/node@3.1.0
+
 ## 2.1.0
 
 ### Minor Changes

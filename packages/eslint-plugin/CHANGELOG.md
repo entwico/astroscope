@@ -1,5 +1,11 @@
 # @astroscope/eslint-plugin
 
+## 2.1.1
+
+### Patch Changes
+
+- bd12c3d: no-raw-strings-in-jsx: stop flagging aria-* state and relationship attributes
+
 ## 2.1.0
 
 ### Minor Changes

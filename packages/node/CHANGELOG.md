@@ -1,5 +1,15 @@
 # @astroscope/node
 
+## 3.1.0
+
+### Minor Changes
+
+- 8aa494d: `getRequestRouteData` accepts the api context, which stays valid across `next(url)` rewrites
+
+### Patch Changes
+
+- 8aa494d: the islands middleware keeps telling pages from html-returning endpoints apart on pages served through a `next(url)` rewrite
+
 ## 3.0.0
 
 ### Major Changes
