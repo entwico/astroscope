@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 3.1.2
+
+### Patch Changes
+
+- 22ac182: keep `astro check`, `astro sync` and `astro build` from breaking island hydration on a running `astro dev` server
+
 ## 3.1.1
 
 ### Patch Changes
