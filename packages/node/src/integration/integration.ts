@@ -14,6 +14,7 @@ import { createRequestInstrumentation } from '../observability/instrument.js';
 import { preparePlatform } from '../platform/prepare.js';
 import { redirectDuplicateSlashes } from '../server/duplicate-slashes.js';
 import { dispatchNativeMount } from '../server/native-mount.js';
+import { resolveCommandCacheDir } from '../tweaks/cache-dir.js';
 import { ssrSourcemapPlugin } from '../tweaks/sourcemap.js';
 import type { NodeOptions, RuntimeOptions } from '../types.js';
 
@@ -110,6 +111,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
         addMiddleware({ order: 'pre', entrypoint: '@astroscope/node/islands-middleware' });
 
         const root = fileURLToPath(config.root);
+        const viteCacheDir = resolveCommandCacheDir(root, command, config.vite.cacheDir);
         const watch = bootOptions === false ? false : (bootOptions.watch ?? true);
 
         bootEntry = bootOptions === false ? undefined : resolveBootEntry(root, bootOptions.entry);
@@ -183,6 +185,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
             },
           },
           vite: {
+            ...(viteCacheDir && { cacheDir: viteCacheDir }),
             plugins: [
               ...devMachinery,
               ...islandWarmup,
