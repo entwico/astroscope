@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 3.1.1
+
+### Patch Changes
+
+- f148fbe: add `charset=utf-8` on transformed html pages and insert document emitter head content at the end of `<head>`
+
 ## 3.1.0
 
 ### Minor Changes
