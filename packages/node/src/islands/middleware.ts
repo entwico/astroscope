@@ -10,10 +10,15 @@ import type { IslandsManifest } from './types.js';
  * rewriter (when a manifest exists — prod with preloading enabled) plus the
  * document emissions registered by other packages, head scripts inserted after
  * `<head>` and end scripts appended once the rewriter finished. Non-page routes
- * (an endpoint or proxy catch-all returning html), non-html responses and
- * already-encoded bodies pass through untouched. Injected bytes invalidate a
- * pre-computed length, so `content-length` is dropped — streamed responses never
- * carry one anyway.
+ * (an endpoint or proxy catch-all returning html), non-html responses,
+ * already-encoded bodies and html declaring a charset other than utf-8 pass
+ * through untouched: the transform decodes and re-encodes the body as utf-8, so
+ * it cannot preserve any other encoding. Astro renders pages through a
+ * `TextEncoder` and labels them a bare `text/html`, so a transformed response
+ * gets `charset=utf-8` stated explicitly — a browser only pre-scans the first
+ * bytes for a `<meta charset>`, and a large head emission would push the tag
+ * past that window. Injected bytes invalidate a pre-computed length, so
+ * `content-length` is dropped — streamed responses never carry one anyway.
  */
 export function createIslandsMiddleware(manifest: IslandsManifest | null): MiddlewareHandler {
   let transformer: IslandsTransformer | undefined;
@@ -36,7 +41,8 @@ export function createIslandsMiddleware(manifest: IslandsManifest | null): Middl
 
     if (
       !response.body ||
-      !contentType.toLowerCase().includes('text/html') ||
+      !isHtml(contentType) ||
+      !isUtf8Compatible(contentType) ||
       response.headers.has('content-encoding')
     ) {
       return response;
@@ -79,6 +85,7 @@ export function createIslandsMiddleware(manifest: IslandsManifest | null): Middl
     const headers = new Headers(response.headers);
 
     headers.delete('content-length');
+    headers.set('content-type', withUtf8Charset(contentType));
 
     return new Response(response.body.pipeThrough(stream), {
       status: response.status,
@@ -86,4 +93,25 @@ export function createIslandsMiddleware(manifest: IslandsManifest | null): Middl
       headers,
     });
   };
+}
+
+function isHtml(contentType: string): boolean {
+  return contentType.toLowerCase().includes('text/html');
+}
+
+function charsetOf(contentType: string): string | undefined {
+  const match = /;\s*charset\s*=\s*"?([^";\s]+)/i.exec(contentType);
+
+  return match?.[1]?.toLowerCase();
+}
+
+/** no declared charset means astro's utf-8 encoder produced the body */
+function isUtf8Compatible(contentType: string): boolean {
+  const charset = charsetOf(contentType);
+
+  return charset === undefined || charset === 'utf-8' || charset === 'utf8';
+}
+
+function withUtf8Charset(contentType: string): string {
+  return charsetOf(contentType) === undefined ? `${contentType.trim()}; charset=utf-8` : contentType;
 }

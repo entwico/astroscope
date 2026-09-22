@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { registerIslandEmitter } from './emitters';
-import { createIslandsTransformer } from './transform';
+import { createIslandsTransformer, insertIntoHead } from './transform';
 import type { IslandsManifest } from './types';
 
 const REGISTRY = Symbol.for('@astroscope/node.islandEmitters');
@@ -174,5 +174,31 @@ describe('createIslandsTransformer', () => {
     await apply(island('load'));
 
     expect(seen[0]).toContain('/_astro/Lazy.ddd.js');
+  });
+});
+
+describe('insertIntoHead', () => {
+  test('inserts before </head>', () => {
+    const html = '<html><head><meta charset="utf-8"><title>t</title></head><body></body></html>';
+
+    expect(insertIntoHead(html, '<script>x</script>')).toBe(
+      '<html><head><meta charset="utf-8"><title>t</title><script>x</script></head><body></body></html>',
+    );
+  });
+
+  test('matches the closing tag case-insensitively with trailing whitespace', () => {
+    expect(insertIntoHead('<HEAD><title>t</title></HEAD ><body></body>', 'x')).toBe(
+      '<HEAD><title>t</title>x</HEAD ><body></body>',
+    );
+  });
+
+  test('falls back to right after <head> when the closing tag is omitted', () => {
+    expect(insertIntoHead('<html><head lang="en"><title>t</title><body></body></html>', 'x')).toBe(
+      '<html><head lang="en">x<title>t</title><body></body></html>',
+    );
+  });
+
+  test('prepends to a document without a head', () => {
+    expect(insertIntoHead('<div>fragment</div>', 'x')).toBe('x<div>fragment</div>');
   });
 });

@@ -239,18 +239,35 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
 export type PageTransformOptions = {
   /** the islands rewriter for this document, when preloading is on (prod with a manifest) */
   rewriter?: IslandRewriter | undefined;
-  /** scripts inserted right after the opening `<head>` tag — buffers the response */
+  /** scripts inserted at the end of `<head>` — buffers the response */
   heads: string[];
   /** script factories invoked after the rewriter finished, results appended at stream end */
   ends: (() => string | null)[];
 };
 
 /**
+ * Head content goes before `</head>`, falling back to right after `<head>`, then
+ * the document start. End of head rather than start: meta charset, title etc come first
+ */
+export function insertIntoHead(html: string, content: string): string {
+  const close = html.search(/<\/head\s*>/i);
+
+  if (close !== -1) {
+    return html.slice(0, close) + content + html.slice(close);
+  }
+
+  const open = /<head[^>]*>/i.exec(html);
+  const at = open ? open.index + open[0].length : 0;
+
+  return html.slice(0, at) + content + html.slice(at);
+}
+
+/**
  * The single streaming pass over an html page response: chunks go through the
- * islands rewriter (when present), head content is inserted right after the
- * opening `<head>` tag (which requires buffering the whole document — head
- * content is dev-style delivery, where throughput is irrelevant), and end
- * factories run last, strictly after every island passed the rewriter.
+ * islands rewriter (when present), head content is inserted into `<head>` (which
+ * buffers the whole document — head content is dev-style delivery, where
+ * throughput is irrelevant), and end factories run last, strictly after every
+ * island passed the rewriter.
  */
 export function createPageTransformStream(options: PageTransformOptions): TransformStream<Uint8Array, Uint8Array> {
   const { rewriter, heads, ends } = options;
@@ -287,12 +304,8 @@ export function createPageTransformStream(options: PageTransformOptions): Transf
 
       if (buffered) {
         const html = buffered.join('') + tail;
-        // nothing but the doctype, comments and <html> can precede <head>, so the
-        // first match cannot sit inside script raw text
-        const head = /<head[^>]*>/i.exec(html);
-        const at = head ? head.index + head[0].length : 0;
 
-        enqueue(controller, html.slice(0, at) + heads.join('') + html.slice(at));
+        enqueue(controller, insertIntoHead(html, heads.join('')));
       } else {
         enqueue(controller, tail);
       }

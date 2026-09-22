@@ -70,6 +70,28 @@ describe('createIslandsMiddleware', () => {
     expect(await run(middleware, response)).toBe(response);
   });
 
+  test('states the utf-8 charset on a bare text/html content type', async () => {
+    const middleware = createIslandsMiddleware(manifest);
+    const result = await run(middleware, htmlResponse(HTML, { 'content-type': 'text/html' }));
+
+    expect(result.headers.get('content-type')).toBe('text/html; charset=utf-8');
+  });
+
+  test('keeps a declared utf-8 charset as is', async () => {
+    const middleware = createIslandsMiddleware(manifest);
+    const result = await run(middleware, htmlResponse(HTML, { 'content-type': 'Text/HTML; Charset=UTF-8' }));
+
+    expect(result.headers.get('content-type')).toBe('Text/HTML; Charset=UTF-8');
+    expect(await result.text()).toContain('modulepreload');
+  });
+
+  test('passes html declaring another charset through untouched', async () => {
+    const middleware = createIslandsMiddleware(manifest);
+    const response = htmlResponse(HTML, { 'content-type': 'text/html; charset=iso-8859-1' });
+
+    expect(await run(middleware, response)).toBe(response);
+  });
+
   test('passes already-encoded responses through untouched', async () => {
     const middleware = createIslandsMiddleware(manifest);
     const response = htmlResponse(HTML, { 'content-encoding': 'br' });
@@ -128,15 +150,15 @@ describe('createIslandsMiddleware', () => {
 describe('document emitters', () => {
   const HEAD_HTML = `<html><head><title>x</title></head><body>${HTML}</body></html>`;
 
-  test('head content is inserted right after <head>, without a manifest', async () => {
+  test('head content is inserted at the end of <head>, without a manifest', async () => {
     registerDocumentEmitter(() => ({ head: '<script>head()</script>' }));
 
     const middleware = createIslandsMiddleware(null);
     const result = await run(middleware, htmlResponse(HEAD_HTML));
     const out = await result.text();
 
-    expect(out.indexOf('head()')).toBeGreaterThan(out.indexOf('<head>'));
-    expect(out.indexOf('head()')).toBeLessThan(out.indexOf('<title>'));
+    expect(out.indexOf('head()')).toBeGreaterThan(out.indexOf('<title>'));
+    expect(out.indexOf('head()')).toBeLessThan(out.indexOf('</head>'));
   });
 
   test('head content is prepended when the document has no head', async () => {
@@ -222,7 +244,8 @@ describe('document emitters', () => {
     const result = await run(middleware, htmlResponse(HEAD_HTML));
     const out = await result.text();
 
-    expect(out.indexOf('head()')).toBeLessThan(out.indexOf('<title>'));
+    expect(out.indexOf('head()')).toBeGreaterThan(out.indexOf('<title>'));
+    expect(out.indexOf('head()')).toBeLessThan(out.indexOf('</head>'));
     expect(out).toContain('modulepreload');
     expect(out.endsWith('<script>end()</script>')).toBe(true);
   });
