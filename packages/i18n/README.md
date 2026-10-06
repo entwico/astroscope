@@ -192,10 +192,10 @@ t('distance', '{$value :unit unit=kilometer}', { value: 42 })
 
 // with metadata object (for extraction tooling)
 t('cart.total', {
-  example: 'Total: {$amount}',
+  fallback: 'Total: {$amount}',
   description: 'Cart total price',
   variables: {
-    amount: { example: '$0.00', description: 'Formatted price' }
+    amount: { fallback: '$0.00', description: 'Formatted price' }
   }
 }, { amount: '$49.99' })
 ```
@@ -255,7 +255,7 @@ i18n.setTranslations('en', { 'key': 'value' });
 // get raw translations (includes manifest fallbacks)
 i18n.getTranslations('en');
 
-// get compiled translations (ICU MessageFormat functions)
+// get compiled translations (MessageFormat 2 functions)
 i18n.getCompiledTranslations('en');
 
 // get extraction manifest

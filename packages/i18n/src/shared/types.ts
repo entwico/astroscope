@@ -46,12 +46,12 @@ export type I18nClientState = {
  *
  * @param key - translation key
  * @param meta - fallback string or meta object with fallback
- * @param values - runtime interpolation values (ICU MessageFormat)
+ * @param values - runtime interpolation values (MessageFormat 2)
  *
  * @example
  * t('checkout.title', 'Order Summary')
- * t('cart.items', '{count, plural, one {# item} other {# items}}', { count: itemCount })
- * t('cart.total', { fallback: 'Total: {amount}' }, { amount: '$49.99' })
+ * t('cart.items', '.input {$count :number}\n.match $count\none {{{$count} item}}\n* {{{$count} items}}', { count: itemCount })
+ * t('cart.total', { fallback: 'Total: {$amount}' }, { amount: '$49.99' })
  */
 export type TranslateFunction = (
   key: string,

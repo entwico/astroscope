@@ -22,13 +22,13 @@ class I18nSingleton {
   // normalized user config with defaults applied
   private config: NormalizedConfig | null = null;
 
-  // locale -> raw translation strings (before ICU compilation)
+  // locale -> raw translation strings (before MessageFormat compilation)
   private rawCache = new Map<string, RawTranslations>();
 
   // locale -> raw translations merged with manifest fallbacks
   private mergedCache = new Map<string, RawTranslations>();
 
-  // locale -> compiled ICU MessageFormat functions
+  // locale -> compiled MessageFormat 2 functions
   private compiledCache = new Map<string, CompiledTranslations>();
 
   // locale -> chunk name -> content hash (for cache busting)

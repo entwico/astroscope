@@ -70,7 +70,7 @@ export const t: TranslateFunction = ((
  * @param key - Translation key
  * @param meta - Fallback string or meta object with fallback (used as message template)
  * @param components - Map of tag names to component callbacks
- * @param values - Runtime interpolation values (ICU MessageFormat)
+ * @param values - Runtime interpolation values (MessageFormat 2)
  *
  * @example
  * ```tsx
