@@ -35,7 +35,10 @@ export type GuardDefinition<
   input?: Shape | undefined;
   /** denies by throwing (see `deny`), proves by returning the values the guarded code may rely on */
   check: (ctx: Ctx, input: GuardInput<Shape>) => MaybePromise<R>;
-  /** what a browser sees when this guard denies (a redirect, a rewrite); default: the denial's status with its message */
+  /**
+   * what a browser sees when this guard denies (a redirect, a rewrite);
+   * default: the denial's status with its message
+   */
   page?: GuardPageDenial | undefined;
 };
 
@@ -84,7 +87,7 @@ export function defineGuard<R extends Proof | void, Shape extends z.ZodRawShape 
 
 /** denies the request: an `ActionError` for actions, the matching status for endpoints and pages */
 export function deny(code: ActionErrorCode, message?: string): never {
-  throw new ActionError({ code, ...(message === undefined ? {} : { message }) });
+  throw new ActionError({ code, ...(message !== undefined && { message }) });
 }
 
 export function isDenial(error: unknown): error is ActionError {

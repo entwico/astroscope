@@ -114,7 +114,7 @@ export function assignWormholeNames(registry: Record<string, object>): void {
     const assign = (wormhole as { [ASSIGN]?: (next: string) => void })[ASSIGN];
 
     if (typeof assign !== 'function') {
-      throw new Error(
+      throw new TypeError(
         `registry entry "${name}" is not a wormhole — the registry must contain defineWormhole() values only`,
       );
     }

@@ -48,6 +48,12 @@ async function startServer(
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
 
+async function drain(url: string, init?: RequestInit): Promise<void> {
+  const res = await fetch(url, init);
+
+  await res.text();
+}
+
 async function waitForSpans(count: number): Promise<tracing.ReadableSpan[]> {
   await vi.waitFor(() => expect(exporter.getFinishedSpans().length).toBeGreaterThanOrEqual(count));
 
@@ -64,7 +70,7 @@ describe('request tracing', () => {
       setTimeout(() => res.end('rest'), 60);
     });
 
-    await (await fetch(`${url}/streaming`)).text();
+    await drain(`${url}/streaming`);
 
     const spans = await waitForSpans(2);
     const serverSpan = spans.find((s) => s.name === 'GET');
@@ -89,10 +95,9 @@ describe('request tracing', () => {
     const startupSpan = trace.getTracer('test').startSpan('startup');
 
     const url = await context.with(trace.setSpan(context.active(), startupSpan), () =>
-      startServer((_req, res) => res.end('ok')),
-    );
+      startServer((_req, res) => res.end('ok')));
 
-    await (await fetch(`${url}/page`)).text();
+    await drain(`${url}/page`);
 
     startupSpan.end();
 
@@ -109,7 +114,7 @@ describe('request tracing', () => {
     const traceId = '11111111111111111111111111111111';
     const remoteSpanId = '2222222222222222';
 
-    await (await fetch(`${url}/page`, { headers: { traceparent: `00-${traceId}-${remoteSpanId}-01` } })).text();
+    await drain(`${url}/page`, { headers: { traceparent: `00-${traceId}-${remoteSpanId}-01` } });
 
     const spans = await waitForSpans(2);
     const serverSpan = spans.find((s) => s.name === 'GET');
@@ -124,11 +129,15 @@ describe('request tracing', () => {
     });
 
     const controller = new AbortController();
-    const request = fetch(`${url}/hanging`, { signal: controller.signal }).catch(() => undefined);
+    const request = fetch(`${url}/hanging`, { signal: controller.signal });
 
     setTimeout(() => controller.abort(), 30);
 
-    await request;
+    try {
+      await request;
+    } catch {
+      // the abort is the point
+    }
 
     const spans = await waitForSpans(2);
     const serverSpan = spans.find((s) => s.name === 'GET');
@@ -144,8 +153,8 @@ describe('request tracing', () => {
       telemetry: { exclude: [{ prefix: '/skip' }] },
     });
 
-    await (await fetch(`${url}/skip/this`)).text();
-    await (await fetch(`${url}/traced`)).text();
+    await drain(`${url}/skip/this`);
+    await drain(`${url}/traced`);
 
     const spans = await waitForSpans(2);
 
@@ -156,7 +165,7 @@ describe('request tracing', () => {
   test('action requests are named after the action', async () => {
     const url = await startServer((_req, res) => res.end('{}'));
 
-    await (await fetch(`${url}/_actions/checkout.submit/`, { method: 'POST' })).text();
+    await drain(`${url}/_actions/checkout.submit/`, { method: 'POST' });
 
     const spans = await waitForSpans(2);
 
@@ -233,8 +242,8 @@ describe('request logging', () => {
       { logging: { exclude: [], extended: false }, telemetry: false },
     );
 
-    await (await fetch(`${url}/missing`)).text();
-    await (await fetch(`${url}/broken`)).text();
+    await drain(`${url}/missing`);
+    await drain(`${url}/broken`);
 
     await vi.waitFor(() => expect(logLines.length).toBe(2));
 
@@ -251,11 +260,15 @@ describe('request logging', () => {
     const url = await startServer(() => {}, { logging: { exclude: [], extended: false }, telemetry: false });
 
     const controller = new AbortController();
-    const request = fetch(`${url}/hanging`, { signal: controller.signal }).catch(() => undefined);
+    const request = fetch(`${url}/hanging`, { signal: controller.signal });
 
     setTimeout(() => controller.abort(), 30);
 
-    await request;
+    try {
+      await request;
+    } catch {
+      // the abort is the point
+    }
 
     const line = await waitForLog();
 
@@ -271,7 +284,7 @@ describe('request logging', () => {
       telemetry: false,
     });
 
-    await (await fetch(`${url}/search?q=astro`, { headers: { 'x-forwarded-for': '10.0.0.1, 10.0.0.2' } })).text();
+    await drain(`${url}/search?q=astro`, { headers: { 'x-forwarded-for': '10.0.0.1, 10.0.0.2' } });
 
     const line = await waitForLog();
     const req = line['req'] as Record<string, unknown>;

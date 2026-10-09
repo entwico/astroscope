@@ -2,9 +2,9 @@ import { t } from '@astroscope/i18n/translate';
 import AddToCartButton from './AddToCartButton';
 
 export type ProductCardNestedProps = {
-  name: string;
-  price: string;
-  image: string;
+  readonly name: string;
+  readonly price: string;
+  readonly image: string;
 };
 
 export default function ProductCardNested({ name, price, image }: ProductCardNestedProps) {

@@ -44,7 +44,7 @@ tester.run('wormholes-static-access', wormholesStaticAccess, {
     },
     {
       filename,
-      code: "import { wormholes } from '@astroscope/wormhole'; wormholes[`cart.${x}`].get();",
+      code: 'import { wormholes } from \'@astroscope/wormhole\'; wormholes[`cart.${x}`].get();',
       errors: [{ messageId: 'dynamicAccess' }],
     },
     {

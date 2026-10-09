@@ -17,8 +17,10 @@ const manifest: WormholeManifest = {
 
 vi.mock('virtual:@astroscope/wormhole/manifest', () => ({ manifest }));
 
+/* eslint-disable unicorn/no-global-object-property-assignment -- the node emitter registries are `Symbol.for` stores on globalThis */
 (globalThis as Record<symbol, unknown>)[REGISTRY] = [];
 (globalThis as Record<symbol, unknown>)[DOCUMENT_REGISTRY] = [];
+/* eslint-enable unicorn/no-global-object-property-assignment */
 
 const { registerWormholeEmitters, createWormholeDocumentEmitter } = await import('./islands-emitter');
 const { setRequestWormholes } = await import('./request-store');
@@ -36,7 +38,7 @@ function island(index: number): IslandInfo {
   const staticClosure = [
     url(chunkNames[base]!),
     '/_astro/client.Cxyz.js',
-    ...chunkNames.slice(base + 1, base + 4).map(url),
+    ...chunkNames.slice(base + 1, base + 4).map((name) => url(name)),
   ];
 
   return {
@@ -44,7 +46,7 @@ function island(index: number): IslandInfo {
     rendererUrl: '/_astro/client.Cxyz.js',
     client: 'load',
     staticClosure,
-    fullClosure: [...staticClosure, ...chunkNames.slice(base + 4, base + 6).map(url)],
+    fullClosure: [...staticClosure, ...chunkNames.slice(base + 4, base + 6).map((name) => url(name))],
   };
 }
 
@@ -66,7 +68,7 @@ const values = {
   search: { query: '' },
 };
 
-function createContext(): APIContext {
+function createRequestContext(): APIContext {
   const context = { request: new Request('http://bench.local/') } as APIContext;
 
   setRequestWormholes(context.request, { values: new Map(Object.entries(values)), emitted: new Set() });
@@ -77,17 +79,17 @@ function createContext(): APIContext {
 test('wormhole islands emitter', async ({ bench }) => {
   await bench.compare(
     bench('one island, fresh document', () => {
-      emitter(islands[0]!, createContext());
+      emitter(islands[0]!, createRequestContext());
     }),
     bench('twenty islands, one document', () => {
-      const context = createContext();
+      const context = createRequestContext();
 
       for (const isle of islands) {
         emitter(isle, context);
       }
     }),
     bench('document end script (script-entry values)', () => {
-      documentEmitter(createContext())?.end?.();
+      documentEmitter(createRequestContext())?.end?.();
     }),
   );
 });

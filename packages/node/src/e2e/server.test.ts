@@ -24,7 +24,7 @@ function walkFiles(dir: string): string[] {
   return out;
 }
 
-const port = 20000 + (process.pid % 10000);
+const port = 20_000 + (process.pid % 10_000);
 const healthPort = port + 1;
 const metricsPort = port + 4;
 const fatalPort = port + 10;
@@ -55,12 +55,26 @@ function rawGet(url: string, headers: Record<string, string> = {}): Promise<RawR
     const req = http.get(url, { headers }, (res) => {
       const chunks: Buffer[] = [];
 
-      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
       res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }));
     });
 
     req.on('error', reject);
   });
+}
+
+async function fetchText(url: string): Promise<string> {
+  const res = await fetch(url);
+
+  return res.text();
+}
+
+async function isListening(url: string): Promise<boolean> {
+  const res = await fetch(url);
+
+  return res.ok;
 }
 
 function logLines(output: string): Record<string, unknown>[] {
@@ -71,7 +85,7 @@ function logLines(output: string): Record<string, unknown>[] {
       try {
         return JSON.parse(line) as Record<string, unknown>;
       } catch {
-        return undefined;
+        return;
       }
     })
     .filter((line): line is Record<string, unknown> => !!line);
@@ -134,14 +148,16 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     server.stderr!.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
     server.on('exit', (code) => (exitCode = code));
 
-    await waitFor(async () => (await fetch(`${baseUrl}/`)).ok, 15_000, 'server to listen');
+    await waitFor(() => isListening(`${baseUrl}/`), 15_000, 'server to listen');
   }, 90_000);
 
   afterAll(async () => {
-    if (server && exitCode === undefined) {
-      server.kill('SIGKILL');
-      await exited();
+    if (!(server && exitCode === undefined)) {
+      return;
     }
+
+    server.kill('SIGKILL');
+    await exited();
   });
 
   test('our build artifacts contain no build machine paths', () => {
@@ -291,7 +307,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       preview.stderr!.on('data', (chunk: Buffer) => (previewOut += chunk.toString()));
       preview.on('exit', (code) => (previewExit = code));
 
-      await waitFor(async () => (await fetch(`${previewUrl}/`)).ok, 15_000, 'preview server to listen');
+      await waitFor(() => isListening(`${previewUrl}/`), 15_000, 'preview server to listen');
     }, 30_000);
 
     afterAll(async () => {
@@ -313,7 +329,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
     test('runs the full production path including boot', async () => {
       // boot output lands in the daemon's log, not the spawned child's stdio
-      const logs = spawnSync('node_modules/.bin/astro', ['preview', 'logs'], { cwd: fixtureRoot, encoding: 'utf-8' });
+      const logs = spawnSync('node_modules/.bin/astro', ['preview', 'logs'], { cwd: fixtureRoot, encoding: 'utf8' });
 
       expect(`${previewOut}${logs.stdout}`).toContain('[e2e] startup dev=false');
 
@@ -331,13 +347,13 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     test('client bundle has no sourcemaps or sourcemap markers', () => {
       const maps = walkFiles(distClient).filter((f) => f.endsWith('.map'));
 
-      expect(maps, maps.length ? `leaked maps: ${maps.join(', ')}` : '').toEqual([]);
+      expect(maps, maps.length > 0 ? `leaked maps: ${maps.join(', ')}` : '').toEqual([]);
 
       const offenders = walkFiles(distClient)
         .filter((f) => /\.[mc]?js$/.test(f))
         .filter((f) => readFileSync(f, 'utf8').includes('//# sourceMappingURL='));
 
-      expect(offenders, offenders.length ? `leaked refs: ${offenders.join(', ')}` : '').toEqual([]);
+      expect(offenders, offenders.length > 0 ? `leaked refs: ${offenders.join(', ')}` : '').toEqual([]);
     });
 
     test('SSR bundle keeps sourcemaps for server stack traces', () => {
@@ -357,7 +373,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
         .filter((f) => /\.m?js$/.test(f))
         .filter((f) => readFileSync(f, 'utf8').includes(CANARY));
 
-      expect(ssrOffenders, ssrOffenders.length ? `canary leaked into SSR: ${ssrOffenders.join(', ')}` : '').toEqual([]);
+      expect(ssrOffenders, ssrOffenders.length > 0 ? `canary leaked into SSR: ${ssrOffenders.join(', ')}` : '').toEqual([]);
 
       const clientHits = walkFiles(distClient)
         .filter((f) => /\.[mc]?js$/.test(f))
@@ -367,13 +383,12 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     });
 
     test('renders a suspending island completely by falling back to streaming, once per component', async () => {
-      const body = await (await fetch(`${baseUrl}/suspense`)).text();
+      const body = await fetchText(`${baseUrl}/suspense`);
 
       expect(body.match(/lazy content rendered on the server/g)).toHaveLength(2);
 
       const fallbacks = logLines(stdout).filter((line) =>
-        String(line['msg']).includes('react island suspended during server render'),
-      );
+        String(line['msg']).includes('react island suspended during server render'));
 
       expect(fallbacks).toHaveLength(1);
       expect(String(fallbacks[0]?.['componentUrl'])).toContain('SuspendingIsland');
@@ -382,7 +397,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
   describe('island preloading', () => {
     test('emits modulepreload links for an immediate island, before the island tag', async () => {
-      const body = await (await fetch(`${baseUrl}/`)).text();
+      const body = await fetchText(`${baseUrl}/`);
 
       expect(body).toMatch(/<link rel="modulepreload" fetchpriority="low" href="\/_astro\/Island\.[^"]+\.js">/);
       // the island's static import is preloaded alongside it
@@ -393,7 +408,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     });
 
     test('registers preload data and inlines the gate runtime for a deferred island', async () => {
-      const body = await (await fetch(`${baseUrl}/deferred`)).text();
+      const body = await fetchText(`${baseUrl}/deferred`);
 
       // inlined runtime — installs at parse time, no external fetch
       expect(body).toContain('@astroscope/node.islandsRuntime');
@@ -404,14 +419,14 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       expect(body).not.toMatch(/<link rel="modulepreload"[^>]*Island/);
     });
 
-    test('ships no gate runtime asset — the runtime is inlined', async () => {
+    test('ships no gate runtime asset — the runtime is inlined', () => {
       const assets = walkFiles(path.join(fixtureRoot, 'dist', 'client'));
 
       expect(assets.filter((f) => path.basename(f).startsWith('islands-runtime'))).toEqual([]);
     });
 
     test('prerendered pages got the rewrite at build time, compressed variants included', async () => {
-      const plain = await (await fetch(`${baseUrl}/static-island`)).text();
+      const plain = await fetchText(`${baseUrl}/static-island`);
 
       expect(plain).toContain('self.__islands__');
       expect(plain).toContain('@astroscope/node.islandsRuntime');
@@ -512,7 +527,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
   describe('platform entry seams', () => {
     test('config seam ran and its early log was buffered and replayed', async () => {
-      await waitFor(() => logLines(stdout).some((line) => line['msg'] === 'config loaded'), 5_000, 'config log');
+      await waitFor(() => logLines(stdout).some((line) => line['msg'] === 'config loaded'), 5000, 'config log');
 
       const line = logLines(stdout).find((l) => l['msg'] === 'config loaded')!;
 
@@ -531,7 +546,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     });
 
     test('logs a single server ready line with timings', async () => {
-      await waitFor(() => logLines(stdout).some((line) => line['msg'] === 'server ready'), 5_000, 'ready log');
+      await waitFor(() => logLines(stdout).some((line) => line['msg'] === 'server ready'), 5000, 'ready log');
 
       const ready = logLines(stdout).filter((l) => l['msg'] === 'server ready');
 
@@ -549,7 +564,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
       await waitFor(
         () => logLines(stdout).some((l) => l['msg'] === 'request completed' && (l['req'] as any)?.url === '/'),
-        5_000,
+        5000,
         'request log',
       );
 
@@ -573,7 +588,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
       await waitFor(
         () => logLines(stdout).some((l) => l['reqId'] === 'e2e-req-1' && l['msg'] === 'request completed'),
-        5_000,
+        5000,
         'request id log',
       );
 
@@ -596,7 +611,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
       await waitFor(
         () => logLines(stdout).filter((l) => l['msg'] === 'request completed').length >= 2,
-        5_000,
+        5000,
         'subsequent request log',
       );
 
@@ -611,12 +626,16 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       await fetch(`${baseUrl}/`);
 
       await waitFor(
-        async () => (await (await fetch(`${metricsUrl}/metrics`)).text()).includes('http_server_request_duration'),
+        async () => {
+          const metrics = await fetchText(`${metricsUrl}/metrics`);
+
+          return metrics.includes('http_server_request_duration');
+        },
         10_000,
         'prometheus metrics',
       );
 
-      const body = await (await fetch(`${metricsUrl}/metrics`)).text();
+      const body = await fetchText(`${metricsUrl}/metrics`);
 
       expect(body).toContain('http_server_request_duration');
       expect(body).toContain('http_route="/"');
@@ -662,7 +681,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
       await waitFor(
         () => logLines(stdout).some((l) => l['msg'] === 'native mount handler failed'),
-        5_000,
+        5000,
         'mount error log',
       );
     });
@@ -676,7 +695,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
               (l['req'] as any)?.url === '/native/echo' &&
               l['route'] === 'native-echo',
           ),
-        5_000,
+        5000,
         'mount request log',
       );
     });
@@ -736,10 +755,11 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
         const req = https.get(url, { rejectUnauthorized: false }, (res) => {
           const chunks: Buffer[] = [];
 
-          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('data', (chunk: Buffer) => {
+            chunks.push(chunk);
+          });
           res.on('end', () =>
-            resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }),
-          );
+            resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }));
         });
 
         req.on('error', reject);
@@ -803,9 +823,11 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
           let res: RawResponse | undefined;
 
           while (!res && Date.now() < deadline) {
-            res = await tlsGet(`${tlsUrl}/`).catch(() => undefined);
-
-            if (!res) await new Promise((resolve) => setTimeout(resolve, 100));
+            try {
+              res = await tlsGet(`${tlsUrl}/`);
+            } catch {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
           }
 
           if (!res) throw new Error(`timed out waiting for the TLS server\n--- server output ---\n${output}`);

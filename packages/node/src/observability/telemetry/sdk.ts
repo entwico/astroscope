@@ -18,7 +18,7 @@ interface TelemetryHandle {
 }
 
 export interface TelemetrySdkOptions {
-  prometheus: { host?: string | undefined; port?: number | undefined } | false;
+  prometheus: false | { host?: string | undefined; port?: number | undefined };
 }
 
 function getHandle(): TelemetryHandle | undefined {
@@ -26,13 +26,13 @@ function getHandle(): TelemetryHandle | undefined {
 }
 
 function defaultEnv(key: string, value: string): void {
-  if (!process.env[key]) process.env[key] = value;
+  const current = process.env[key];
+
+  if (!current) process.env[key] = value;
 }
 
 export async function startTelemetry(options: TelemetrySdkOptions): Promise<void> {
-  const g = globalThis as Record<symbol, unknown>;
-
-  if (g[TELEMETRY_KEY]) return;
+  if (getHandle()) return;
 
   if (process.env['OTEL_SDK_DISABLED'] === 'true') {
     log.debug('telemetry disabled via OTEL_SDK_DISABLED');
@@ -83,6 +83,8 @@ export async function startTelemetry(options: TelemetrySdkOptions): Promise<void
   const hostMetrics = new HostMetrics();
 
   hostMetrics.start();
+
+  const g = globalThis as Record<symbol, unknown>;
 
   g[TELEMETRY_KEY] = {
     shutdown: () => sdk.shutdown(),

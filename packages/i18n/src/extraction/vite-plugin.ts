@@ -49,7 +49,7 @@ function formatExtractionErrors(errors: ExtractionError[], projectRoot: string):
     `${list}\n\n` +
     `Production builds strip the fallback argument, so these keys would render as their own key string. ` +
     `Fallbacks must be static string literals — pass runtime values as MF2 variables instead:\n` +
-    `  t('some.key', 'Hello {$name}', { name })`
+    '  t(\'some.key\', \'Hello {$name}\', { name })'
   );
 }
 
@@ -93,7 +93,7 @@ export function i18nVitePlugin(options: I18nVitePluginOptions): Plugin {
     async configureServer(server) {
       // configureServer can be called during astro build's internal dev server
       // check isProduction to skip eager scanning during build
-      if (server.config.isProduction || isBuild) {
+      if (isBuild || server.config.isProduction) {
         return;
       }
 
@@ -121,10 +121,13 @@ export function i18nVitePlugin(options: I18nVitePluginOptions): Plugin {
     },
 
     load(id) {
-      if (isResolvedVirtualModuleId(id)) {
-        if (isBuild) {
-          // in build mode, load manifest from JSON file at runtime
-          return `
+      if (!isResolvedVirtualModuleId(id)) {
+        return;
+      }
+
+      if (isBuild) {
+        // in build mode, load manifest from JSON file at runtime
+        return `
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -135,20 +138,19 @@ const manifestJson = JSON.parse(readFileSync(join(__dirname, '${MANIFEST_FILE_NA
 export const manifest = manifestJson;
 export function getManifest() { return manifestJson; }
 `;
-        }
+      }
 
-        // in dev mode, import the getManifest function from the plugin
-        // this provides live access to the extraction state as files are transformed
-        return `
+      // in dev mode, import the getManifest function from the plugin
+      // this provides live access to the extraction state as files are transformed
+      return `
 import { getManifest as _getManifest } from '@astroscope/i18n/extraction';
 export const manifest = { keys: [], chunks: {}, scripts: [] };
 export function getManifest() { return _getManifest(); }
 `;
-      }
     },
 
     async transform(code, filename) {
-      if (!ALL_EXTENSIONS.some((ext) => filename.endsWith(ext))) {
+      if (ALL_EXTENSIONS.every((ext) => !filename.endsWith(ext))) {
         return null;
       }
 
@@ -168,6 +170,7 @@ export function getManifest() { return _getManifest(); }
       });
 
       // only pay for the sourcemap lookup when there is something to report
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context
       const errors = result.errors.length > 0 ? mapErrorsToSource(result.errors, this.getCombinedSourcemap()) : [];
 
       store.addFileKeys(filename, result.keys);
@@ -207,48 +210,50 @@ export function getManifest() { return _getManifest(); }
       const scriptEntries: string[] = [];
 
       for (const [fileName, chunk] of Object.entries(bundle)) {
-        if (chunk.type === 'chunk' && chunk.moduleIds) {
-          const keys = new Set<string>();
-          let hasI18nModule = false;
+        if (!(chunk.type === 'chunk' && chunk.moduleIds)) {
+          continue;
+        }
 
-          // collect keys from all (sub)modules in the chunk
-          for (const moduleId of chunk.moduleIds) {
-            const moduleKeys = store.fileToKeys.get(moduleId);
+        const keys = new Set<string>();
+        let hasI18nModule = false;
 
-            moduleKeys?.forEach((k) => keys.add(k));
+        // collect keys from all (sub)modules in the chunk
+        for (const moduleId of chunk.moduleIds) {
+          const moduleKeys = store.fileToKeys.get(moduleId);
 
-            if (store.filesWithI18n.has(moduleId)) {
-              hasI18nModule = true;
-            }
+          moduleKeys?.forEach((k) => keys.add(k));
+
+          if (store.filesWithI18n.has(moduleId)) {
+            hasI18nModule = true;
           }
+        }
 
-          const chunkName = chunkIdToName(fileName.replace(/\.js$/, '')); // cut .js extension
+        const chunkName = chunkIdToName(fileName.replace(/\.js$/, '')); // cut .js extension
 
-          if (keys.size) {
-            state.chunkManifest[chunkName] = Array.from(keys);
-          }
+        if (keys.size > 0) {
+          state.chunkManifest[chunkName] = [...keys];
+        }
 
-          if (hasI18nModule) {
-            chunksWithI18n.add(chunkName);
-          }
+        if (hasI18nModule) {
+          chunksWithI18n.add(chunkName);
+        }
 
-          chunkNameToFileName.set(chunkName, fileName);
+        chunkNameToFileName.set(chunkName, fileName);
 
-          const imports: string[] = [];
+        const imports: string[] = [];
 
-          for (const importedFile of [...chunk.imports, ...chunk.dynamicImports]) {
-            const baseName = importedFile.replace(/^.*\//, '').replace(/\.js$/, '');
+        for (const importedFile of [...chunk.imports, ...chunk.dynamicImports]) {
+          const baseName = importedFile.replace(/^.*\//, '').replace(/\.js$/, '');
 
-            imports.push(chunkIdToName(baseName));
-          }
+          imports.push(chunkIdToName(baseName));
+        }
 
-          directImports.set(chunkName, imports);
+        directImports.set(chunkName, imports);
 
-          // astro `<script>` entries are not islands, so no island carries their
-          // hashes — collect them so the middleware can bootstrap their chunks
-          if ((chunk.isEntry || chunk.isDynamicEntry) && chunk.facadeModuleId?.includes('astro&type=script')) {
-            scriptEntries.push(chunkName);
-          }
+        // astro `<script>` entries are not islands, so no island carries their
+        // hashes — collect them so the middleware can bootstrap their chunks
+        if ((chunk.isEntry || chunk.isDynamicEntry) && chunk.facadeModuleId?.includes('astro&type=script')) {
+          scriptEntries.push(chunkName);
         }
       }
 
@@ -260,11 +265,13 @@ export function getManifest() { return _getManifest(); }
 
         visited.add(chunkName);
 
-        if (state.chunkManifest[chunkName]) {
+        if (Object.hasOwn(state.chunkManifest, chunkName)) {
           scriptChunks.add(chunkName);
         }
 
-        for (const imported of directImports.get(chunkName) ?? []) {
+        const imports = directImports.get(chunkName) ?? [];
+
+        for (const imported of imports) {
           walkScripts(imported, visited);
         }
       };
@@ -321,15 +328,18 @@ export function getManifest() { return _getManifest(); }
       // write the manifest JSON file after bundle is written
       // only emit from client build (has full chunk mapping, runs after server build)
       // write to server directory so it's not publicly accessible (same location as the virtual module)
-      if (this.environment.name === 'client' && outputOptions.dir) {
-        const chunksDir = path.resolve(outputOptions.dir, '..', 'server', 'chunks');
-        const manifestPath = path.join(chunksDir, MANIFEST_FILE_NAME);
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context
+      if (!(this.environment.name === 'client' && outputOptions.dir)) {
+        return;
+      }
 
-        if (fs.existsSync(chunksDir)) {
-          fs.writeFileSync(manifestPath, JSON.stringify(getManifest()));
-        } else {
-          logger.error(`server chunks directory not found, cannot write manifest to ${manifestPath}`);
-        }
+      const chunksDir = path.resolve(outputOptions.dir, '..', 'server', 'chunks');
+      const manifestPath = path.join(chunksDir, MANIFEST_FILE_NAME);
+
+      if (fs.existsSync(chunksDir)) {
+        fs.writeFileSync(manifestPath, JSON.stringify(getManifest()));
+      } else {
+        logger.error(`server chunks directory not found, cannot write manifest to ${manifestPath}`);
       }
     },
   };

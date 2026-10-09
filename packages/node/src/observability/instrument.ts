@@ -37,7 +37,7 @@ function getClientIp(req: IncomingMessage): string | undefined {
   const first = Array.isArray(forwarded) ? forwarded[0] : forwarded;
 
   return (
-    first?.split(',')[0]?.trim() ??
+    first?.split(',', 1)[0]?.trim() ??
     (req.headers['x-real-ip'] as string | undefined) ??
     (req.headers['cf-connecting-ip'] as string | undefined)
   );
@@ -51,7 +51,7 @@ function resolveReqId(req: IncomingMessage): string {
 }
 
 function chunkSize(chunk: unknown): number {
-  if (chunk == null) return 0;
+  if (chunk === null || chunk === undefined) return 0;
   if (ArrayBuffer.isView(chunk)) return chunk.byteLength;
   if (typeof chunk === 'string') return Buffer.byteLength(chunk);
 
@@ -161,10 +161,12 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
 
       firstByteTime = performance.now();
 
-      if (firstByteSpan) {
-        firstByteSpan.setAttribute('http.response.status_code', res.statusCode);
-        firstByteSpan.end();
+      if (!firstByteSpan) {
+        return;
       }
+
+      firstByteSpan.setAttribute('http.response.status_code', res.statusCode);
+      firstByteSpan.end();
     };
 
     res.write = ((chunk: unknown, ...rest: unknown[]) => {
@@ -194,7 +196,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
       const ttfb = roundTime((firstByteTime ?? performance.now()) - startTime);
 
       if (requestLogger) {
-        const level = truncated || status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
+        const level = truncated || status >= 500 ? 'error' : (status >= 400 ? 'warn' : 'info');
 
         requestLogger[level](
           {
@@ -206,7 +208,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
             ...(aborted && { aborted: true }),
             ...(truncated && { truncated: true }),
           },
-          truncated ? 'request truncated' : aborted ? 'request aborted' : 'request completed',
+          truncated ? 'request truncated' : (aborted ? 'request aborted' : 'request completed'),
         );
       }
 
@@ -232,17 +234,19 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
         span.end();
       }
 
-      if (telemetry) {
-        endActiveRequest?.();
-        recordHttpRequestDuration({ method, route: record.route, status }, responseTime);
+      if (!telemetry) {
+        return;
+      }
 
-        if (record.actionName) {
-          recordActionDuration({ name: record.actionName, status }, responseTime);
-        }
+      endActiveRequest?.();
+      recordHttpRequestDuration({ method, route: record.route, status }, responseTime);
 
-        if (truncated) {
-          recordRenderFailure(record.route);
-        }
+      if (record.actionName) {
+        recordActionDuration({ name: record.actionName, status }, responseTime);
+      }
+
+      if (truncated) {
+        recordRenderFailure(record.route);
       }
     };
 

@@ -12,8 +12,19 @@ describe('createWormholeMergeScript', () => {
     const script = createWormholeMergeScript({ cart: { items: [1] } });
     const js = script.replace(/^<script>/, '').replace(/<\/script>$/, '');
     const seen: unknown[] = [];
-    const scope = { __wormholes__: { cart: { l: [(value: unknown) => seen.push(value)] } } };
+    const scope = {
+      __wormholes__: {
+        cart: {
+          l: [
+            (value: unknown) => {
+              seen.push(value);
+            },
+          ],
+        },
+      },
+    };
 
+    // eslint-disable-next-line no-new-func -- evaluates the generated inline script
     new Function('self', js)(scope);
 
     expect((scope.__wormholes__.cart as { v?: unknown }).v).toEqual({ items: [1] });

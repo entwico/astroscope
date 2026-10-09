@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-incorrect-template-string-interpolation -- fixture sources contain template syntax */
 import { RuleTester } from 'eslint';
 import { describe, it } from 'vitest';
 import { tStaticMeta } from './t-static-meta.js';
@@ -48,6 +49,19 @@ tester.run('t-static-meta', tStaticMeta, {
       // interpolated per-variable description
       code: 't(`greeting`, { variables: { name: { description: `from ${src}` } } });',
       errors: [{ messageId: 'dynamicMeta' }],
+    },
+    // tagged templates are calls, not literals — the extractor cannot read them
+    {
+      code: 't(`regex`, String.raw`Use \\| for OR: a\\|b`);',
+      errors: [{ messageId: 'taggedMeta' }],
+    },
+    {
+      code: 't(`regex`, { fallback: String.raw`a\\|b`, description: tag`static` });',
+      errors: [{ messageId: 'taggedMeta' }, { messageId: 'taggedMeta' }],
+    },
+    {
+      code: 't(`greeting`, { fallback: `{name}`, variables: { name: { fallback: String.raw`\\d+` } } });',
+      errors: [{ messageId: 'taggedMeta' }],
     },
   ],
 });

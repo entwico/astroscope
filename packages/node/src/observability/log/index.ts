@@ -71,7 +71,7 @@ function createLogProxy(bindings: Bindings[]): LogProxy {
   const resolve = (): Logger => {
     const base = contextLogger(store);
 
-    if (!bindings.length) return base;
+    if (bindings.length === 0) return base;
 
     if (cachedBase !== base) {
       cachedBase = base;
@@ -124,7 +124,7 @@ function createLogProxy(bindings: Bindings[]): LogProxy {
     get root() {
       const base = getLogStore().root ?? (fallbackLogger ??= pino({ level: 'info' }));
 
-      return bindings.length ? base.child(Object.assign({}, ...bindings) as Bindings) : base;
+      return bindings.length > 0 ? base.child(Object.assign({}, ...bindings) as Bindings) : base;
     },
   };
 }

@@ -25,13 +25,13 @@ function createIsland(overrides: Partial<IslandInfo> = {}): IslandInfo {
   };
 }
 
-function createContext(): APIContext {
+function createApiContext(): APIContext {
   return { request: new Request('http://localhost/'), locals: {} } as APIContext;
 }
 
 async function setup(manifest?: Partial<ExtractionManifest>) {
-  (globalThis as Record<symbol, unknown>)[REGISTRY] = [];
-  (globalThis as Record<symbol, unknown>)[DOCUMENT_REGISTRY] = [];
+  vi.stubGlobal(REGISTRY, []);
+  vi.stubGlobal(DOCUMENT_REGISTRY, []);
 
   mocks.manifest = {
     keys: [],
@@ -56,14 +56,14 @@ async function setup(manifest?: Partial<ExtractionManifest>) {
 }
 
 beforeEach(() => {
-  (globalThis as Record<symbol, unknown>)[REGISTRY] = [];
-  (globalThis as Record<symbol, unknown>)[DOCUMENT_REGISTRY] = [];
+  vi.stubGlobal(REGISTRY, []);
+  vi.stubGlobal(DOCUMENT_REGISTRY, []);
 });
 
 describe('i18n islands emitter', () => {
   test('emits hashes for the full closure and preload links for the static closure', async () => {
     const { emitter, setRequestLocale } = await setup();
-    const context = createContext();
+    const context = createApiContext();
 
     setRequestLocale(context, 'en');
 
@@ -80,7 +80,7 @@ describe('i18n islands emitter', () => {
 
   test('emits eager imports for the full closure, dynamic chunks included', async () => {
     const { emitter, setRequestLocale } = await setup();
-    const context = createContext();
+    const context = createApiContext();
 
     setRequestLocale(context, 'en');
 
@@ -93,7 +93,7 @@ describe('i18n islands emitter', () => {
 
   test('emits each chunk hash once per request', async () => {
     const { emitter, setRequestLocale } = await setup();
-    const context = createContext();
+    const context = createApiContext();
 
     setRequestLocale(context, 'en');
 
@@ -116,12 +116,12 @@ describe('i18n islands emitter', () => {
   test('contributes nothing when the middleware recorded no locale', async () => {
     const { emitter } = await setup();
 
-    expect(emitter(createIsland(), createContext())).toBeNull();
+    expect(emitter(createIsland(), createApiContext())).toBeNull();
   });
 
   test('keeps the locale when a rewrite replaced the request', async () => {
     const { emitter, setRequestLocale } = await setup();
-    const context = createContext();
+    const context = createApiContext();
 
     setRequestLocale(context, 'en');
 
@@ -133,7 +133,7 @@ describe('i18n islands emitter', () => {
 
   test('ignores chunks without translations', async () => {
     const { emitter, setRequestLocale } = await setup();
-    const context = createContext();
+    const context = createApiContext();
 
     setRequestLocale(context, 'en');
 
@@ -153,7 +153,7 @@ describe('i18n islands emitter', () => {
 describe('createI18nDocumentEmitter', () => {
   test('dev delivers the full state as head content', async () => {
     const { createI18nDocumentEmitter, setRequestLocale } = await setup();
-    const context = createContext();
+    const context = createApiContext();
 
     setRequestLocale(context, 'en');
 
@@ -166,7 +166,7 @@ describe('createI18nDocumentEmitter', () => {
 
   test('prod delivers script-chunk hashes as end content', async () => {
     const { createI18nDocumentEmitter, setRequestLocale } = await setup({ scripts: ['Cart.Cabc'] });
-    const context = createContext();
+    const context = createApiContext();
 
     setRequestLocale(context, 'en');
 
@@ -178,7 +178,7 @@ describe('createI18nDocumentEmitter', () => {
 
   test('prod contributes nothing without a chunk manifest — no client t() exists', async () => {
     const { createI18nDocumentEmitter, setRequestLocale } = await setup({ chunks: {} });
-    const context = createContext();
+    const context = createApiContext();
 
     setRequestLocale(context, 'en');
 
@@ -188,6 +188,6 @@ describe('createI18nDocumentEmitter', () => {
   test('contributes nothing when the middleware recorded no locale', async () => {
     const { createI18nDocumentEmitter } = await setup();
 
-    expect(createI18nDocumentEmitter(true)(createContext())).toBeNull();
+    expect(createI18nDocumentEmitter(true)(createApiContext())).toBeNull();
   });
 });

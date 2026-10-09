@@ -39,73 +39,6 @@ export class KeyStore {
   ) {}
 
   /**
-   * Add key occurrences for a file, replacing any existing occurrences for that file.
-   */
-  addFileKeys(filename: string, keys: ExtractedKeyOccurrence[]): void {
-    const newKeyStrings = keys.map((k) => k.key);
-    const oldKeys = this.fileToKeys.get(filename);
-
-    // log key changes on HMR
-    if (oldKeys) {
-      const uniqueNew = [...new Set(newKeyStrings)];
-      const uniqueOld = [...new Set(oldKeys)];
-      const added = uniqueNew.filter((k) => !uniqueOld.includes(k));
-      const removed = uniqueOld.filter((k) => !uniqueNew.includes(k));
-      const file = filename.split('/').pop();
-
-      if (added.length > 0 || removed.length > 0) {
-        const parts: string[] = [];
-
-        if (added.length > 0) parts.push(`+${added.length}`);
-        if (removed.length > 0) parts.push(`-${removed.length}`);
-
-        this.logger.info(`hmr: ${parts.join(' ')} key(s) in ${file}`);
-      }
-    }
-
-    // remove old occurrences for this file (if any)
-    if (oldKeys) {
-      for (let i = this.occurrences.length - 1; i >= 0; i--) {
-        if (this.occurrences[i]?.file === filename) {
-          this.occurrences.splice(i, 1);
-        }
-      }
-    }
-
-    this.filesWithI18n.add(filename);
-
-    // check for inconsistencies before adding new keys
-    if (this.consistency !== 'off') {
-      this.checkConsistency(keys);
-    }
-
-    if (keys.length > 0) {
-      this.occurrences.push(...keys);
-    }
-
-    this.fileToKeys.set(filename, newKeyStrings);
-  }
-
-  /**
-   * Record the non-extractable t() calls found in a file, replacing any
-   * previously recorded for it.
-   */
-  addFileErrors(filename: string, errors: ExtractionError[]): void {
-    if (errors.length > 0) {
-      this.errorsByFile.set(filename, errors);
-    } else {
-      this.errorsByFile.delete(filename);
-    }
-  }
-
-  /**
-   * All non-extractable t() calls found so far, across every scanned file.
-   */
-  get extractionErrors(): ExtractionError[] {
-    return Array.from(this.errorsByFile.values()).flat();
-  }
-
-  /**
    * Check new keys for inconsistencies with existing occurrences.
    */
   private checkConsistency(newKeys: ExtractedKeyOccurrence[]): void {
@@ -180,8 +113,9 @@ export class KeyStore {
 
     // sort keys for consistent comparison
     const sorted: Record<string, unknown> = {};
+    const names = Object.keys(meta.variables).toSorted((a, b) => a.localeCompare(b));
 
-    for (const key of Object.keys(meta.variables).sort()) {
+    for (const key of names) {
       sorted[key] = meta.variables[key];
     }
 
@@ -214,6 +148,73 @@ export class KeyStore {
   }
 
   /**
+   * Add key occurrences for a file, replacing any existing occurrences for that file.
+   */
+  addFileKeys(filename: string, keys: ExtractedKeyOccurrence[]): void {
+    const newKeyStrings = keys.map((k) => k.key);
+    const oldKeys = this.fileToKeys.get(filename);
+
+    // log key changes on HMR
+    if (oldKeys) {
+      const uniqueNew = [...new Set(newKeyStrings)];
+      const uniqueOld = [...new Set(oldKeys)];
+      const added = uniqueNew.filter((k) => !uniqueOld.includes(k));
+      const removed = uniqueOld.filter((k) => !uniqueNew.includes(k));
+      const file = filename.split('/').pop();
+
+      if (added.length > 0 || removed.length > 0) {
+        const parts: string[] = [];
+
+        if (added.length > 0) parts.push(`+${added.length}`);
+        if (removed.length > 0) parts.push(`-${removed.length}`);
+
+        this.logger.info(`hmr: ${parts.join(' ')} key(s) in ${file}`);
+      }
+    }
+
+    // remove old occurrences for this file (if any)
+    if (oldKeys) {
+      for (let i = this.occurrences.length - 1; i >= 0; i--) {
+        if (this.occurrences[i]?.file === filename) {
+          this.occurrences.splice(i, 1);
+        }
+      }
+    }
+
+    this.filesWithI18n.add(filename);
+
+    // check for inconsistencies before adding new keys
+    if (this.consistency !== 'off') {
+      this.checkConsistency(keys);
+    }
+
+    if (keys.length > 0) {
+      this.occurrences.push(...keys);
+    }
+
+    this.fileToKeys.set(filename, newKeyStrings);
+  }
+
+  /**
+   * Record the non-extractable t() calls found in a file, replacing any
+   * previously recorded for it.
+   */
+  addFileErrors(filename: string, errors: ExtractionError[]): void {
+    if (errors.length > 0) {
+      this.errorsByFile.set(filename, errors);
+    } else {
+      this.errorsByFile.delete(filename);
+    }
+  }
+
+  /**
+   * All non-extractable t() calls found so far, across every scanned file.
+   */
+  get extractionErrors(): ExtractionError[] {
+    return this.errorsByFile.values().toArray().flat();
+  }
+
+  /**
    * Check if any error-level inconsistencies were found.
    * Call this at the end of build to determine if it should fail.
    */
@@ -239,15 +240,17 @@ export class KeyStore {
 
         existing.meta = occurrence.meta;
       } else {
-        keyMap.set(occurrence.key, {
+        const key: ExtractedKey = {
           key: occurrence.key,
           meta: occurrence.meta,
           files: [fileLocation],
-        });
+        };
+
+        keyMap.set(occurrence.key, key);
       }
     }
 
-    return Array.from(keyMap.values());
+    return keyMap.values().toArray();
   }
 
   /**

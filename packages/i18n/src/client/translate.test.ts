@@ -108,7 +108,7 @@ describe('rich', () => {
 
   const wrap =
     (tag: string) =>
-    (children: (string | Node)[]): Node => ({ tag, children });
+      (children: (string | Node)[]): Node => ({ tag, children });
 
   test('wraps markup content with the matching component', async () => {
     const { rich } = await loadTranslate(createState({ translations: { tos: 'Read our {#link}Terms{/link}' } }));

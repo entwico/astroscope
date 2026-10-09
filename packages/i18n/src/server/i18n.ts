@@ -46,6 +46,34 @@ class I18nSingleton {
   // tracks the manifest version to detect when derived caches need invalidation
   private manifestVersion = 0;
 
+  /**
+   * invalidate derived caches when the extraction manifest has changed (dev mode HMR)
+   */
+  private invalidateIfManifestChanged(): void {
+    const { version } = getGlobalState();
+
+    if (version === this.manifestVersion) {
+      return;
+    }
+
+    this.manifestVersion = version;
+    this.mergedCache.clear();
+    this.compiledCache.clear();
+    this.chunkCache.clear();
+  }
+
+  private resolveLocales(locales?: string | string[] | undefined): string[] {
+    if (!locales) {
+      return this.config?.locales ?? [];
+    }
+
+    if (typeof locales === 'string') {
+      return [locales];
+    }
+
+    return locales;
+  }
+
   async configure(config: I18nConfig): Promise<void> {
     if (!config.locales?.length) {
       throw new Error('i18n.configure(): locales array is required and must not be empty');
@@ -86,10 +114,13 @@ class I18nSingleton {
     };
 
     // resolved lazily so importing the singleton needs no virtual module
-    if (!this.manifestGetter) {
-      const m = await import('virtual:@astroscope/i18n/manifest');
-      this.manifestGetter = m.getManifest;
+    if (this.manifestGetter) {
+      return;
     }
+
+    const m = await import('virtual:@astroscope/i18n/manifest');
+
+    this.manifestGetter = m.getManifest;
   }
 
   isConfigured(): boolean {
@@ -146,7 +177,7 @@ class I18nSingleton {
     const withFallbacks: RawTranslations = { ...raw };
 
     for (const { key, meta } of manifest.keys) {
-      if (!(key in withFallbacks) && meta.fallback) {
+      if (!Object.hasOwn(withFallbacks, key) && meta.fallback) {
         withFallbacks[key] = meta.fallback;
       }
     }
@@ -210,8 +241,10 @@ class I18nSingleton {
     const chunkTranslations: RawTranslations = {};
 
     for (const key of keys) {
-      if (translations[key]) {
-        chunkTranslations[key] = translations[key];
+      const translation = translations[key];
+
+      if (translation) {
+        chunkTranslations[key] = translation;
       }
     }
 
@@ -276,34 +309,6 @@ class I18nSingleton {
   /** seconds since each locale's translations were last set */
   getTranslationsAge(now = Date.now()): { locale: string; seconds: number }[] {
     return [...this.updatedAt].map(([locale, at]) => ({ locale, seconds: (now - at) / 1000 }));
-  }
-
-  /**
-   * invalidate derived caches when the extraction manifest has changed (dev mode HMR)
-   */
-  private invalidateIfManifestChanged(): void {
-    const { version } = getGlobalState();
-
-    if (version === this.manifestVersion) {
-      return;
-    }
-
-    this.manifestVersion = version;
-    this.mergedCache.clear();
-    this.compiledCache.clear();
-    this.chunkCache.clear();
-  }
-
-  private resolveLocales(locales?: string | string[] | undefined): string[] {
-    if (!locales) {
-      return this.config?.locales ?? [];
-    }
-
-    if (typeof locales === 'string') {
-      return [locales];
-    }
-
-    return locales;
   }
 }
 

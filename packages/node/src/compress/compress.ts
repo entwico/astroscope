@@ -45,10 +45,7 @@ export async function compressClientDir(clientDir: string, logger: AstroIntegrat
       compressed++;
       totalRaw += raw.byteLength;
 
-      const best = Math.min(
-        brBuf.byteLength < raw.byteLength ? brBuf.byteLength : raw.byteLength,
-        gzBuf.byteLength < raw.byteLength ? gzBuf.byteLength : raw.byteLength,
-      );
+      const best = Math.min(brBuf.byteLength, raw.byteLength, gzBuf.byteLength, raw.byteLength);
 
       savedBytes += raw.byteLength - best;
     }),
@@ -71,7 +68,7 @@ function formatBytes(bytes: number): string {
   let value = bytes;
 
   for (const unit of UNITS) {
-    if (value < 1024 || unit === UNITS[UNITS.length - 1]) {
+    if (value < 1024 || unit === UNITS.at(-1)) {
       return unit === 'B' ? `${value} ${unit}` : `${value.toFixed(1)} ${unit}`;
     }
 

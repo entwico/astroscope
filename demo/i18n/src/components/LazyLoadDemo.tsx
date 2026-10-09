@@ -33,7 +33,7 @@ export default function LazyLoadDemo() {
 
       {showModal && (
         <Suspense
-          fallback={
+          fallback={(
             <div
               style={{
                 position: 'fixed',
@@ -46,7 +46,7 @@ export default function LazyLoadDemo() {
             >
               <div style={{ color: 'white', fontSize: '1.5rem' }}>{t('lazy.loading', 'Loading...')}</div>
             </div>
-          }
+          )}
         >
           <StatsModal onClose={() => setShowModal(false)} />
         </Suspense>

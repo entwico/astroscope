@@ -90,7 +90,11 @@ describe.skipIf(skip)('dev island warmup', () => {
   }, 60_000);
 
   afterAll(async () => {
-    await server?.stop().catch(() => {});
+    try {
+      await server?.stop();
+    } catch {
+      // the server may already be gone
+    }
 
     if (vitestEnv !== undefined) process.env['VITEST'] = vitestEnv;
 
@@ -160,5 +164,5 @@ import { LateIsland } from '../components/LateIsland';
 
 function stripAnsi(s: string): string {
   // eslint-disable-next-line no-control-regex
-  return s.replace(/\x1b\[[0-9;]*m/g, '');
+  return s.replaceAll(/\u{1B}\[[0-9;]*m/gu, '');
 }

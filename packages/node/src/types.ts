@@ -141,7 +141,7 @@ export interface NodeOptions {
    * built-in `security.checkOrigin` (which supports no exclusions).
    * Enabled by default; set to `false` to keep Astro's built-in behavior.
    */
-  csrf?: { exclude?: ExcludePattern[] | undefined } | false | undefined;
+  csrf?: false | { exclude?: ExcludePattern[] | undefined } | undefined;
 
   /**
    * Island dependency preloading: streams html responses through a rewriter that
@@ -193,8 +193,8 @@ export interface RuntimeOptions {
   server: string;
   bodySizeLimit: number;
   shutdownTimeout: number;
-  health: { host?: string | undefined; port?: number | undefined; paths?: HealthProbePaths | undefined } | false;
-  logging: { exclude: ExcludePattern[]; extended: boolean } | false;
+  health: false | { host?: string | undefined; port?: number | undefined; paths?: HealthProbePaths | undefined };
+  logging: false | { exclude: ExcludePattern[]; extended: boolean };
   telemetry:
-    { exclude: ExcludePattern[]; prometheus: { host?: string | undefined; port?: number | undefined } | false } | false;
+    false | { exclude: ExcludePattern[]; prometheus: false | { host?: string | undefined; port?: number | undefined } };
 }

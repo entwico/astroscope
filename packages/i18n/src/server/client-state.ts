@@ -9,7 +9,7 @@ import { i18n } from './i18n.js';
 
 /** translation values may contain `</script>` — escape `<` so they cannot end the tag */
 export function jsonForScript(value: unknown): string {
-  return JSON.stringify(value).replace(/</g, '\\u003c');
+  return JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
 }
 
 /** the full dev-mode state: every translation for the locale */

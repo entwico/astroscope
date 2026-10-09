@@ -20,7 +20,9 @@ export function onStartup(context: BootContext): void {
   mountNativeHandler({ prefix: '/native', name: 'native-echo' }, (req, res) => {
     const chunks: Buffer[] = [];
 
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       res.setHeader('set-cookie', ['native_a=1', 'native_b=2']);
       res.writeHead(200, { 'content-type': 'application/json' });

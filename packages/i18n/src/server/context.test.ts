@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { getContext, runWithContext } from './context';
 import type { I18nContext } from './types';
 
-const createContext = (locale: string): I18nContext => ({
+const createI18nContext = (locale: string): I18nContext => ({
   locale,
   translations: {},
   rawTranslations: {},
@@ -17,7 +17,7 @@ describe('getContext', () => {
 
 describe('runWithContext', () => {
   test('provides the context inside the callback', () => {
-    const context = createContext('en');
+    const context = createI18nContext('en');
 
     runWithContext(context, () => {
       expect(getContext()).toBe(context);
@@ -25,11 +25,11 @@ describe('runWithContext', () => {
   });
 
   test('returns the callback result', () => {
-    expect(runWithContext(createContext('en'), () => 42)).toBe(42);
+    expect(runWithContext(createI18nContext('en'), () => 42)).toBe(42);
   });
 
   test('keeps the context across async boundaries', async () => {
-    const context = createContext('en');
+    const context = createI18nContext('en');
 
     await runWithContext(context, async () => {
       await Promise.resolve();
@@ -39,8 +39,8 @@ describe('runWithContext', () => {
   });
 
   test('supports nested contexts and restores the outer one', () => {
-    const outer = createContext('en');
-    const inner = createContext('de');
+    const outer = createI18nContext('en');
+    const inner = createI18nContext('de');
 
     runWithContext(outer, () => {
       runWithContext(inner, () => {
@@ -52,7 +52,7 @@ describe('runWithContext', () => {
   });
 
   test('clears the context after the callback returns', () => {
-    runWithContext(createContext('en'), () => {});
+    runWithContext(createI18nContext('en'), () => {});
 
     expect(getContext()).toBeNull();
   });
@@ -61,7 +61,7 @@ describe('runWithContext', () => {
     const seen: string[] = [];
 
     const run = (locale: string) =>
-      runWithContext(createContext(locale), async () => {
+      runWithContext(createI18nContext(locale), async () => {
         await new Promise((resolve) => setTimeout(resolve, 1));
 
         seen.push(getContext()?.locale ?? 'none');
@@ -69,6 +69,8 @@ describe('runWithContext', () => {
 
     await Promise.all([run('en'), run('de')]);
 
-    expect(seen.sort()).toEqual(['de', 'en']);
+    seen.sort((a, b) => a.localeCompare(b));
+
+    expect(seen).toEqual(['de', 'en']);
   });
 });

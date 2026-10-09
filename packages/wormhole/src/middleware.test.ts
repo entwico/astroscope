@@ -42,8 +42,8 @@ async function load(
   manifest: WormholeManifest | null = null,
   routeIslands: Record<string, RouteIsland[]> = {},
 ) {
-  (globalThis as Record<symbol, unknown>)[REGISTRY] = [];
-  (globalThis as Record<symbol, unknown>)[DOCUMENT_REGISTRY] = [];
+  vi.stubGlobal(REGISTRY, []);
+  vi.stubGlobal(DOCUMENT_REGISTRY, []);
 
   mocks.manifest = manifest;
   mocks.registry = registry as Record<string, Wormhole<unknown>>;
@@ -66,12 +66,17 @@ const createCtx = (path: string, routePattern = path): APIContext =>
   }) as APIContext;
 
 const htmlNext = (body: () => string, onCall?: () => void) => {
-  return vi.fn(async () => {
+  return vi.fn(() => {
     onCall?.();
 
-    return new Response(body(), { headers: { 'content-type': 'text/html' } });
+    return Promise.resolve(new Response(body(), { headers: { 'content-type': 'text/html' } }));
   }) as unknown as MiddlewareNext & ReturnType<typeof vi.fn>;
 };
+
+/** a sorted copy for order-independent comparison of who ran */
+function sorted(values: string[]): string[] {
+  return values.toSorted((a, b) => a.localeCompare(b));
+}
 
 /** a registry of counting handlers — each returns its name, `calls` records who ran */
 function countingRegistry(
@@ -148,7 +153,7 @@ describe('createWormholeMiddleware', () => {
     const { defineWormhole } = await import('./define');
     const { createWormholeMiddleware, getRequestWormholes } = await load({
       cart: defineWormhole({ handler: () => 1 }),
-      closed: defineWormhole({ handler: () => undefined }),
+      closed: defineWormhole({ handler: () => {} }),
     });
 
     const handler = createWormholeMiddleware();
@@ -161,7 +166,7 @@ describe('createWormholeMiddleware', () => {
 
     const request = getRequestWormholes(ctx.request);
 
-    expect([...request!.values.entries()]).toEqual([['cart', 1]]);
+    expect([...request!.values]).toEqual([['cart', 1]]);
   });
 
   test('handlers run in parallel', async () => {
@@ -252,7 +257,7 @@ describe('createWormholeMiddleware', () => {
 
     const handler = createWormholeMiddleware();
     const response = new Response('<html><head></head></html>', { headers: { 'content-type': 'text/html' } });
-    const next = vi.fn(async () => response);
+    const next = vi.fn(() => Promise.resolve(response));
 
     expect(await handler(createCtx('/page'), next as unknown as MiddlewareNext)).toBe(response);
   });
@@ -273,7 +278,7 @@ describe('route-scoped loading', () => {
       htmlNext(() => ''),
     );
 
-    expect([...calls].sort()).toEqual([...names].sort());
+    expect(sorted(calls)).toEqual(sorted(names));
   });
 
   test('a known route loads its manifest reads, its islands` reads and eager wormholes', async () => {
@@ -304,7 +309,7 @@ describe('route-scoped loading', () => {
       createCtx('/page'),
       htmlNext(() => ''),
     );
-    expect([...calls].sort()).toEqual(['audit', 'cart', 'config', 'session', 'stats']);
+    expect(sorted(calls)).toEqual(['audit', 'cart', 'config', 'session', 'stats']);
 
     calls.length = 0;
 
@@ -312,7 +317,7 @@ describe('route-scoped loading', () => {
       createCtx('/plain'),
       htmlNext(() => ''),
     );
-    expect([...calls].sort()).toEqual(['config']);
+    expect(sorted(calls)).toEqual(['config']);
   });
 
   test('an unknown route loads everything', async () => {
@@ -329,7 +334,7 @@ describe('route-scoped loading', () => {
       htmlNext(() => ''),
     );
 
-    expect([...calls].sort()).toEqual([...names].sort());
+    expect(sorted(calls)).toEqual(sorted(names));
   });
 
   test('a route the node manifest does not know loads everything', async () => {
@@ -342,7 +347,7 @@ describe('route-scoped loading', () => {
       htmlNext(() => ''),
     );
 
-    expect([...calls].sort()).toEqual([...names].sort());
+    expect(sorted(calls)).toEqual(sorted(names));
   });
 
   test('dynamic access anywhere on the route degrades to everything', async () => {
@@ -359,7 +364,7 @@ describe('route-scoped loading', () => {
       createCtx('/page'),
       htmlNext(() => ''),
     );
-    expect([...calls].sort()).toEqual([...names].sort());
+    expect(sorted(calls)).toEqual(sorted(names));
 
     calls.length = 0;
 
@@ -367,7 +372,7 @@ describe('route-scoped loading', () => {
       createCtx('/server'),
       htmlNext(() => ''),
     );
-    expect([...calls].sort()).toEqual([...names].sort());
+    expect(sorted(calls)).toEqual(sorted(names));
   });
 
   test('names outside the registry are ignored', async () => {

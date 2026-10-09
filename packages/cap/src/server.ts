@@ -36,9 +36,7 @@ export function captcha(options: CaptchaOptions = {}) {
       if (verification === 'rejected') {
         log.info('cap token rejected');
         deny('FORBIDDEN', 'captcha invalid');
-      }
-
-      if (verification === 'unavailable') {
+      } else if (verification === 'unavailable') {
         deny('SERVICE_UNAVAILABLE', 'captcha verification unavailable');
       }
     },

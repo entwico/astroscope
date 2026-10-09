@@ -187,7 +187,7 @@ const { keys, chunks, scripts } = i18n.getManifest();
     </div>
   </div>
 
-  <!-- Hidden components to ensure Vite creates separate chunks (never hydrates) -->
+  {/* Hidden components to ensure Vite creates separate chunks (never hydrates) */}
   <div style="display: none;">
     <ProductCardNested client:visible name="Hidden" price="$0" image="#000" />
     <AddToCartButton client:visible productName="Hidden" />

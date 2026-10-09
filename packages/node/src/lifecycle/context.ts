@@ -4,6 +4,7 @@ import type { BootContext } from './types.js';
 const STORE_KEY = Symbol.for('@astroscope/node/boot-context');
 
 export function setBootContext(context: BootContext): void {
+  // eslint-disable-next-line unicorn/no-global-object-property-assignment -- Symbol.for store on globalThis, shared across module instances
   (globalThis as Record<symbol, BootContext | undefined>)[STORE_KEY] = context;
 }
 

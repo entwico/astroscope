@@ -148,10 +148,11 @@ export function CapWidget({
 
 function labelAttributes(labels: CapWidgetLabels | undefined): Record<string, string> {
   const attributes: Record<string, string> = {};
+  const entries = Object.entries(labels ?? {});
 
-  for (const [key, value] of Object.entries(labels ?? {})) {
+  for (const [key, value] of entries) {
     if (value !== undefined) {
-      attributes[`data-cap-i18n-${key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}`] = value;
+      attributes[`data-cap-i18n-${key.replaceAll(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}`] = value;
     }
   }
 

@@ -30,7 +30,7 @@ export function machineMeta(): MachineMeta {
 }
 
 export function stamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  return new Date().toISOString().replaceAll(/[:.]/g, '-').slice(0, 19);
 }
 
 /** newest result file with the given prefix, or undefined */
@@ -45,7 +45,7 @@ export function latestResult(prefix: string): string | undefined {
     return undefined;
   }
 
-  files.sort();
+  files.sort((a, b) => a.localeCompare(b));
 
-  return files.length ? path.join(resultsDir, files[files.length - 1]!) : undefined;
+  return files.length > 0 ? path.join(resultsDir, files.at(-1)!) : undefined;
 }

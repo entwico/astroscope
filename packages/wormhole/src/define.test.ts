@@ -7,7 +7,7 @@ vi.mock('virtual:@astroscope/wormhole/registry', () => ({ wormholes: {} }));
 
 describe('defineWormhole', () => {
   test('name and key come from the registry key', () => {
-    const wh = defineWormhole<number>({ handler: () => undefined });
+    const wh = defineWormhole<number>({ handler: () => {} });
 
     assignWormholeNames({ cart: wh });
 
@@ -16,14 +16,14 @@ describe('defineWormhole', () => {
   });
 
   test('throws on any use before registration', () => {
-    const wh = defineWormhole<number>({ handler: () => undefined });
+    const wh = defineWormhole<number>({ handler: () => {} });
 
     expect(() => wh.name).toThrow('wormhole is not registered');
     expect(() => wh.get()).toThrow('wormhole is not registered');
   });
 
   test('re-assigning the same name is idempotent, a different name throws', () => {
-    const wh = defineWormhole<number>({ handler: () => undefined });
+    const wh = defineWormhole<number>({ handler: () => {} });
 
     assignWormholeNames({ cart: wh });
     assignWormholeNames({ cart: wh });
@@ -36,7 +36,7 @@ describe('defineWormhole', () => {
   });
 
   test('get() outside an open scope throws with the wormhole name', () => {
-    const wh = defineWormhole<number>({ handler: () => undefined });
+    const wh = defineWormhole<number>({ handler: () => {} });
 
     assignWormholeNames({ session: wh });
 
@@ -54,7 +54,7 @@ describe('defineWormhole', () => {
   });
 
   test('set() throws on the server', () => {
-    const wh = defineWormhole<{ v: number }>({ handler: () => undefined });
+    const wh = defineWormhole<{ v: number }>({ handler: () => {} });
 
     assignWormholeNames({ counter: wh });
 
@@ -62,7 +62,7 @@ describe('defineWormhole', () => {
   });
 
   test('subscribe() is inert on the server', () => {
-    const wh = defineWormhole<number>({ handler: () => undefined });
+    const wh = defineWormhole<number>({ handler: () => {} });
 
     assignWormholeNames({ counter: wh });
 
@@ -71,7 +71,7 @@ describe('defineWormhole', () => {
 
   describe('readonly typing', () => {
     test('exposes the stored value as deeply readonly', () => {
-      const wh = defineWormhole<{ cart: { items: string[] }; count: number }>({ handler: () => undefined });
+      const wh = defineWormhole<{ cart: { items: string[] }; count: number }>({ handler: () => {} });
 
       assignWormholeNames({ readonlyDemo: wh });
 

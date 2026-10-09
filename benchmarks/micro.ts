@@ -36,7 +36,9 @@ function indexTasks(report: Report): Map<string, Task> {
     const relative = path.relative(root, file.name);
 
     for (const test of file.assertionResults) {
-      for (const group of test.benchmarks ?? []) {
+      const groups = test.benchmarks ?? [];
+
+      for (const group of groups) {
         for (const task of group.tasks) {
           tasks.set(`${relative} > ${test.fullName} > ${task.name}`, task);
         }

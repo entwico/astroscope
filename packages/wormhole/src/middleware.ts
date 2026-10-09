@@ -42,7 +42,7 @@ export function createWormholeMiddleware(options: WormholeMiddlewareOptions = {}
     sources.set(name, source);
   }
 
-  const everything = [...sources.keys()];
+  const everything = sources.keys().toArray();
   const eager = everything.filter((name) => sources.get(name)!.eager);
 
   // what a route opens, resolved once per route: the name, the handler and the ALS key
@@ -110,15 +110,15 @@ export function createWormholeMiddleware(options: WormholeMiddlewareOptions = {}
         const open = new Map<string, unknown>();
         const scope = new Map<string, unknown>(als.getStore());
 
-        for (let i = 0; i < entries.length; i++) {
+        for (const [i, entry] of entries.entries()) {
           const data = loaded[i];
 
           if (data === undefined) {
             continue;
           }
 
-          open.set(entries[i]!.name, data);
-          scope.set(entries[i]!.key, data);
+          open.set(entry!.name, data);
+          scope.set(entry!.key, data);
         }
 
         // the islands emitter and the stream-end script run while the response streams,

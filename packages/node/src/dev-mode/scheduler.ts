@@ -32,6 +32,79 @@ export class RestartScheduler {
     private readonly logger: Logger,
   ) {}
 
+  private _scheduleRun(server: ViteDevServer): void {
+    clearTimeout(this._debounceTimer);
+    this._debounceTimer = setTimeout(() => {
+      this._debounceTimer = undefined;
+      void this._run(server);
+    }, this.debounceMs);
+  }
+
+  private async _run(server: ViteDevServer): Promise<void> {
+    if (this._inFlight) {
+      // loop driving the in-flight restart will pick up the next iteration.
+      this._pending = true;
+
+      return;
+    }
+
+    this._inFlight = true;
+
+    const { promise: runPromise, resolve: resolveRun } = Promise.withResolvers<void>();
+
+    this._runPromise = runPromise;
+
+    try {
+      do {
+        this._pending = false;
+
+        const bootDeps = [...this._pendingBootDeps].toSorted((a, b) => a.localeCompare(b));
+        const fullReloads = [...this._pendingFullReloads].toSorted((a, b) => a.localeCompare(b));
+
+        this._pendingBootDeps.clear();
+        this._pendingFullReloads.clear();
+
+        if (bootDeps.length > 0 || fullReloads.length > 0) {
+          this.logger.info(this._formatReason(server, bootDeps, fullReloads));
+        }
+
+        try {
+          await server.restart();
+        } catch (error) {
+          this.logger.error(`error during dev server restart: ${serializeError(error)}`);
+        }
+      } while (this._pending);
+    } finally {
+      this._inFlight = false;
+      this._runPromise = undefined;
+      resolveRun();
+    }
+  }
+
+  private _formatReason(server: ViteDevServer, bootDeps: string[], fullReloads: string[]): string {
+    const root = server.config.root;
+    const rel = (p: string): string => path.relative(root, p) || p;
+    const parts: string[] = [];
+
+    if (bootDeps.length === 1) {
+      parts.push(`boot dep changed: ${rel(bootDeps[0]!)}`);
+    } else if (bootDeps.length > 1) {
+      parts.push(`boot deps changed (${bootDeps.length}): ${bootDeps.map((p) => rel(p)).join(', ')}`);
+    }
+
+    if (fullReloads.length > 0) {
+      const named = fullReloads.filter((p) => p !== FULL_RELOAD_UNKNOWN);
+
+      if (named.length === 0) {
+        parts.push('vite SSR full-reload');
+      } else {
+        parts.push(`vite SSR full-reload (triggered by ${named.map((p) => rel(p)).join(', ')})`);
+      }
+    }
+
+    return `${parts.join(' + ')} — restarting dev server`;
+  }
+
   // true from the moment a change is queued until the restart completes — covers
   // the debounce window too, so requests don't slip past the gate before _run starts.
   isRestartPending(): boolean {
@@ -74,80 +147,5 @@ export class RestartScheduler {
         // restart failed — release anyway
       }
     }
-  }
-
-  private _scheduleRun(server: ViteDevServer): void {
-    clearTimeout(this._debounceTimer);
-    this._debounceTimer = setTimeout(() => {
-      this._debounceTimer = undefined;
-      void this._run(server);
-    }, this.debounceMs);
-  }
-
-  private async _run(server: ViteDevServer): Promise<void> {
-    if (this._inFlight) {
-      // loop driving the in-flight restart will pick up the next iteration.
-      this._pending = true;
-
-      return;
-    }
-
-    this._inFlight = true;
-
-    let resolveRun!: () => void;
-
-    this._runPromise = new Promise<void>((resolve) => {
-      resolveRun = resolve;
-    });
-
-    try {
-      do {
-        this._pending = false;
-
-        const bootDeps = [...this._pendingBootDeps].sort();
-        const fullReloads = [...this._pendingFullReloads].sort();
-
-        this._pendingBootDeps.clear();
-        this._pendingFullReloads.clear();
-
-        if (bootDeps.length > 0 || fullReloads.length > 0) {
-          this.logger.info(this._formatReason(server, bootDeps, fullReloads));
-        }
-
-        try {
-          await server.restart();
-        } catch (error) {
-          this.logger.error(`error during dev server restart: ${serializeError(error)}`);
-        }
-      } while (this._pending);
-    } finally {
-      this._inFlight = false;
-      this._runPromise = undefined;
-      resolveRun();
-    }
-  }
-
-  private _formatReason(server: ViteDevServer, bootDeps: string[], fullReloads: string[]): string {
-    const root = server.config.root;
-    const rel = (p: string): string => path.relative(root, p) || p;
-    const parts: string[] = [];
-
-    if (bootDeps.length === 1) {
-      parts.push(`boot dep changed: ${rel(bootDeps[0]!)}`);
-    } else if (bootDeps.length > 1) {
-      parts.push(`boot deps changed (${bootDeps.length}): ${bootDeps.map(rel).join(', ')}`);
-    }
-
-    if (fullReloads.length > 0) {
-      const named = fullReloads.filter((p) => p !== FULL_RELOAD_UNKNOWN);
-
-      if (named.length === 0) {
-        parts.push('vite SSR full-reload');
-      } else {
-        parts.push(`vite SSR full-reload (triggered by ${named.map(rel).join(', ')})`);
-      }
-    }
-
-    return `${parts.join(' + ')} — restarting dev server`;
   }
 }

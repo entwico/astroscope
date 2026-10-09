@@ -25,7 +25,10 @@ export type ModuleGraph = {
 };
 
 export type RouteIslandsResult = {
-  /** route pattern → island component ids (absolute module ids, query stripped); pages missing from the graph are absent */
+  /**
+   * route pattern → island component ids (absolute module ids, query stripped);
+   * pages missing from the graph are absent
+   */
   routes: Map<string, Set<string>>;
   /** module id → route patterns whose page reaches it, the whole server module graph */
   patternsByModule: Map<string, Set<string>>;

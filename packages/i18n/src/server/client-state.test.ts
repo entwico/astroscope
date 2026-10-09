@@ -46,7 +46,7 @@ describe('createFullStateScript', () => {
     const script = createFullStateScript('en');
 
     expect(script).not.toContain('a</script>');
-    expect(script).toContain('\\u003c/script');
+    expect(script).toContain(String.raw`\u003c/script`);
   });
 });
 

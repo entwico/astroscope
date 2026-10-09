@@ -119,10 +119,10 @@ function findMount(req: IncomingMessage): Mount | undefined {
   let best: Mount | undefined;
 
   for (const mount of getStore().mounts) {
-    if (mount.prefix && matchesPrefix(pathname, mount.prefix)) {
-      if (!best?.prefix || mount.prefix.length > best.prefix.length) {
-        best = mount;
-      }
+    if (!mount.prefix || !matchesPrefix(pathname, mount.prefix)) continue;
+
+    if (!best?.prefix || mount.prefix.length > best.prefix.length) {
+      best = mount;
     }
   }
 
@@ -159,13 +159,14 @@ export function dispatchNativeMount(req: IncomingMessage, res: ServerResponse): 
     const result = mount.handler(req, res);
 
     if (result instanceof Promise) {
-      result.catch((err: unknown) => {
-        log.error(err instanceof Error ? { err } : { reason: err }, 'native mount handler failed');
+      // eslint-disable-next-line unicorn/prefer-await -- fire-and-forget: the connect handler is synchronous, the mount owns the response
+      result.catch((error: unknown) => {
+        log.error(error instanceof Error ? { err: error } : { reason: error }, 'native mount handler failed');
         failResponse(res);
       });
     }
-  } catch (err) {
-    log.error(err instanceof Error ? { err } : { reason: err }, 'native mount handler failed');
+  } catch (error) {
+    log.error(error instanceof Error ? { err: error } : { reason: error }, 'native mount handler failed');
     failResponse(res);
   }
 

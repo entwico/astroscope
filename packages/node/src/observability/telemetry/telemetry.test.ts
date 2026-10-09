@@ -99,7 +99,9 @@ describe('instruments', () => {
     active.add(1);
     active.add(-1);
 
-    expect((await collect('test.active'))?.metric.dataPoints[0]?.value).toBe(1);
+    const sample = await collect('test.active');
+
+    expect(sample?.metric.dataPoints[0]?.value).toBe(1);
   });
 
   test('an observable gauge created before the sdk is bound when the sdk starts', async () => {
@@ -115,7 +117,8 @@ describe('instruments', () => {
 
     age = 7;
 
-    const point = (await collect('test.age'))?.metric.dataPoints[0];
+    const sample = await collect('test.age');
+    const point = sample?.metric.dataPoints[0];
 
     expect(point?.value).toBe(7);
     expect(point?.attributes).toEqual({ locale: 'en' });
@@ -127,7 +130,9 @@ describe('instruments', () => {
 
     createObservableGauge('test.late', {}, (result) => result.observe(1));
 
-    expect((await collect('test.late'))?.metric.dataPoints[0]?.value).toBe(1);
+    const sample = await collect('test.late');
+
+    expect(sample?.metric.dataPoints[0]?.value).toBe(1);
   });
 });
 
@@ -164,8 +169,7 @@ describe('withSpan', () => {
     expect(() =>
       withSpan('throws', {}, () => {
         throw new Error('boom');
-      }),
-    ).toThrow('boom');
+      })).toThrow('boom');
 
     const [span] = spans.getFinishedSpans();
 
@@ -182,7 +186,7 @@ describe('withSpan', () => {
     const parent = trace.getTracer('test').startSpan('parent');
     const parentContext = trace.setSpan(context.active(), parent);
 
-    await withSpan('child', { parent: parentContext, scope: '@astroscope/test' }, async () => undefined);
+    await withSpan('child', { parent: parentContext, scope: '@astroscope/test' }, async () => {});
 
     parent.end();
 

@@ -57,10 +57,10 @@ async function invoke(handler: MiddlewareHandler, ctx: APIContext, next: Middlew
 
 const createNext = (onCall?: () => void) => {
   const response = new Response('from next');
-  const next = vi.fn(async () => {
+  const next = vi.fn(() => {
     onCall?.();
 
-    return response;
+    return Promise.resolve(response);
   }) as unknown as MiddlewareNext & ReturnType<typeof vi.fn>;
 
   return { next, response };
@@ -264,7 +264,7 @@ describe('createI18nMiddleware', () => {
     i18n.setTranslations('en', { greeting: 'Hello' });
 
     const response = new Response('<html><head></head></html>', { headers: { 'content-type': 'text/html' } });
-    const next = vi.fn(async () => response) as unknown as MiddlewareNext;
+    const next = vi.fn(() => Promise.resolve(response)) as unknown as MiddlewareNext;
 
     const result = await invoke(createI18nMiddleware({ locale: () => 'en' }), createCtx('/page'), next);
 

@@ -15,6 +15,7 @@ class CapSingleton {
       }
     }
 
+    // eslint-disable-next-line unicorn/no-global-object-property-assignment -- the `Symbol.for` slot on globalThis is the store shared across module instances
     (globalThis as ConfigHolder)[CONFIG_KEY] = {
       baseUrl: config.baseUrl.trim().replace(/\/+$/, ''),
       siteKey: config.siteKey.trim(),
@@ -23,7 +24,7 @@ class CapSingleton {
   }
 
   isConfigured(): boolean {
-    return !!(globalThis as ConfigHolder)[CONFIG_KEY];
+    return this.getConfig() !== undefined;
   }
 
   /** @internal */

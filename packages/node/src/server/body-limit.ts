@@ -12,7 +12,7 @@ import { overrideRequestRoute } from '../observability/request-route.js';
  * `0` or `Infinity` disables the limit.
  */
 export function enforceBodyLimit(req: IncomingMessage, res: ServerResponse, limit: number): boolean {
-  if (limit === 0 || limit === Number.POSITIVE_INFINITY) return false;
+  if (limit === 0 || limit === Infinity) return false;
 
   const declared = Number(req.headers['content-length']);
 

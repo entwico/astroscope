@@ -10,7 +10,7 @@ const { missingAdd, logDebug } = vi.hoisted(() => ({ missingAdd: vi.fn(), logDeb
 
 vi.mock('@astroscope/node/telemetry', () => ({
   createCounter: () => ({ add: missingAdd }),
-  createObservableGauge: () => undefined,
+  createObservableGauge: () => {},
 }));
 
 vi.mock('@astroscope/node/log', () => ({ log: { debug: logDebug } }));
@@ -27,7 +27,7 @@ async function createTranslate() {
   return { getLocale, rich, runWithContext, t };
 }
 
-const createContext = (
+const createI18nContext = (
   locale: string,
   raw: Record<string, string>,
   fallback: FallbackBehavior = 'fallback',
@@ -48,7 +48,7 @@ describe('getLocale', () => {
   test('returns the context locale inside a request', async () => {
     const { getLocale, runWithContext } = await createTranslate();
 
-    runWithContext(createContext('de', {}), () => {
+    runWithContext(createI18nContext('de', {}), () => {
       expect(getLocale()).toBe('de');
     });
   });
@@ -78,7 +78,7 @@ describe('t inside request context', () => {
   test('uses the translation from the context', async () => {
     const { runWithContext, t } = await createTranslate();
 
-    runWithContext(createContext('de', { greeting: 'Hallo {$name}' }), () => {
+    runWithContext(createI18nContext('de', { greeting: 'Hallo {$name}' }), () => {
       expect(t('greeting', 'Hello {$name}', { name: 'Welt' })).toBe('Hallo Welt');
     });
   });
@@ -86,7 +86,7 @@ describe('t inside request context', () => {
   test('prefers the translation over the fallback', async () => {
     const { runWithContext, t } = await createTranslate();
 
-    runWithContext(createContext('en', { greeting: 'Hi' }), () => {
+    runWithContext(createI18nContext('en', { greeting: 'Hi' }), () => {
       expect(t('greeting', 'Hello')).toBe('Hi');
     });
   });
@@ -94,14 +94,14 @@ describe('t inside request context', () => {
   test('uses the meta fallback when the translation is missing', async () => {
     const { runWithContext, t } = await createTranslate();
 
-    runWithContext(createContext('en', {}), () => {
+    runWithContext(createI18nContext('en', {}), () => {
       expect(t('missing', 'Hello {$name}', { name: 'World' })).toBe('Hello World');
     });
   });
 
   test('caches the compiled fallback in the context', async () => {
     const { runWithContext, t } = await createTranslate();
-    const context = createContext('en', {});
+    const context = createI18nContext('en', {});
 
     runWithContext(context, () => {
       t('missing', 'Hello');
@@ -113,7 +113,7 @@ describe('t inside request context', () => {
   test('falls back to the key when meta has no fallback', async () => {
     const { runWithContext, t } = await createTranslate();
 
-    runWithContext(createContext('en', {}), () => {
+    runWithContext(createI18nContext('en', {}), () => {
       expect(t('missing.key', '')).toBe('missing.key');
     });
   });
@@ -121,7 +121,7 @@ describe('t inside request context', () => {
   test('fallback behavior key returns the key even with a fallback given', async () => {
     const { runWithContext, t } = await createTranslate();
 
-    runWithContext(createContext('en', {}, 'key'), () => {
+    runWithContext(createI18nContext('en', {}, 'key'), () => {
       expect(t('missing.key', 'Hello')).toBe('missing.key');
     });
   });
@@ -129,7 +129,7 @@ describe('t inside request context', () => {
   test('fallback behavior throw raises for missing translations', async () => {
     const { runWithContext, t } = await createTranslate();
 
-    runWithContext(createContext('en', {}, 'throw'), () => {
+    runWithContext(createI18nContext('en', {}, 'throw'), () => {
       expect(() => t('missing.key', 'Hello')).toThrow('Missing translation for key: missing.key');
     });
   });
@@ -138,7 +138,7 @@ describe('t inside request context', () => {
     const { runWithContext, t } = await createTranslate();
     const fallback = vi.fn((key: string) => `[${key}]`);
 
-    runWithContext(createContext('en', {}, fallback), () => {
+    runWithContext(createI18nContext('en', {}, fallback), () => {
       expect(t('missing.key', 'Hello')).toBe('[missing.key]');
     });
 
@@ -151,7 +151,7 @@ describe('rich', () => {
 
   const tag =
     (name: string) =>
-    (children: unknown[]): Node => ({ tag: name, children });
+      (children: unknown[]): Node => ({ tag: name, children });
 
   test('wraps markup in the fallback with components', async () => {
     const { rich } = await createTranslate();
@@ -164,7 +164,7 @@ describe('rich', () => {
   test('prefers the raw translation from the context', async () => {
     const { rich, runWithContext } = await createTranslate();
 
-    runWithContext(createContext('de', { tos: 'Lies die {#link}AGB{/link}' }), () => {
+    runWithContext(createI18nContext('de', { tos: 'Lies die {#link}AGB{/link}' }), () => {
       const result = rich<Node>('tos', 'Read our {#link}Terms{/link}', { link: tag('a') });
 
       expect(result).toEqual(['Lies die ', { tag: 'a', children: ['AGB'] }]);
@@ -200,7 +200,7 @@ describe('rich', () => {
   test('treats an empty raw translation as missing', async () => {
     const { rich, runWithContext } = await createTranslate();
 
-    runWithContext(createContext('de', { tos: '' }), () => {
+    runWithContext(createI18nContext('de', { tos: '' }), () => {
       expect(rich('tos', 'Read our terms')).toEqual(['Read our terms']);
     });
   });
@@ -213,7 +213,7 @@ describe('missing translations', () => {
     missingAdd.mockClear();
     logDebug.mockClear();
 
-    runWithContext(createContext('de', { present: 'Da' }), () => {
+    runWithContext(createI18nContext('de', { present: 'Da' }), () => {
       expect(t('present', 'Here')).toBe('Da');
       expect(t('absent', 'Gone')).toBe('Gone');
     });
@@ -228,7 +228,7 @@ describe('missing translations', () => {
 
     missingAdd.mockClear();
 
-    runWithContext(createContext('en', {}), () => {
+    runWithContext(createI18nContext('en', {}), () => {
       expect(rich('absent', 'Gone')).toEqual(['Gone']);
     });
 

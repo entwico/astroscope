@@ -8,7 +8,7 @@ const STORE_KEY = Symbol.for('@astroscope/node/health');
 
 export interface RegistrableCheck {
   name: string;
-  check: () => Promise<{ status: 'healthy' | 'unhealthy' } | void> | { status: 'healthy' | 'unhealthy' } | void;
+  check: () => Promise<void | { status: 'healthy' | 'unhealthy' }> | void | { status: 'healthy' | 'unhealthy' };
   optional?: boolean;
   timeout?: number;
 }

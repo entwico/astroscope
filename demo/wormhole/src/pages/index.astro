@@ -60,10 +60,10 @@ const counter = wormholes.counter.get();
     <div class="card-body">
       <h2 class="card-title">
         Astro Script Block
-        <code class="badge badge-ghost">{"<script>"}</code>
+        <code class="badge badge-ghost">{'<script>'}</code>
       </h2>
       <p class="text-sm text-base-content/70 mb-4">
-        Wormholes accessed in a client-side <code class="badge badge-ghost">{"<script>"}</code> tag — shares the same values as React islands.
+        Wormholes accessed in a client-side <code class="badge badge-ghost">{'<script>'}</code> tag — shares the same values as React islands.
       </p>
       <p>Counter value from script: <strong id="script-counter">-</strong></p>
       <p>Visitors from the script-only stats wormhole: <strong id="script-stats">-</strong></p>
@@ -77,7 +77,7 @@ const counter = wormholes.counter.get();
 <script>
   import { wormholes } from '@astroscope/wormhole';
 
-  const counterEl = document.getElementById('script-counter')!;
+  const counterEl = document.querySelector('#script-counter')!;
 
   counterEl.textContent = String(wormholes.counter.get().count);
 
@@ -85,5 +85,5 @@ const counter = wormholes.counter.get();
     counterEl.textContent = String(data.count);
   });
 
-  document.getElementById('script-stats')!.textContent = String(wormholes.stats.get().visitors);
+  document.querySelector('#script-stats')!.textContent = String(wormholes.stats.get().visitors);
 </script>

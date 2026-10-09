@@ -25,7 +25,7 @@ export function isIslandElement(node: TSESTree.JSXOpeningElement): node is TSEST
     return false;
   }
 
-  return node.attributes.some(isClientDirective);
+  return node.attributes.some((attribute) => isClientDirective(attribute));
 }
 
 function resolveComponentType(checker: ts.TypeChecker, tsTagNode: ts.Node): ts.Type | null {

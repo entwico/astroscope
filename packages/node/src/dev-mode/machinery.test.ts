@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/prefer-event-target -- an EventEmitter stands in for chokidar's watcher and node's http server */
 import EventEmitter from 'node:events';
 import type { Plugin } from 'vite';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
@@ -5,7 +6,7 @@ import type { BootModule } from '../lifecycle/lifecycle';
 
 vi.mock('./vite-env.js', () => ({
   ssrImport: vi.fn(),
-  getAstroHotEnv: vi.fn(() => undefined),
+  getAstroHotEnv: vi.fn(() => {}),
 }));
 
 vi.mock('../lifecycle/lifecycle.js', () => ({
@@ -99,18 +100,22 @@ describe('dev machinery configureServer', () => {
     const order: string[] = [];
     const mod: BootModule = { onStartup: vi.fn(), onShutdown: vi.fn() };
 
-    mockedSsrImport.mockImplementation(async () => {
+    mockedSsrImport.mockImplementation(() => {
       order.push('import');
 
-      return mod;
+      return Promise.resolve(mod);
     });
-    mockedRunStartup.mockImplementation(async () => {
+    mockedRunStartup.mockImplementation(() => {
       order.push('startup');
+
+      return Promise.resolve();
     });
 
     const { plugin } = getStartupPlugin({
-      prepare: async () => {
+      prepare: () => {
         order.push('prepare');
+
+        return Promise.resolve();
       },
     });
 
@@ -134,12 +139,16 @@ describe('dev machinery configureServer', () => {
 
     const order: string[] = [];
 
-    mockedRunStartup.mockImplementation(async (mod) => {
+    mockedRunStartup.mockImplementation((mod) => {
       order.push(mod === oldModule ? 'startup-old' : 'startup-new');
+
+      return Promise.resolve();
     });
 
-    mockedRunShutdown.mockImplementation(async (mod) => {
+    mockedRunShutdown.mockImplementation((mod) => {
       order.push(mod === oldModule ? 'shutdown-old' : 'shutdown-new');
+
+      return Promise.resolve();
     });
 
     mockedSsrImport.mockResolvedValueOnce(oldModule).mockResolvedValueOnce(newModule);
@@ -241,9 +250,7 @@ describe('dev machinery configureServer', () => {
     let failPrepare = false;
 
     const { plugin } = getStartupPlugin({
-      prepare: async () => {
-        if (failPrepare) throw new Error('config invalid');
-      },
+      prepare: () => (failPrepare ? Promise.reject(new Error('config invalid')) : Promise.resolve()),
     });
 
     await (plugin.configureServer as never as ConfigureServer)(createMockServer());

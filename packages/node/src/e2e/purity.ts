@@ -12,7 +12,7 @@ const MACHINE_PATH_RE = /\/(?:Users|home)\/[^/"'`\s]+\//;
  * paths (SSR manifest urls, compiled component ids) are upstream's to fix.
  */
 function isLeaking(file: string): boolean {
-  const content = readFileSync(file, 'utf-8');
+  const content = readFileSync(file, 'utf8');
 
   if (file.endsWith('.map')) {
     const map = JSON.parse(content) as { sources?: string[]; sourceRoot?: string };

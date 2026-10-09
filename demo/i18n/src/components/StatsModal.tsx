@@ -7,19 +7,33 @@ export type StatsModalProps = {
 export default function StatsModal({ onClose }: StatsModalProps) {
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="stats-title"
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
       }}
-      onClick={onClose}
     >
+      <button
+        type="button"
+        aria-label={t('stats.close', 'Close')}
+        onClick={onClose}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      />
       <div
         style={{
+          position: 'relative',
           background: 'white',
           borderRadius: '12px',
           padding: '2rem',
@@ -27,9 +41,10 @@ export default function StatsModal({ onClose }: StatsModalProps) {
           width: '90%',
           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ marginTop: 0 }}>{t('stats.title', 'Your Statistics')}</h2>
+        <h2 id="stats-title" style={{ marginTop: 0 }}>
+          {t('stats.title', 'Your Statistics')}
+        </h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', margin: '1.5rem 0' }}>
           <div style={{ padding: '1rem', background: '#f0f9ff', borderRadius: '8px', textAlign: 'center' }}>

@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-incorrect-template-string-interpolation -- fixture sources contain template syntax */
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RuleTester } from '@typescript-eslint/rule-tester';

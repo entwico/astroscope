@@ -12,15 +12,15 @@ vi.mock('astro:actions', () => {
   const statuses: Record<string, number> = { BAD_REQUEST: 400, FORBIDDEN: 403, SERVICE_UNAVAILABLE: 503 };
 
   class ActionError extends Error {
+    static codeToStatus(code: string) {
+      return statuses[code] ?? 500;
+    }
+
     code: string;
 
     constructor({ code, message }: { code: string; message?: string }) {
       super(message ?? code);
       this.code = code;
-    }
-
-    static codeToStatus(code: string) {
-      return statuses[code] ?? 500;
     }
   }
 
@@ -39,7 +39,7 @@ function createContext(body?: Record<string, string>) {
 }
 
 function mockFetch(response: Response) {
-  const fetchMock = vi.fn(async () => response);
+  const fetchMock = vi.fn(() => Promise.resolve(response));
 
   vi.stubGlobal('fetch', fetchMock);
 

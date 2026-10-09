@@ -49,8 +49,7 @@ async function startServer(respond: () => Response): Promise<string> {
       getRequestRecord()!.route = '/page';
 
       void writeResponse(respond(), res);
-    }),
-  );
+    }));
 
   servers.push(server);
 

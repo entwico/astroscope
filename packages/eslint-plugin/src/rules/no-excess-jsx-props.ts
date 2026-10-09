@@ -12,20 +12,20 @@ const createRule = ESLintUtils.RuleCreator<PluginDocs>(
 );
 
 const PRIMITIVE_FLAGS =
-  ts.TypeFlags.String |
-  ts.TypeFlags.Number |
-  ts.TypeFlags.Boolean |
-  ts.TypeFlags.BigInt |
-  ts.TypeFlags.StringLiteral |
-  ts.TypeFlags.NumberLiteral |
-  ts.TypeFlags.BooleanLiteral |
-  ts.TypeFlags.BigIntLiteral |
-  ts.TypeFlags.EnumLiteral |
-  ts.TypeFlags.Null |
-  ts.TypeFlags.Undefined |
-  ts.TypeFlags.Void |
-  ts.TypeFlags.Never |
-  ts.TypeFlags.ESSymbol;
+  ts.TypeFlags.String
+  | ts.TypeFlags.Number
+  | ts.TypeFlags.Boolean
+  | ts.TypeFlags.BigInt
+  | ts.TypeFlags.StringLiteral
+  | ts.TypeFlags.NumberLiteral
+  | ts.TypeFlags.BooleanLiteral
+  | ts.TypeFlags.BigIntLiteral
+  | ts.TypeFlags.EnumLiteral
+  | ts.TypeFlags.Null
+  | ts.TypeFlags.Undefined
+  | ts.TypeFlags.Void
+  | ts.TypeFlags.Never
+  | ts.TypeFlags.ESSymbol;
 
 function isPrimitive(type: ts.Type): boolean {
   return (type.flags & PRIMITIVE_FLAGS) !== 0;
@@ -60,7 +60,7 @@ function resolveTypeParameter(type: ts.Type, checker: ts.TypeChecker): ts.Type |
 }
 
 function constituents(type: ts.Type): ts.Type[] {
-  if (type.isUnion()) return type.types.flatMap(constituents);
+  if (type.isUnion()) return type.types.flatMap((member) => constituents(member));
 
   return [type];
 }
@@ -113,7 +113,7 @@ function isLiteralType(type: ts.Type): boolean {
 
 function isLiteralOrUnionOfLiterals(type: ts.Type): boolean {
   if (isLiteralType(type)) return true;
-  if (type.isUnion()) return type.types.every(isLiteralType);
+  if (type.isUnion()) return type.types.every((member) => isLiteralType(member));
 
   return false;
 }
@@ -179,7 +179,7 @@ function narrowByDiscriminant(expected: ts.Type, actual: ts.Type, checker: ts.Ty
     // anything else can't pick a branch
     if (isLiteralType(propType)) {
       actualValues.add(getLiteralValue(propType));
-    } else if (propType.isUnion() && propType.types.every(isLiteralType)) {
+    } else if (propType.isUnion() && propType.types.every((member) => isLiteralType(member))) {
       for (const member of propType.types) actualValues.add(getLiteralValue(member));
     } else {
       return expected;
@@ -358,7 +358,9 @@ function collectExcessPaths(
   walkExcess(expected, actual, rootPath, new Map(), out, checker, site);
 
   // de-dup (nested unions can surface the same excess multiple times)
-  return [...new Set(out)].sort();
+  const unique = [...new Set(out)].toSorted((a, b) => a.localeCompare(b));
+
+  return unique;
 }
 
 export const noExcessJsxProps = createRule({

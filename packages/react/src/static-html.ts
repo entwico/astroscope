@@ -8,7 +8,7 @@ import { createElement as h, memo } from 'react';
 export const StaticHtml = memo(
   ({ value, name, hydrate = true }: { value: string | null; name?: string; hydrate?: boolean }) => {
     // value can be a SlotString object, so emptiness is checked via trim()
-    if (value == null || value.trim() === '') return null;
+    if (!value?.trim()) return null;
 
     const tagName = hydrate ? 'astro-slot' : 'astro-static-slot';
 

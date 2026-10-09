@@ -76,7 +76,7 @@ export function createStaticHandler(app: BaseApp, client: string) {
       fullUrl = fullUrl.slice(0, fullUrl.indexOf('#'));
     }
 
-    const [urlPath = '', urlQuery] = fullUrl.split('?');
+    const [urlPath = '', urlQuery] = fullUrl.split('?', 2);
     let fsPath = app.removeBase(urlPath);
 
     try {

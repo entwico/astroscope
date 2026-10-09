@@ -50,7 +50,7 @@ export function evaluatePathRedirect(
   const pathname = queryIndex === -1 ? url : url.slice(0, queryIndex);
   const query = queryIndex === -1 ? '' : url.slice(queryIndex);
 
-  const collapsed = pathname.includes('//') ? pathname.replace(DUPLICATE_SLASHES, '/') : pathname;
+  const collapsed = pathname.includes('//') ? pathname.replaceAll(DUPLICATE_SLASHES, '/') : pathname;
 
   if (collapsed.startsWith('/\\')) return undefined;
 
@@ -85,18 +85,22 @@ function isInternalPath(pathname: string): boolean {
   switch (pathname.charAt(1)) {
     case '_':
     case '@':
-    case '.':
+    case '.': {
       return true;
+    }
     case '/':
-    case '\\':
+    case '\\': {
       return !isJustSlashes(pathname);
-    default:
+    }
+    default: {
       return false;
+    }
   }
 }
 
 function isJustSlashes(pathname: string): boolean {
   for (let i = 0; i < pathname.length; i++) {
+    // eslint-disable-next-line unicorn/prefer-code-point -- hot path ascii check
     if (pathname.charCodeAt(i) !== 47) return false;
   }
 

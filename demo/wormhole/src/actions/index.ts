@@ -1,6 +1,6 @@
+import { defineAction } from '@astroscope/node/guards';
 import { wormholes } from '@astroscope/wormhole';
 import { z } from 'astro/zod';
-import { defineAction } from 'astro:actions';
 import { setCount } from '../server/store';
 
 export const server = {

@@ -17,6 +17,7 @@ function getStore(): EventStore {
 
   const store: EventStore = { listeners: new Map() };
 
+  // eslint-disable-next-line unicorn/no-global-object-property-assignment -- Symbol.for store on globalThis, shared across module instances
   (globalThis as Record<symbol, EventStore>)[STORE_KEY] = store;
 
   return store;

@@ -3,8 +3,7 @@ import type { Wormhole } from '../types';
 import { useWormhole } from './index';
 
 const useSyncExternalStore = vi.hoisted(() =>
-  vi.fn((_subscribe: () => void, getSnapshot: () => unknown) => getSnapshot()),
-);
+  vi.fn((_subscribe: () => void, getSnapshot: () => unknown) => getSnapshot()));
 
 vi.mock('react', () => ({ useSyncExternalStore }));
 

@@ -67,7 +67,7 @@ function fix(
   source: string,
   sourceCode: Rule.RuleContext['sourceCode'],
 ): Rule.Fix | null {
-  const quote = sourceCode.getText(declaration.source).startsWith('"') ? '"' : "'";
+  const quote = sourceCode.getText(declaration.source).startsWith('"') ? '"' : '\'';
   const replacement = `import { ${sourceCode.getText(specifier)} } from ${quote}${source}${quote};`;
 
   if (declaration.specifiers.length === 1) {

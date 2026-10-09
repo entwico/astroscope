@@ -56,7 +56,7 @@ describe('constructRootLogger', () => {
   });
 
   test('awaits a factory function and passes the dev flag', async () => {
-    const factory = vi.fn(async () => captureOptions({ level: 'trace' }));
+    const factory = vi.fn(() => Promise.resolve(captureOptions({ level: 'trace' })));
 
     const root = await constructRootLogger(factory, { dev: true });
 

@@ -39,7 +39,10 @@ export type WormholeVitePluginOptions = {
   registryPath: string | null;
   /** the middleware's exclude patterns, null for the default */
   exclude: ExcludePattern[] | null;
-  /** route modules (absolute ids) → the route patterns they serve, see `routeEntrypoints` of `@astroscope/node/islands` */
+  /**
+   * route modules (absolute ids) → the route patterns they serve, see `routeEntrypoints`
+   * of `@astroscope/node/islands`
+   */
   pages: () => Map<string, string[]>;
 };
 
@@ -81,6 +84,7 @@ export function wormholeVitePlugin(options: WormholeVitePluginOptions): Plugin {
       }
 
       // the registry carries the handlers, and with them the project's server code
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context api
       if (id === options.registryPath && this.environment?.name === 'client') {
         throw new Error(
           `[@astroscope/wormhole] ${path.relative(process.cwd(), id)} is server-only — client code reads wormholes through the \`wormholes\` proxy from '@astroscope/wormhole'`,
@@ -123,16 +127,18 @@ export { manifest };
     },
 
     async transform(code, id) {
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context api
       if (!isBuild || !this.environment) return;
       if (id.includes('node_modules')) return;
 
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context api
       const client = this.environment.name === 'client';
       const extensions = client ? SCAN_EXTENSIONS : SERVER_SCAN_EXTENSIONS;
       // astro `<script>` modules carry their language in the query (`?astro&type=script&…&lang.ts`),
       // other virtual variants (`?astroPropagatedAssets`) keep the file's own extension
       const file = extensions.some((ext) => id.endsWith(ext)) ? id : stripQuery(id);
 
-      if (!extensions.some((ext) => file.endsWith(ext))) return;
+      if (extensions.every((ext) => !file.endsWith(ext))) return;
       if (!code.includes('@astroscope/wormhole')) return;
 
       // dynamic import keeps the parser out of the SSR runtime bundle
@@ -145,8 +151,10 @@ export { manifest };
     },
 
     async generateBundle() {
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context api
       if (this.environment.name === 'client') return;
 
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context api
       const { routes, patternsByModule } = await collectRouteIslands(this, options.pages());
 
       for (const pattern of routes.keys()) {
@@ -181,6 +189,7 @@ export { manifest };
     },
 
     writeBundle(outputOptions, bundle) {
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context api
       if (this.environment.name !== 'client' || !outputOptions.dir) return;
 
       const chunks: WormholeManifest['chunks'] = {};
@@ -228,7 +237,7 @@ export { manifest };
 
           visited.add(fileName);
           chunkNamesByFileName.get(fileName)?.forEach((name) => names.add(name));
-          chunkEdges.get(fileName)?.forEach(walk);
+          chunkEdges.get(fileName)?.forEach((imported) => walk(imported));
         };
 
         walk(entry);

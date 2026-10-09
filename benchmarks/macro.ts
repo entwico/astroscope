@@ -33,9 +33,9 @@ const pages: Record<string, string> = {
   prerendered: '/static',
 };
 
-const port = 21000 + (process.pid % 1000);
+const port = 21_000 + (process.pid % 1000);
 
-async function build(name: string, env: Record<string, string>): Promise<string> {
+function build(name: string, env: Record<string, string>): string {
   const outDir = path.join(outRoot, name);
 
   rmSync(outDir, { recursive: true, force: true });
@@ -70,7 +70,9 @@ async function serve(outDir: string): Promise<ChildProcess> {
 
   while (Date.now() < deadline) {
     try {
-      if ((await fetch(`http://127.0.0.1:${port}/`)).ok) return server;
+      const response = await fetch(`http://127.0.0.1:${port}/`);
+
+      if (response.ok) return server;
     } catch {
       // not listening yet
     }
@@ -110,7 +112,7 @@ async function measure(url: string, seconds: number): Promise<PageResult> {
 }
 
 async function runVariant(name: string, env: Record<string, string>): Promise<VariantResult> {
-  const outDir = await build(name, env);
+  const outDir = build(name, env);
   const server = await serve(outDir);
   const pageResults: Record<string, PageResult> = {};
 
@@ -169,7 +171,7 @@ const previous = previousFile
 const results: Record<string, VariantResult> = {};
 
 for (const [name, env] of Object.entries(variants)) {
-  if (only.length && !only.includes(name)) continue;
+  if (only.length > 0 && !only.includes(name)) continue;
 
   console.log(`\n=== ${name} ===`);
   results[name] = await runVariant(name, env);
@@ -183,7 +185,7 @@ const out = path.join(resultsDir, `macro-${stamp()}.json`);
 writeFileSync(out, `${JSON.stringify({ meta: { ...machineMeta(), duration, connections }, results }, null, 2)}\n`);
 console.log(`\nresult written to ${path.relative(root, out)}`);
 
-if (failures.length) {
+if (failures.length > 0) {
   console.error(`\nthroughput dropped more than ${threshold}%:\n  ${failures.join('\n  ')}`);
   process.exit(1);
 }

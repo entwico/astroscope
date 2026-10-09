@@ -9,7 +9,7 @@ import type { ExtractionError } from './types.js';
  * cannot be mapped keep the position babel gave them.
  */
 export function mapErrorsToSource(errors: ExtractionError[], map: unknown): ExtractionError[] {
-  if (errors.length === 0 || !map) {
+  if (!map || errors.length === 0) {
     return errors;
   }
 

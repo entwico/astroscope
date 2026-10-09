@@ -14,7 +14,7 @@ const INSTALLED = Symbol.for('@astroscope/node.islandsRuntime');
 type RegistryEntry = string[] | { l?: string[]; i?: string[] };
 
 function register(entries: Record<string, RegistryEntry>): void {
-  (globalThis as { __islands__?: Record<string, RegistryEntry> }).__islands__ = entries;
+  vi.stubGlobal('__islands__', entries);
 }
 
 function importedUrls(): string[] {
@@ -52,8 +52,8 @@ function preloadedHrefs(): string[] {
 }
 
 beforeEach(() => {
-  document.head.innerHTML = '';
-  document.body.innerHTML = '';
+  document.head.replaceChildren();
+  document.body.replaceChildren();
 
   delete (globalThis as Record<symbol, unknown>)[INSTALLED];
   delete (globalThis as { __islands__?: unknown }).__islands__;
@@ -73,6 +73,7 @@ beforeEach(() => {
       constructor(callback: MutationCallback) {
         mutate = callback;
       }
+
       observe() {}
       disconnect() {}
     },
@@ -84,9 +85,11 @@ beforeEach(() => {
       constructor(callback: IntersectionCallback) {
         intersect = callback;
       }
+
       observe(target: Element) {
         observedTargets.push(target);
       }
+
       unobserve() {}
       disconnect() {}
     },
@@ -129,7 +132,7 @@ describe('islands gate runtime', () => {
     expect(observedTargets).toEqual([...island.children]);
     expect(preloadedHrefs()).toEqual([]);
 
-    intersect?.([{ target: island.children[1]!, isIntersecting: true }]);
+    intersect?.([{ target: island.lastElementChild!, isIntersecting: true }]);
 
     expect(preloadedHrefs()).toEqual(['/_astro/Menu.js']);
   });
@@ -184,10 +187,10 @@ describe('islands gate runtime', () => {
     document.body.append(first, second);
     await loadRuntime();
 
-    expect(observedTargets).toEqual([first.children[0], second.children[0]]);
+    expect(observedTargets).toEqual([first.firstElementChild, second.firstElementChild]);
 
-    intersect?.([{ target: second.children[0]!, isIntersecting: true }]);
-    intersect?.([{ target: first.children[0]!, isIntersecting: true }]);
+    intersect?.([{ target: second.firstElementChild!, isIntersecting: true }]);
+    intersect?.([{ target: first.firstElementChild!, isIntersecting: true }]);
 
     expect(preloadedHrefs()).toEqual(['/_astro/Card.js', '/_astro/shared.js']);
   });
@@ -257,11 +260,15 @@ describe('islands gate runtime', () => {
 
     // evaluation order follows fetch completion — compare order-free
     await vi.waitFor(
-      () => expect([...importedUrls()].sort()).toEqual(['/_i18n/en/Cart.abc.js', '/_i18n/en/Lazy.def.js']),
+      () => {
+        const urls = [...importedUrls()].toSorted((a, b) => a.localeCompare(b));
+
+        expect(urls).toEqual(['/_i18n/en/Cart.abc.js', '/_i18n/en/Lazy.def.js']);
+      },
       { timeout: 5000 },
     );
     expect(preloadedHrefs()).toEqual(['/_astro/Cart.js']);
-  }, 10000);
+  }, 10_000);
 
   test('an import shared between components fires only once', async () => {
     register({
@@ -277,7 +284,7 @@ describe('islands gate runtime', () => {
     idleCallbacks.forEach((cb) => cb());
 
     await vi.waitFor(() => expect(importedUrls()).toEqual(['/_i18n/en/shared.abc.js']), { timeout: 5000 });
-  }, 10000);
+  }, 10_000);
 
   test('a failed eager import stays silent', async () => {
     register({ '/_astro/A.js': { l: ['/_astro/A.js'], i: ['/definitely-not-resolvable.js'] } });

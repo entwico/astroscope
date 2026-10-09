@@ -85,8 +85,10 @@ export { manifest };
     },
 
     async generateBundle() {
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the rollup plugin context
       if (!options.enabled || this.environment.name === 'client') return;
 
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the rollup plugin context
       const { routes } = await collectRouteIslands(this, options.pages());
 
       for (const [pattern, islands] of routes) {
@@ -95,6 +97,7 @@ export { manifest };
     },
 
     writeBundle(outputOptions, bundle) {
+      // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the rollup plugin context
       if (!options.enabled || this.environment.name !== 'client' || !outputOptions.dir) return;
 
       const chunks: IslandsManifest['chunks'] = {};
@@ -120,7 +123,7 @@ export { manifest };
         routes[pattern] = [...islands].map((component) => entryByComponent.get(component)).filter(defined);
       }
 
-      const runtimeSource = fs.readFileSync(new URL('./islands-runtime.iife.js', import.meta.url), 'utf-8').trim();
+      const runtimeSource = fs.readFileSync(new URL('islands-runtime.iife.js', import.meta.url), 'utf8').trim();
 
       // the source goes verbatim into an inline script tag
       if (runtimeSource.toLowerCase().includes('</script')) {

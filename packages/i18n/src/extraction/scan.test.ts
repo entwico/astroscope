@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-incorrect-template-string-interpolation -- fixture sources contain astro expression syntax */
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -25,7 +26,7 @@ async function createProject(files: Record<string, string>): Promise<string> {
     const fullPath = path.join(root, relativePath);
 
     await mkdir(path.dirname(fullPath), { recursive: true });
-    await writeFile(fullPath, content, 'utf-8');
+    await writeFile(fullPath, content, 'utf8');
   }
 
   return root;
@@ -130,8 +131,10 @@ const title = t('page.title', 'Welcome');
 
     const store = await scan({ projectRoot: root, logger: mockLogger, consistency: 'error' });
 
+    const keys = store.extractedKeys.map((k) => k.key).toSorted((a, b) => a.localeCompare(b));
+
     expect(store.uniqueKeyCount).toBe(2);
-    expect(store.extractedKeys.map((k) => k.key).sort()).toEqual(['key.a', 'key.b']);
+    expect(keys).toEqual(['key.a', 'key.b']);
     expect(store.fileToKeys.size).toBe(2);
   });
 

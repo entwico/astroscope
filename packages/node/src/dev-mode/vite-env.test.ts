@@ -4,9 +4,11 @@ import { getAstroHotEnv, ssrImport } from './vite-env';
 
 // build a fake DevEnvironment as a plain object — instanceof RunnableDevEnvironment
 // would return false, which is exactly the case we want to tolerate
-function makeRunnableEnv(imported: unknown = { ok: true }) {
+function makeRunnableEnv(imported?: unknown) {
+  const resolved = imported ?? { ok: true };
+
   return {
-    runner: { import: vi.fn(async () => imported) },
+    runner: { import: vi.fn(() => Promise.resolve(resolved)) },
     hot: { send: vi.fn() },
   };
 }
@@ -48,7 +50,7 @@ describe('ssrImport', () => {
     // simulates consumer bringing its own vite copy: env is a valid runnable
     // shape but would fail `instanceof RunnableDevEnvironment` against our vite
     const ssr = {
-      runner: { import: async (id: string) => ({ importedId: id }) },
+      runner: { import: (id: string) => Promise.resolve({ importedId: id }) },
       hot: { send: vi.fn() },
     };
     const server = makeServer({ ssr });

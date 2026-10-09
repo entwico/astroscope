@@ -16,7 +16,7 @@ export const tRequiresMeta: Rule.RuleModule = {
     return {
       CallExpression(node) {
         if (node.callee.type !== 'Identifier' || node.callee.name !== 't') return;
-        if (node.arguments.length < 1) return; // no key — other rules handle this
+        if (node.arguments.length === 0) return; // no key — other rules handle this
 
         if (node.arguments.length < 2) {
           context.report({ node, messageId: 'missingMeta' });

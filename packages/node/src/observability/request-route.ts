@@ -24,12 +24,14 @@ function applyRoute(route: string, method: string, override: boolean): void {
 
   const span = trace.getActiveSpan();
 
-  if (span?.isRecording()) {
-    span.setAttribute('http.route', route);
+  if (!span?.isRecording()) {
+    return;
+  }
 
-    if (!record?.actionName) {
-      span.updateName(`${method} ${route}`);
-    }
+  span.setAttribute('http.route', route);
+
+  if (!record?.actionName) {
+    span.updateName(`${method} ${route}`);
   }
 }
 

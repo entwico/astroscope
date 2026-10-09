@@ -1,8 +1,8 @@
 import { t } from '@astroscope/i18n/translate';
 
 export type CartProps = {
-  itemCount: number;
-  total: string;
+  readonly itemCount: number;
+  readonly total: string;
 };
 
 export default function Cart({ itemCount, total }: CartProps) {

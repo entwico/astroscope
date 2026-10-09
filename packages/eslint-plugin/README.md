@@ -197,7 +197,7 @@ Rules for projects using `@astroscope/i18n`, opt-in alongside `recommended`. The
 | `@astroscope/i18n/t-import-source`       | error    |         | `t` must be imported from `@astroscope/i18n/translate`                                                      |
 | `@astroscope/i18n/no-module-level-t`     | error    |         | `t()` must not be called at module level (needs request context on server, hydrated translations on client) |
 | `@astroscope/i18n/t-static-key`          | error    |         | first argument must be a static string literal (dynamic keys break build-time extraction)                   |
-| `@astroscope/i18n/t-static-meta`         | warn     |         | second argument must be statically analyzable (extraction reads it at build time)                           |
+| `@astroscope/i18n/t-static-meta`         | warn     |         | second argument must be statically analyzable: no concatenation, interpolation or tagged templates (extraction reads it at build time) |
 | `@astroscope/i18n/t-requires-meta`       | warn     |         | second argument (fallback/meta) should be provided for development DX                                       |
 | `@astroscope/i18n/no-t-reassign`         | error    |         | forbids aliasing or reassigning `t` (the extractor only recognizes `t()` calls)                             |
 | `@astroscope/i18n/no-raw-strings-in-jsx` | warn     |         | warns when raw strings appear in JSX that may need translation                                              |

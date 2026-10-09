@@ -1,5 +1,3 @@
-import astroscope from '@astroscope/eslint-plugin';
-
 import rootConfig from '../../eslint.config.js';
 
 export default [
@@ -7,6 +5,5 @@ export default [
   // run `pnpm lint:demo` to test the rule against them
   { ignores: ['src/examples/**'] },
 
-  ...rootConfig,
-  ...astroscope.configs.recommended,
+  ...(await rootConfig),
 ];

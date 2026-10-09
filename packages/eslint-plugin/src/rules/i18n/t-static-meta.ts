@@ -1,13 +1,19 @@
 import type { Rule } from 'eslint';
 import type { Node, ObjectExpression, Property } from 'estree';
 
-// a meta string is non-extractable when built via `+` concatenation or an
-// interpolated template literal — the build cannot read either statically
-function isDynamicString(node: Node): boolean {
-  return (
-    (node.type === 'BinaryExpression' && node.operator === '+') ||
-    (node.type === 'TemplateLiteral' && node.expressions.length > 0)
-  );
+// a meta string is non-extractable when built via `+` concatenation, an interpolated template
+// literal or a tagged template (`String.raw`) — the build cannot read any of them statically
+function dynamicStringMessage(node: Node): 'dynamicMeta' | 'taggedMeta' | undefined {
+  if ((node.type === 'BinaryExpression' && node.operator === '+') ||
+    (node.type === 'TemplateLiteral' && node.expressions.length > 0)) {
+    return 'dynamicMeta';
+  }
+
+  if (node.type === 'TaggedTemplateExpression') {
+    return 'taggedMeta';
+  }
+
+  return undefined;
 }
 
 function findProperty(obj: ObjectExpression, name: string): Property | undefined {
@@ -34,15 +40,18 @@ export const tStaticMeta: Rule.RuleModule = {
     messages: {
       dynamicMeta:
         '`t()` {{ field }} must be a static string literal. String concatenation and template expressions cannot be extracted at build time — use an MF2 template with variables instead, e.g. `t(key, "Hello {name}", { name })`.',
+      taggedMeta:
+        '`t()` {{ field }} must be a plain string literal. A tagged template such as `String.raw` is a call the extractor cannot evaluate at build time — write the escapes in a plain string instead.',
     },
     schema: [],
   },
   create(context) {
     const checkField = (obj: ObjectExpression, field: string) => {
       const prop = findProperty(obj, field);
+      const messageId = prop && dynamicStringMessage(prop.value);
 
-      if (prop && isDynamicString(prop.value)) {
-        context.report({ node: prop.value, messageId: 'dynamicMeta', data: { field } });
+      if (prop && messageId) {
+        context.report({ node: prop.value, messageId, data: { field } });
       }
     };
 
@@ -55,8 +64,10 @@ export const tStaticMeta: Rule.RuleModule = {
         if (!meta) return; // no fallback — other rules handle this
 
         // string shorthand: t('key', 'a' + b)
-        if (isDynamicString(meta)) {
-          context.report({ node: meta, messageId: 'dynamicMeta', data: { field: 'fallback' } });
+        const messageId = dynamicStringMessage(meta);
+
+        if (messageId) {
+          context.report({ node: meta, messageId, data: { field: 'fallback' } });
 
           return;
         }

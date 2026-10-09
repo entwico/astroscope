@@ -8,7 +8,7 @@ function getTransform(): TransformFn {
   const plugin = stripSsrEffectsPlugin();
   const t = plugin.transform as unknown as TransformFn;
 
-  if (typeof t !== 'function') throw new Error('transform should be a function');
+  if (typeof t !== 'function') throw new TypeError('transform should be a function');
 
   return (code, id, opts) => t.call({}, code, id, opts);
 }

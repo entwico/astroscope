@@ -98,9 +98,9 @@ export const corpus: [name: string, fixture: string][] = [
 ];
 
 export function strip(fixture: string): string {
-  return fixture.replace(/§/g, '');
+  return fixture.replaceAll('§', '');
 }
 
 export function expected(fixture: string): string {
-  return fixture.replace(/§/g, P);
+  return fixture.replaceAll('§', () => P);
 }

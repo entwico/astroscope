@@ -34,16 +34,16 @@ describe('evaluatePathRedirect', () => {
     });
 
     test('ignores absolute-form and asterisk-form request targets', () => {
-      expect(evaluatePathRedirect('http://example.com//products', 'GET', 'never')).toBeUndefined();
+      expect(evaluatePathRedirect('https://example.com//products', 'GET', 'never')).toBeUndefined();
       expect(evaluatePathRedirect('*', 'OPTIONS', 'never')).toBeUndefined();
       expect(evaluatePathRedirect('', 'GET', 'never')).toBeUndefined();
     });
 
     test('never produces a scheme-relative location', () => {
       expect(evaluatePathRedirect('//evil.com/x', 'GET', 'never')?.location).toBe('/evil.com/x');
-      expect(evaluatePathRedirect('//\\evil.com/x', 'GET', 'never')).toBeUndefined();
-      expect(evaluatePathRedirect('///\\evil.com', 'GET', 'never')).toBeUndefined();
-      expect(evaluatePathRedirect('/\\evil.com', 'GET', 'always')).toBeUndefined();
+      expect(evaluatePathRedirect(String.raw`//\evil.com/x`, 'GET', 'never')).toBeUndefined();
+      expect(evaluatePathRedirect(String.raw`///\evil.com`, 'GET', 'never')).toBeUndefined();
+      expect(evaluatePathRedirect(String.raw`/\evil.com`, 'GET', 'always')).toBeUndefined();
     });
   });
 

@@ -44,7 +44,9 @@ const bootstrap = { user: 'Ada', note: '</script><img src=x onerror=alert(1)>' }
     <div class="card bg-base-100 shadow-xl">
       <div class="card-body">
         <h2 class="card-title">&lt;JsonLd&gt; — schema.org</h2>
-        <p>Renders a safe <code>&lt;script type="application/ld+json"&gt;</code> into the page (view source). Source:</p>
+        <p>
+          Renders a safe <code>&lt;script type="application/ld+json"&gt;</code> into the page (view source). Source:
+        </p>
         <pre class="bg-base-300 p-4 rounded-lg overflow-x-auto"><code>{JSON.stringify(org, null, 2)}</code></pre>
         <JsonLd content={org} />
       </div>
@@ -57,7 +59,7 @@ const bootstrap = { user: 'Ada', note: '</script><img src=x onerror=alert(1)>' }
       </div>
     </div>
 
-    <div class="h-[120vh]"></div>
+    <div class="h-[120vh]" />
 
     <div id="bottom" class="card bg-base-100 shadow-xl">
       <div class="card-body">
@@ -69,14 +71,14 @@ const bootstrap = { user: 'Ada', note: '</script><img src=x onerror=alert(1)>' }
 
   <script is:inline>
     // read the embedded JSON back to prove the escape round-trips and didn't break out
-    const el = document.getElementById('bootstrap');
+    const el = document.querySelector('#bootstrap');
     const data = JSON.parse(el.textContent);
 
-    document.getElementById('roundtrip').textContent = data.note;
+    document.querySelector('#roundtrip').textContent = data.note;
 
     // if the escape had failed, the breakout payload would have created a real <img> in the DOM
     const brokeOut = Boolean(document.querySelector('img[src="x"]'));
-    const safe = document.getElementById('safe');
+    const safe = document.querySelector('#safe');
 
     safe.textContent = brokeOut ? 'YES — vulnerable!' : 'no — safe';
     safe.className = brokeOut ? 'text-error' : 'text-success';

@@ -4,7 +4,7 @@ export type CapIntegrationOptions = {
 };
 
 export type CapConfig = {
-  /** base url of the cap standalone service, e.g. `http://cap.cap:3000` */
+  /** base url of the cap standalone service, e.g. `https://cap.cap:3000` */
   baseUrl: string;
   siteKey: string;
   secretKey: string;

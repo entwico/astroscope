@@ -51,8 +51,8 @@ type WithOrigin = {
 export type SeoProps = Pick<
   WebpageMetadata,
   'title' | 'description' | 'index' | 'follow' | 'canonical' | 'unavailableAfter' | 'alternates'
-> &
-  WithOrigin;
+>
+& WithOrigin;
 
 /**
  * Props for `<OpenGraph>` — the social-sharing subset of {@link WebpageMetadata} plus the site
@@ -61,15 +61,15 @@ export type SeoProps = Pick<
 export type OpenGraphProps = Pick<
   WebpageMetadata,
   'title' | 'description' | 'ogType' | 'ogImage' | 'canonical' | 'twitterCard' | 'twitterSite'
-> &
-  WithOrigin & {
-    /** Site name (`og:site_name`). */
-    siteName: string;
-  };
+>
+& WithOrigin & {
+  /** Site name (`og:site_name`). */
+  siteName: string;
+};
 
 /** Props for `<PageMetadata>` — page metadata plus the site name and an optional origin override. */
-export type PageMetadataProps = WebpageMetadata &
-  WithOrigin & {
+export type PageMetadataProps = WebpageMetadata
+  & WithOrigin & {
     /** Site name (`og:site_name`). */
     siteName: string;
   };

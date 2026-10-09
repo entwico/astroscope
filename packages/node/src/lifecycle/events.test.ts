@@ -72,7 +72,7 @@ describe('on / off / emit', () => {
       order.push(1);
     });
 
-    on('afterOnStartup', async () => {
+    on('afterOnStartup', () => {
       order.push(2);
     });
 

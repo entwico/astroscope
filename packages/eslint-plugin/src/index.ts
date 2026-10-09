@@ -17,7 +17,7 @@ import { preferSsrGuard } from './rules/prefer-ssr-guard.js';
 import { wormholeConfigs } from './wormhole.js';
 
 const pkg = JSON.parse(
-  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8'),
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'),
 ) as { version: string };
 
 const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config | Linter.Config[]> } = {

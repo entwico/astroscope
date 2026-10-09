@@ -7,7 +7,7 @@ vi.mock('@astroscope/node/log', () => ({
   log: { info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-function createContext(url: string, init: RequestInit = {}) {
+function createApiContext(url: string, init: RequestInit = {}) {
   return {
     url: new URL(url),
     request: new Request(url, init),
@@ -16,10 +16,10 @@ function createContext(url: string, init: RequestInit = {}) {
 }
 
 const passed = new Response('passed');
-const next: MiddlewareNext = vi.fn(async () => passed);
+const next: MiddlewareNext = vi.fn(() => Promise.resolve(passed));
 
 function mockFetch(...responses: Response[]) {
-  const fetchMock = vi.fn(async () => responses.shift() ?? new Response(null, { status: 500 }));
+  const fetchMock = vi.fn(() => Promise.resolve(responses.shift() ?? new Response(null, { status: 500 })));
 
   vi.stubGlobal('fetch', fetchMock);
 
@@ -41,7 +41,7 @@ afterEach(() => {
 describe('proxy', () => {
   test('forwards challenge to the site key path with filtered headers', async () => {
     const fetchMock = mockFetch(Response.json({ challenge: { c: 1 }, token: 't' }));
-    const ctx = createContext('https://example.com/_cap/challenge', {
+    const ctx = createApiContext('https://example.com/_cap/challenge', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'session=1', authorization: 'x' },
       body: '{}',
@@ -65,7 +65,7 @@ describe('proxy', () => {
   test('passes the redeem answer through untouched', async () => {
     mockFetch(Response.json({ success: true, token: 'tok', expires: 1 }, { status: 200 }));
 
-    const ctx = createContext('https://example.com/_cap/redeem', { method: 'POST', body: '{}' });
+    const ctx = createApiContext('https://example.com/_cap/redeem', { method: 'POST', body: '{}' });
     const response = (await middleware(ctx, next)) as Response;
 
     expect(await response.json()).toEqual({ success: true, token: 'tok', expires: 1 });
@@ -78,7 +78,7 @@ describe('proxy', () => {
       ['https://example.com/_cap/siteverify', 'POST'],
       ['https://example.com/_cap/challenge', 'GET'],
     ] as const) {
-      expect(((await middleware(createContext(url, { method }), next)) as Response).status).toBe(404);
+      expect(((await middleware(createApiContext(url, { method }), next)) as Response).status).toBe(404);
     }
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe('proxy', () => {
     cap.reset();
 
     const fetchMock = mockFetch();
-    const ctx = createContext('https://example.com/_cap/challenge', { method: 'POST', body: '{}' });
+    const ctx = createApiContext('https://example.com/_cap/challenge', { method: 'POST', body: '{}' });
 
     expect(((await middleware(ctx, next)) as Response).status).toBe(503);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -97,17 +97,15 @@ describe('proxy', () => {
   test('answers 502 when the service cannot be reached', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
-        throw new TypeError('fetch failed');
-      }),
+      vi.fn(() => Promise.reject(new TypeError('fetch failed'))),
     );
 
-    const ctx = createContext('https://example.com/_cap/challenge', { method: 'POST', body: '{}' });
+    const ctx = createApiContext('https://example.com/_cap/challenge', { method: 'POST', body: '{}' });
 
     expect(((await middleware(ctx, next)) as Response).status).toBe(502);
   });
 
   test('leaves other requests to the next handler', async () => {
-    expect(await middleware(createContext('https://example.com/page'), next)).toBe(passed);
+    expect(await middleware(createApiContext('https://example.com/page'), next)).toBe(passed);
   });
 });

@@ -65,6 +65,7 @@ import Modal from './Modal';
   });
 
   test('finds islands inside expression containers', () => {
+    /* eslint-disable unicorn/no-incorrect-template-string-interpolation -- astro source fixture, `{item}` is a jsx expression container */
     const source = `---
 import Card from './Card';
 
@@ -76,6 +77,7 @@ const items = [1, 2, 3];
   ))}
 </ul>
 `;
+    /* eslint-enable unicorn/no-incorrect-template-string-interpolation */
 
     expect(scanAstroSource(source)).toEqual(['./Card']);
   });
@@ -197,7 +199,9 @@ describe('selectBareSpecifiers', () => {
       { importer: '/a.astro', specifier: '#imports' },
     ];
 
-    expect(selectBareSpecifiers(islands, root).sort()).toEqual([
+    const specifiers = selectBareSpecifiers(islands, root).toSorted((a, b) => a.localeCompare(b));
+
+    expect(specifiers).toEqual([
       '@radix-ui/react-slider',
       'nanostores',
       'nanostores/react',

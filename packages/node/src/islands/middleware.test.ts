@@ -1,5 +1,5 @@
 import type { APIContext, RouteData } from 'astro';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { setRequestRouteData } from '../server/route-store';
 import { registerDocumentEmitter } from './emitters';
 import { createIslandsMiddleware } from './middleware';
@@ -23,7 +23,7 @@ function htmlResponse(body: string, headers: Record<string, string> = {}): Respo
   return new Response(body, { headers: { 'content-type': 'text/html; charset=utf-8', ...headers } });
 }
 
-function createContext(routeType?: RouteData['type']): APIContext {
+function createApiContext(routeType?: RouteData['type']): APIContext {
   const request = new Request('http://localhost/page');
   const locals = {};
 
@@ -37,14 +37,18 @@ function createContext(routeType?: RouteData['type']): APIContext {
 async function run(
   middleware: ReturnType<typeof createIslandsMiddleware>,
   response: Response,
-  context: APIContext = createContext(),
+  context: APIContext = createApiContext(),
 ): Promise<Response> {
   return (await middleware(context, () => Promise.resolve(response))) as Response;
 }
 
 beforeEach(() => {
-  (globalThis as Record<symbol, unknown>)[REGISTRY] = [];
-  (globalThis as Record<symbol, unknown>)[DOCUMENT_REGISTRY] = [];
+  vi.stubGlobal(REGISTRY, []);
+  vi.stubGlobal(DOCUMENT_REGISTRY, []);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('createIslandsMiddleware', () => {
@@ -103,19 +107,19 @@ describe('createIslandsMiddleware', () => {
     const middleware = createIslandsMiddleware(manifest);
     const response = htmlResponse(HTML);
 
-    expect(await run(middleware, response, createContext('endpoint'))).toBe(response);
+    expect(await run(middleware, response, createApiContext('endpoint'))).toBe(response);
   });
 
   test('rewrites html from page routes', async () => {
     const middleware = createIslandsMiddleware(manifest);
-    const result = await run(middleware, htmlResponse(HTML), createContext('page'));
+    const result = await run(middleware, htmlResponse(HTML), createApiContext('page'));
 
     expect(await result.text()).toContain('modulepreload');
   });
 
   test('keeps the route type when a rewrite replaced the request', async () => {
     const middleware = createIslandsMiddleware(manifest);
-    const context = createContext('endpoint');
+    const context = createApiContext('endpoint');
     const response = htmlResponse(HTML);
 
     // astro copies the request on every `next(url)` rewrite — locals stay the same object
@@ -233,7 +237,7 @@ describe('document emitters', () => {
     const middleware = createIslandsMiddleware(null);
     const response = htmlResponse(HTML);
 
-    expect(await run(middleware, response, createContext('endpoint'))).toBe(response);
+    expect(await run(middleware, response, createApiContext('endpoint'))).toBe(response);
     expect(emitter).not.toHaveBeenCalled();
   });
 

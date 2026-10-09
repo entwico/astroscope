@@ -49,8 +49,7 @@ describe('measureHandler', () => {
     expect(() =>
       measureHandler('cart', () => {
         throw new TypeError('bad');
-      }),
-    ).toThrow('bad');
+      })).toThrow('bad');
 
     expect(add).toHaveBeenCalledWith(1, { 'astro.wormhole.name': 'cart', 'error.type': 'TypeError' });
     expect(logError).toHaveBeenCalledWith({ err: expect.any(TypeError), wormhole: 'cart' }, 'wormhole handler failed');

@@ -86,8 +86,9 @@ export function scanWormholeAccess(code: string, id: string): WormholeScan | nul
 
   const locals = new Set<string>();
   const scan: WormholeScan = { names: new Set(), dynamic: false };
+  const body = program['body'] as Node[];
 
-  for (const statement of program['body'] as Node[]) {
+  for (const statement of body) {
     const source = (statement['source'] as Node | null)?.['value'];
 
     if (source !== PACKAGE_NAME) {
@@ -95,7 +96,9 @@ export function scanWormholeAccess(code: string, id: string): WormholeScan | nul
     }
 
     if (statement.type === 'ImportDeclaration') {
-      for (const specifier of statement['specifiers'] as Node[]) {
+      const specifiers = statement['specifiers'] as Node[];
+
+      for (const specifier of specifiers) {
         if (specifier.type === 'ImportSpecifier') {
           const imported = specifier['imported'] as Node;
           const name = imported.type === 'Identifier' ? (imported['name'] as string) : (imported['value'] as string);
@@ -120,7 +123,7 @@ export function scanWormholeAccess(code: string, id: string): WormholeScan | nul
   walk(
     program,
     (node, parent, key) => {
-      if (node.type !== 'Identifier' || !locals.has(node['name'] as string) || !parent) {
+      if (!parent || node.type !== 'Identifier' || !locals.has(node['name'] as string)) {
         return;
       }
 
@@ -128,7 +131,7 @@ export function scanWormholeAccess(code: string, id: string): WormholeScan | nul
         return;
       }
 
-      if (isMember(parent) && key === 'object') {
+      if (key === 'object' && isMember(parent)) {
         const property = parent['property'] as Node;
 
         if (!parent['computed'] && property.type === 'Identifier') {

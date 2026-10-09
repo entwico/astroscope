@@ -28,7 +28,7 @@ afterEach(() => {
   // restore by mutating: reassigning process.env would detach it from the real environment,
   // making later process.loadEnvFile writes invisible
   for (const key of Object.keys(process.env)) {
-    if (!(key in originalEnv)) {
+    if (!Object.hasOwn(originalEnv, key)) {
       delete process.env[key];
     }
   }

@@ -3,6 +3,7 @@ import { serializeExcludePatterns } from './serialize';
 import type { ExcludePattern } from './index';
 
 function roundTrip(patterns: ExcludePattern[]): ExcludePattern[] {
+  // eslint-disable-next-line no-new-func -- the serialized source is evaluated to prove it round-trips
   return new Function(`return ${serializeExcludePatterns(patterns)};`)() as ExcludePattern[];
 }
 
@@ -18,7 +19,7 @@ describe('serializeExcludePatterns', () => {
   });
 
   test('serializes regex patterns as regex literals with flags', () => {
-    expect(serializeExcludePatterns([{ pattern: /^\/api\/v\d+\//i }])).toBe('[{ pattern: /^\\/api\\/v\\d+\\//i }]');
+    expect(serializeExcludePatterns([{ pattern: /^\/api\/v\d+\//i }])).toBe(String.raw`[{ pattern: /^\/api\/v\d+\//i }]`);
   });
 
   test('round-trips mixed patterns through evaluation', () => {
@@ -37,7 +38,7 @@ describe('serializeExcludePatterns', () => {
 
     const regex = (evaluated[4] as { pattern: RegExp }).pattern;
 
-    expect(regex.source).toBe('^\\/_image');
+    expect(regex.source).toBe(String.raw`^\/_image`);
     expect(regex.flags).toBe('g');
   });
 

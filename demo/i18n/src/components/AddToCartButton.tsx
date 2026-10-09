@@ -2,7 +2,7 @@ import { t } from '@astroscope/i18n/translate';
 import { useState } from 'react';
 
 export type AddToCartButtonProps = {
-  productName: string;
+  readonly productName: string;
 };
 
 export default function AddToCartButton({ productName }: AddToCartButtonProps) {

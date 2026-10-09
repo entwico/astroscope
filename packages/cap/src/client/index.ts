@@ -30,10 +30,12 @@ let registered: Promise<void> | undefined;
  */
 export function registerCapWidget(): Promise<void> {
   registered ??= (async () => {
+    /* eslint-disable unicorn/no-global-object-property-assignment -- the cap widget reads its `window.CAP_*` globals on load, assigning them is its documented configuration mechanism */
     window.CAP_CUSTOM_WASM_URL = capWasmUrl;
     window.CAP_CUSTOM_HASHWX_URL = hashwxWasmUrl;
     window.CAP_PAKO_URL = pakoUrl;
     window.CAP_DISABLE_WIDGET_REF = true;
+    /* eslint-enable unicorn/no-global-object-property-assignment */
 
     await import('cap-widget');
     await customElements.whenDefined('cap-widget');
@@ -85,16 +87,20 @@ export function createCapSession(solve: () => Promise<string | null> = solveCap)
 
   const usable = () => prepared !== null && Date.now() - prepared.solvedAt < PREPARED_TOKEN_LIFETIME_MS;
 
-  const start = (): Promise<string | null> => {
-    pending ??= solve()
-      .then((token) => {
-        prepared = token === null ? null : { token, solvedAt: Date.now() };
+  const solveAndKeep = async (): Promise<string | null> => {
+    try {
+      const token = await solve();
 
-        return token;
-      })
-      .finally(() => {
-        pending = null;
-      });
+      prepared = token === null ? null : { token, solvedAt: Date.now() };
+
+      return token;
+    } finally {
+      pending = null;
+    }
+  };
+
+  const start = (): Promise<string | null> => {
+    pending ??= solveAndKeep();
 
     return pending;
   };

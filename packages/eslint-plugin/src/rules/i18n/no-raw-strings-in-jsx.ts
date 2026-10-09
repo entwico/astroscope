@@ -259,9 +259,9 @@ export const noRawStringsInJsx: Rule.RuleModule = {
         const attrName =
           node.name?.type === 'JSXIdentifier'
             ? node.name.name
-            : node.name?.type === 'JSXNamespacedName'
-              ? `${node.name.namespace.name}:${node.name.name.name}`
-              : null;
+            : (node.name?.type === 'JSXNamespacedName'
+                ? `${node.name.namespace.name}:${node.name.name.name}`
+                : null);
 
         if (attrName && shouldIgnoreAttribute(attrName)) return;
 

@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-incorrect-template-string-interpolation -- fixture sources contain template syntax */
 import tsParser from '@typescript-eslint/parser';
 import * as astroEslintParser from 'astro-eslint-parser';
 import { RuleTester } from 'eslint';

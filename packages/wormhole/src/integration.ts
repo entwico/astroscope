@@ -92,7 +92,7 @@ export default function wormholeIntegration(options: WormholeIntegrationOptions 
         if (path.resolve(fileURLToPath(written)) !== path.resolve(stubFile)) {
           logger.error(
             `registry type stub landed at ${fileURLToPath(written)} instead of the expected ${stubFile} — ` +
-              `its relative import is now wrong and the wormholes proxy is untyped; please report this to @astroscope/wormhole`,
+            `its relative import is now wrong and the wormholes proxy is untyped; please report this to @astroscope/wormhole`,
           );
         }
       },

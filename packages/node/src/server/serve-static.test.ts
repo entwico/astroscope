@@ -88,10 +88,11 @@ function rawGet(url: string, headers: Record<string, string> = {}): Promise<RawR
     const req = http.get(url, { headers }, (res) => {
       const chunks: Buffer[] = [];
 
-      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
       res.on('end', () =>
-        resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString() }),
-      );
+        resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString() }));
     });
 
     req.on('error', reject);
@@ -264,8 +265,11 @@ describe('trailing slash handling', () => {
   test('ignore: serves the directory index with and without a trailing slash', async () => {
     const url = await startServer(createApp({ trailingSlash: 'ignore' }));
 
-    expect((await rawGet(`${url}/docs`)).body).toBe('docs index');
-    expect((await rawGet(`${url}/docs/`)).body).toBe('docs index');
+    const withoutSlash = await rawGet(`${url}/docs`);
+    const withSlash = await rawGet(`${url}/docs/`);
+
+    expect(withoutSlash.body).toBe('docs index');
+    expect(withSlash.body).toBe('docs index');
   });
 });
 

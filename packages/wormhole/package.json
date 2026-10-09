@@ -68,7 +68,8 @@
     "react": "^19.2.8",
     "tsdown": "^0.23.0",
     "typescript": "^6.0.3",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   },
   "peerDependencies": {
     "@astroscope/node": "workspace:^",

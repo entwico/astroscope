@@ -45,7 +45,7 @@ export async function constructRootLogger(
   store.root = root;
 
   for (const entry of store.buffer.splice(0)) {
-    const bindings = entry.bindings.length ? (Object.assign({}, ...entry.bindings) as Bindings) : {};
+    const bindings = entry.bindings.length > 0 ? (Object.assign({}, ...entry.bindings) as Bindings) : {};
     const target = root.child({ ...bindings, bufferedTime: new Date(entry.time).toISOString() });
 
     (target[entry.level] as (...args: unknown[]) => void)(...entry.args);
@@ -69,7 +69,7 @@ export function dumpEarlyLogs(): void {
   if (store.root) return;
 
   for (const entry of store.buffer.splice(0)) {
-    const bindings = entry.bindings.length ? Object.assign({}, ...entry.bindings) : undefined;
+    const bindings = entry.bindings.length > 0 ? Object.assign({}, ...entry.bindings) : undefined;
 
     console.error(
       new Date(entry.time).toISOString(),
@@ -79,8 +79,10 @@ export function dumpEarlyLogs(): void {
     );
   }
 
-  if (store.dropped > 0) {
-    console.error(`(${store.dropped} early log entries dropped)`);
-    store.dropped = 0;
+  if (!(store.dropped > 0)) {
+    return;
   }
+
+  console.error(`(${store.dropped} early log entries dropped)`);
+  store.dropped = 0;
 }

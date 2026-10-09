@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-incorrect-template-string-interpolation -- fixture sources contain mf2 placeholder syntax */
 import { describe, expect, test } from 'vitest';
 import { extractKeysFromFile } from './extract.js';
 
@@ -134,7 +135,7 @@ describe('extractKeysFromFile', () => {
         stripFallbacks: true,
       });
 
-      expect(result.code).toContain("t('hello')");
+      expect(result.code).toContain('t(\'hello\')');
       expect(result.code).not.toContain('Hello World');
     });
 
@@ -152,7 +153,7 @@ describe('extractKeysFromFile', () => {
         stripFallbacks: true,
       });
 
-      expect(result.code).toContain("t('hello', undefined,");
+      expect(result.code).toContain('t(\'hello\', undefined,');
       expect(result.code).toContain('name:');
     });
 

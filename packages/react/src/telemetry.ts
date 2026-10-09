@@ -24,8 +24,10 @@ const renderFailures = createCounter('astro.island.render.failures', {
 
 /** the component's display name, through memo/forwardRef wrappers; bounded by the codebase */
 export function componentName(Component: unknown): string {
-  if (typeof Component === 'function' || (typeof Component === 'object' && Component !== null)) {
-    const { displayName, name, type, render } = Component as {
+  let current = Component;
+
+  while (typeof current === 'function' || (typeof current === 'object' && current !== null)) {
+    const { displayName, name, type, render } = current as {
       displayName?: unknown;
       name?: unknown;
       type?: unknown;
@@ -34,9 +36,15 @@ export function componentName(Component: unknown): string {
 
     if (typeof displayName === 'string' && displayName) return displayName;
     if (typeof name === 'string' && name) return name;
+
     // memo wraps as `type`, forwardRef as `render`
-    if (type !== undefined && type !== Component) return componentName(type);
-    if (typeof render === 'function') return componentName(render);
+    if (type !== undefined && type !== current) {
+      current = type;
+    } else if (typeof render === 'function') {
+      current = render;
+    } else {
+      break;
+    }
   }
 
   return 'anonymous';

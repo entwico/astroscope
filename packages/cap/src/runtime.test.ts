@@ -6,10 +6,10 @@ afterEach(() => cap.reset());
 
 describe('cap.configure', () => {
   test('trims values and the trailing slash of the base url', () => {
-    cap.configure({ baseUrl: ' http://cap.cap:3000/ ', siteKey: ' site ', secretKey: 'secret' });
+    cap.configure({ baseUrl: ' https://cap.cap:3000/ ', siteKey: ' site ', secretKey: 'secret' });
 
     expect(cap.isConfigured()).toBe(true);
-    expect(cap.getConfig()).toEqual({ baseUrl: 'http://cap.cap:3000', siteKey: 'site', secretKey: 'secret' });
+    expect(cap.getConfig()).toEqual({ baseUrl: 'https://cap.cap:3000', siteKey: 'site', secretKey: 'secret' });
   });
 
   test.each(['baseUrl', 'siteKey', 'secretKey'] as const)('requires %s', (key) => {

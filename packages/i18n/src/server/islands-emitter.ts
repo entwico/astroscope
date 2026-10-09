@@ -185,11 +185,13 @@ export function registerI18nEmitters(): void {
     let fresh = false;
 
     for (const [chunk, hash] of chunks) {
-      if (!emitted.has(chunk)) {
-        emitted.add(chunk);
-        merge[chunk] = hash;
-        fresh = true;
+      if (emitted.has(chunk)) {
+        continue;
       }
+
+      emitted.add(chunk);
+      merge[chunk] = hash;
+      fresh = true;
     }
 
     const html = fresh

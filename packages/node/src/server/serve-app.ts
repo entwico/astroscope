@@ -91,7 +91,8 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
   // a client going away stops the render; on a failed stream the cancel rejects
   // with the render error, which the catch below has already reported
   res.on('close', () => {
-    reader.cancel().catch(() => undefined);
+    // eslint-disable-next-line unicorn/prefer-await -- fire-and-forget: nothing to await in a sync close listener
+    reader.cancel().catch(() => {});
   });
 
   try {
@@ -100,7 +101,7 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
     }
 
     res.end();
-  } catch (err) {
+  } catch (error) {
     const record = getRequestRecord();
 
     if (record) {
@@ -109,7 +110,7 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
 
     log.error(
       {
-        ...(err instanceof Error ? { err } : { reason: err }),
+        ...(error instanceof Error ? { err: error } : { reason: error }),
         ...(record?.route && { route: record.route }),
         ...(!record?.logger && { url: record?.url ?? res.req.url }),
       },
@@ -117,7 +118,7 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
     );
 
     res.write('Internal server error', () => {
-      res.destroy(err instanceof Error ? err : undefined);
+      res.destroy(error instanceof Error ? error : undefined);
     });
   }
 }
@@ -144,18 +145,20 @@ export function createAppHandler(app: BaseApp, options: RuntimeOptions, client: 
     const { pathname } = new URL(url);
 
     for (const status of [404, 500]) {
-      if (pathname.endsWith(`/${status}.html`) || pathname.endsWith(`/${status}/index.html`)) {
-        const response = await readFSErrorPage(client, status);
-
-        if (response) return response;
+      if (!(pathname.endsWith(`/${status}.html`) || pathname.endsWith(`/${status}/index.html`))) {
+        continue;
       }
+
+      const response = await readFSErrorPage(client, status);
+
+      if (response) return response;
     }
 
     return new Response(null, { status: 404 });
   };
 
   const bodySizeLimit =
-    options.bodySizeLimit === 0 || options.bodySizeLimit === Number.POSITIVE_INFINITY
+    options.bodySizeLimit === 0 || options.bodySizeLimit === Infinity
       ? undefined
       : options.bodySizeLimit;
 
@@ -168,8 +171,8 @@ export function createAppHandler(app: BaseApp, options: RuntimeOptions, client: 
         ...(bodySizeLimit !== undefined && { bodySizeLimit }),
         port: options.port,
       });
-    } catch (err) {
-      log.error(err instanceof Error ? { err, url: req.url } : { reason: err, url: req.url }, 'could not render');
+    } catch (error) {
+      log.error(error instanceof Error ? { err: error, url: req.url } : { reason: error, url: req.url }, 'could not render');
 
       res.statusCode = 500;
       res.end('Internal Server Error');

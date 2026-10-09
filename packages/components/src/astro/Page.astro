@@ -9,6 +9,8 @@ type Props = PageProps;
 
 const {
   lang,
+  // the html spec requires the `utf-8` spelling for <meta charset>; the rule targets node encoding names
+  // eslint-disable-next-line unicorn/text-encoding-identifier-case
   charset = 'utf-8',
   viewport = 'width=device-width, initial-scale=1',
   htmlClass,

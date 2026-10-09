@@ -12,6 +12,7 @@ async function load() {
 function runMergeScript(script: string): void {
   const js = script.replace(/^<script>/, '').replace(/<\/script>$/, '');
 
+  // eslint-disable-next-line no-new-func -- evaluates the generated inline script
   new Function('self', js)(globalThis);
 }
 

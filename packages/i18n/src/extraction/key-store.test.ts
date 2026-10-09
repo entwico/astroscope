@@ -3,31 +3,32 @@ import { type Mock, describe, expect, test, vi } from 'vitest';
 import { KeyStore } from './key-store.js';
 import type { ExtractedKeyOccurrence } from './types.js';
 
-const createMockLogger = () =>
-  ({
+const createMockLogger = () => {
+  const logger = {
     info: vi.fn(() => {}),
     warn: vi.fn(() => {}),
     error: vi.fn(() => {}),
     debug: () => {},
     label: 'test',
-    fork() {
-      return this;
-    },
-  }) as unknown as AstroIntegrationLogger & {
+    fork: () => logger,
+  } as unknown as AstroIntegrationLogger & {
     warn: Mock;
     error: Mock;
   };
+
+  return logger;
+};
 
 const createOccurrence = (
   key: string,
   file: string,
   line = 1,
-  meta: ExtractedKeyOccurrence['meta'] = { fallback: `fallback for ${key}` },
+  meta?: ExtractedKeyOccurrence['meta'],
 ): ExtractedKeyOccurrence => ({
   key,
   file,
   line,
-  meta,
+  meta: meta ?? { fallback: `fallback for ${key}` },
 });
 
 describe('KeyStore', () => {

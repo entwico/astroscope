@@ -21,7 +21,7 @@ export default function capIntegration(options: CapIntegrationOptions = {}): Ast
       return id === VIRTUAL_CONFIG_ID ? RESOLVED_VIRTUAL_CONFIG_ID : undefined;
     },
     load(id) {
-      if (id !== RESOLVED_VIRTUAL_CONFIG_ID) return undefined;
+      if (id !== RESOLVED_VIRTUAL_CONFIG_ID) return;
 
       return `export const path = ${JSON.stringify(path)};`;
     },

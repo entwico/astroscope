@@ -27,6 +27,7 @@ export function installRouteIslands(manifest: IslandsManifest | null): void {
   const routes = manifest?.routes;
 
   if (!routes) {
+    // eslint-disable-next-line unicorn/no-global-object-property-assignment -- Symbol.for store on globalThis, shared across module instances
     (globalThis as Scope)[STORE] = () => null;
 
     return;
@@ -35,6 +36,7 @@ export function installRouteIslands(manifest: IslandsManifest | null): void {
   let graph: ChunkGraph | undefined;
   const cache = new Map<string, RouteIsland[]>();
 
+  // eslint-disable-next-line unicorn/no-global-object-property-assignment -- Symbol.for store on globalThis, shared across module instances
   (globalThis as Scope)[STORE] = (pattern) => {
     const cached = cache.get(pattern);
 

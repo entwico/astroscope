@@ -153,12 +153,14 @@ export default function FormattersDemo() {
           </strong>{' '}
           (escaping literal braces)
           <br />
+          {/* eslint-disable-next-line unicorn/prefer-string-raw -- the i18n extractor reads only plain string literals */}
           {t('demo.escape_braces', 'Code example: \\{\\{$name\\}\\} outputs {$name}', { name: 'value' })}
         </div>
 
         <div>
           <strong>Escaped in pattern</strong>
           <br />
+          {/* eslint-disable-next-line unicorn/prefer-string-raw -- the i18n extractor reads only plain string literals */}
           {t('demo.escape_pattern', 'Use \\| for OR in regex: a\\|b')}
         </div>
       </div>

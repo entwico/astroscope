@@ -1,7 +1,7 @@
 {
   "name": "@astroscope/cap",
   "version": "0.0.0",
-  "description": "Cap captcha for Astro \u2014 invisible or widget, verified by a guard on actions, endpoints and pages",
+  "description": "Cap captcha for Astro",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -73,7 +73,8 @@
     "react": "^19.2.8",
     "tsdown": "^0.23.0",
     "typescript": "^6.0.3",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   },
   "peerDependencies": {
     "@astroscope/node": "workspace:^",

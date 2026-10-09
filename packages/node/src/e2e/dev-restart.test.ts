@@ -64,7 +64,11 @@ describe.skipIf(devSkip)('dev-mode restart with in-flight requests', () => {
   }, 60_000);
 
   afterAll(async () => {
-    await server?.stop().catch(() => {});
+    try {
+      await server?.stop();
+    } catch {
+      // the server may already be gone
+    }
 
     if (vitestEnv !== undefined) process.env['VITEST'] = vitestEnv;
 
@@ -109,9 +113,13 @@ describe.skipIf(devSkip)('dev-mode restart with in-flight requests', () => {
     const baseUrl = getBaseUrl();
 
     // warm up so first-compile cost isn't in the restart-window timing
-    await fetch(`${baseUrl}/slow?delay=0`)
-      .then((r) => r.text())
-      .catch(() => {});
+    try {
+      const warmup = await fetch(`${baseUrl}/slow?delay=0`);
+
+      await warmup.text();
+    } catch {
+      // only the compile matters here
+    }
 
     stderrBuf = '';
     stdoutBuf = '';
@@ -119,7 +127,7 @@ describe.skipIf(devSkip)('dev-mode restart with in-flight requests', () => {
     // must outlast the restart pipeline so disposeSingleton fires before readSingleton
     const slowDelayMs = 8000;
 
-    void fetch(`${baseUrl}/slow?delay=${slowDelayMs}`).catch(() => undefined);
+    void fetch(`${baseUrl}/slow?delay=${slowDelayMs}`).catch(() => {});
 
     const requestStart = Date.now();
 
@@ -173,7 +181,7 @@ describe.skipIf(devSkip)('dev-mode restart with in-flight requests', () => {
 // vite wraps [vite] / [@astroscope/node] prefixes in ANSI codes — strip for literal regexes
 function stripAnsi(s: string): string {
   // eslint-disable-next-line no-control-regex
-  return s.replace(/\x1b\[[0-9;]*m/g, '');
+  return s.replaceAll(/\u{1B}\[[0-9;]*m/gu, '');
 }
 
 async function waitFor(condition: () => boolean, timeoutMs: number): Promise<void> {

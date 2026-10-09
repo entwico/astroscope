@@ -16,8 +16,10 @@ const manifest: ExtractionManifest = {
 
 vi.mock('virtual:@astroscope/i18n/manifest', () => ({ getManifest: () => manifest }));
 
+/* eslint-disable unicorn/no-global-object-property-assignment -- the node emitter registries are Symbol.for stores on globalThis */
 (globalThis as Record<symbol, unknown>)[REGISTRY] = [];
 (globalThis as Record<symbol, unknown>)[DOCUMENT_REGISTRY] = [];
+/* eslint-enable unicorn/no-global-object-property-assignment */
 
 const { i18n } = await import('./i18n');
 const { registerI18nEmitters, createI18nDocumentEmitter, setRequestLocale } = await import('./islands-emitter');
@@ -40,7 +42,7 @@ function island(index: number): IslandInfo {
   const staticClosure = [
     url(chunkNames[base]!),
     '/_astro/client.Cxyz.js',
-    ...chunkNames.slice(base + 1, base + 4).map(url),
+    ...chunkNames.slice(base + 1, base + 4).map((name) => url(name)),
   ];
 
   return {
@@ -48,13 +50,13 @@ function island(index: number): IslandInfo {
     rendererUrl: '/_astro/client.Cxyz.js',
     client: 'load',
     staticClosure,
-    fullClosure: [...staticClosure, ...chunkNames.slice(base + 4, base + 6).map(url)],
+    fullClosure: [...staticClosure, ...chunkNames.slice(base + 4, base + 6).map((name) => url(name))],
   };
 }
 
 const islands = Array.from({ length: 20 }, (_, i) => island(i));
 
-function createContext(): APIContext {
+function createApiContext(): APIContext {
   const context = { request: new Request('http://bench.local/'), locals: {} } as APIContext;
 
   setRequestLocale(context, 'en');
@@ -65,17 +67,17 @@ function createContext(): APIContext {
 test('i18n islands emitter', async ({ bench }) => {
   await bench.compare(
     bench('one island, fresh document', () => {
-      emitter(islands[0]!, createContext());
+      emitter(islands[0]!, createApiContext());
     }),
     bench('twenty islands, one document', () => {
-      const context = createContext();
+      const context = createApiContext();
 
       for (const isle of islands) {
         emitter(isle, context);
       }
     }),
     bench('document end script (script-entry hashes)', () => {
-      documentEmitter(createContext())?.end?.();
+      documentEmitter(createApiContext())?.end?.();
     }),
   );
 });

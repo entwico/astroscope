@@ -47,7 +47,7 @@ async function warmupModules(): Promise<void> {
     app.manifest.serverIslandMappings,
   ].filter(defined);
 
-  const results = await Promise.allSettled(loaders.map((load) => load()));
+  const results = await Promise.allSettled(loaders.map((load) => Promise.resolve(load())));
   const failures = results.filter((result) => result.status === 'rejected');
 
   if (failures.length === 0) return;
@@ -114,10 +114,10 @@ export async function startServer(overrides?: {
         log: () => import('virtual:@astroscope/node/log-entry'),
       },
     });
-  } catch (err) {
+  } catch (error) {
     // the logger never came up — no silent phase, dump the buffer and die
     dumpEarlyLogs();
-    console.error(err);
+    console.error(error);
     process.exit(1);
   }
 
@@ -143,21 +143,23 @@ export async function startServer(overrides?: {
   // before the join below is never seen as an unhandled rejection
   const warmupStartedAt = performance.now();
   const warmupSpan = startSpan('warmup', { parent: startup.context });
-  const warmup = warmupModules().then(
-    () => {
-      warmupMs = roundMs(performance.now() - warmupStartedAt);
-      warmupSpan.span.end();
-
-      return undefined;
-    },
-    (error: unknown) => {
+  const settleWarmup = async (): Promise<unknown> => {
+    try {
+      await warmupModules();
+    } catch (error) {
       warmupMs = roundMs(performance.now() - warmupStartedAt);
       warmupSpan.span.setStatus({ code: SpanStatusCode.ERROR, message: 'warmup import failed' });
       warmupSpan.span.end();
 
       return error;
-    },
-  );
+    }
+
+    warmupMs = roundMs(performance.now() - warmupStartedAt);
+    warmupSpan.span.end();
+
+    return undefined;
+  };
+  const warmup = settleWarmup();
 
   const shutdownLifecycle = async (shutdownContext?: StartedSpan['context']): Promise<void> => {
     try {
@@ -166,22 +168,24 @@ export async function startServer(overrides?: {
       } else {
         await runShutdown(bootModule, context);
       }
-    } catch (err) {
-      log.error(err instanceof Error ? { err } : { reason: err }, 'shutdown failed');
+    } catch (error) {
+      log.error(error instanceof Error ? { err: error } : { reason: error }, 'shutdown failed');
     }
 
     clearNativeMounts();
 
-    if (health) {
-      deactivateHealthChecks();
+    if (!health) {
+      return;
+    }
 
-      try {
-        await healthServer.stop();
-      } catch (err) {
-        // a startup failure can tear the health server down before it has
-        // finished binding; stopping it is best-effort
-        log.debug(err instanceof Error ? { err } : { reason: err }, 'health probe server stop failed');
-      }
+    deactivateHealthChecks();
+
+    try {
+      await healthServer.stop();
+    } catch (error) {
+      // a startup failure can tear the health server down before it has
+      // finished binding; stopping it is best-effort
+      log.debug(error instanceof Error ? { err: error } : { reason: error }, 'health probe server stop failed');
     }
   };
 
@@ -204,8 +208,8 @@ export async function startServer(overrides?: {
     await withSpan('boot', { parent: startup.context }, () => runStartup(bootModule, context));
 
     bootMs = roundMs(performance.now() - bootStartedAt);
-  } catch (err) {
-    await failStartup(err, 'startup failed');
+  } catch (error) {
+    await failStartup(error, 'startup failed');
   }
 
   const warmupError = await warmup;
@@ -228,8 +232,8 @@ export async function startServer(overrides?: {
 
   try {
     tls = loadTlsOptions();
-  } catch (err) {
-    await failStartup(err, 'failed to load TLS options');
+  } catch (error) {
+    await failStartup(error, 'failed to load TLS options');
   }
 
   const listener: http.RequestListener = (req, res) => {
@@ -260,8 +264,8 @@ export async function startServer(overrides?: {
         server.listen(port, host, resolve);
       });
     });
-  } catch (err) {
-    await failStartup(err, `failed to listen on ${host}:${port}`);
+  } catch (error) {
+    await failStartup(error, `failed to listen on ${host}:${port}`);
   }
 
   if (health) probes.ready.enable();
@@ -283,11 +287,7 @@ export async function startServer(overrides?: {
   );
 
   let stopPromise: Promise<void> | undefined;
-  let resolveClosed!: () => void;
-
-  const closedPromise = new Promise<void>((resolve) => {
-    resolveClosed = resolve;
-  });
+  const { promise: closedPromise, resolve: resolveClosed } = Promise.withResolvers<void>();
 
   const doStop = async (): Promise<void> => {
     if (health) probes.ready.disable();

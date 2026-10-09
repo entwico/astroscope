@@ -14,13 +14,13 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
   try {
     return await next();
-  } catch (err) {
-    if (stamp != null && Number(stamp) !== getCurrentGeneration()) {
+  } catch (error) {
+    if (stamp !== null && Number(stamp) !== getCurrentGeneration()) {
       recordStaleError();
 
       return new Response(null, { status: 503 });
     }
 
-    throw err;
+    throw error;
   }
 };

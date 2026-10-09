@@ -57,9 +57,11 @@ export function registerHealthCheck(definition: HealthCheckDefinition): () => vo
   return () => {
     const current = store.unregisters.get(definition.name);
 
-    if (current) {
-      store.unregisters.delete(definition.name);
-      current();
+    if (!current) {
+      return;
     }
+
+    store.unregisters.delete(definition.name);
+    current();
   };
 }

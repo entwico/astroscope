@@ -4,13 +4,13 @@ import { getCurrentGeneration, incrementGeneration, recordStaleError } from './g
 const STATE_KEY = Symbol.for('@astroscope/node/generation');
 
 beforeEach(() => {
-  // reset the globalThis-backed state so each test starts fresh
-  (globalThis as Record<symbol, unknown>)[STATE_KEY] = undefined;
+  vi.stubGlobal(STATE_KEY, undefined);
 });
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('generation counter', () => {

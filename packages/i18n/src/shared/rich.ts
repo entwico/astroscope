@@ -61,6 +61,56 @@ function isMarkupPart(part: Part): part is MessageMarkupPart {
   return part.type === 'markup';
 }
 
+function applyMarkupPart<T>(
+  part: MessageMarkupPart,
+  stack: StackFrame<T>[],
+  result: (string | T)[],
+  components: RichComponents<T>,
+  nextKey: () => string,
+): void {
+  const target = stack.length > 0 ? stack.at(-1)!.children : result;
+
+  switch (part.kind) {
+    case 'open': {
+      stack.push({ name: part.name, children: [] });
+
+      break;
+    }
+
+    case 'close': {
+      const frame = stack.pop();
+
+      if (!frame) {
+        // mismatched close tag, ignore
+        break;
+      }
+
+      const component = components[frame.name];
+      const parent = stack.length > 0 ? stack.at(-1)!.children : result;
+
+      if (component) {
+        parent.push(addKeyIfNeeded(component(frame.children), nextKey()));
+      } else {
+        // no component for this tag, just flatten children
+        parent.push(...frame.children);
+      }
+
+      break;
+    }
+
+    case 'standalone': {
+      // self-closing: {#icon/}
+      const component = components[part.name];
+
+      if (component) {
+        target.push(addKeyIfNeeded(component([]), nextKey()));
+      }
+
+      break;
+    }
+  }
+}
+
 /**
  * Convert MF2 formatToParts() output to a tree of nodes.
  * Works with any JSX runtime (Astro, React, etc.) - the callbacks
@@ -80,38 +130,13 @@ export function partsToNodes<T>(parts: Part[], components: RichComponents<T>): (
   const result: (string | T)[] = [];
   const stack: StackFrame<T>[] = [];
   let keyIndex = 0;
+  const nextKey = () => `rich-${keyIndex++}`;
 
   for (const part of parts) {
-    const target = stack.length > 0 ? stack[stack.length - 1]!.children : result;
+    const target = stack.length > 0 ? stack.at(-1)!.children : result;
 
     if (isMarkupPart(part)) {
-      if (part.kind === 'open') {
-        stack.push({ name: part.name, children: [] });
-      } else if (part.kind === 'close') {
-        const frame = stack.pop();
-
-        if (!frame) {
-          // mismatched close tag, ignore
-          continue;
-        }
-
-        const component = components[frame.name];
-        const parent = stack.length > 0 ? stack[stack.length - 1]!.children : result;
-
-        if (component) {
-          parent.push(addKeyIfNeeded(component(frame.children), `rich-${keyIndex++}`));
-        } else {
-          // no component for this tag, just flatten children
-          parent.push(...frame.children);
-        }
-      } else if (part.kind === 'standalone') {
-        // self-closing: {#icon/}
-        const component = components[part.name];
-
-        if (component) {
-          target.push(addKeyIfNeeded(component([]), `rich-${keyIndex++}`));
-        }
-      }
+      applyMarkupPart(part, stack, result, components, nextKey);
     } else if (part.type === 'text') {
       // plain text content - MessageTextPart.value is a string
       target.push(part.value as string);
@@ -132,7 +157,7 @@ export function partsToNodes<T>(parts: Part[], components: RichComponents<T>): (
   // handle unclosed tags by flattening remaining stack frames
   while (stack.length > 0) {
     const frame = stack.pop()!;
-    const parent = stack.length > 0 ? stack[stack.length - 1]!.children : result;
+    const parent = stack.length > 0 ? stack.at(-1)!.children : result;
 
     parent.push(...frame.children);
   }

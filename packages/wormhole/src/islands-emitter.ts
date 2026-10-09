@@ -86,7 +86,7 @@ export function createWormholeDocumentEmitter(dev: boolean = IS_DEV): DocumentEm
     }
 
     const names = manifest.scripts.includes('*')
-      ? [...request.values.keys()]
+      ? request.values.keys().toArray()
       : manifest.scripts.filter((name) => request.values.has(name));
 
     if (names.length === 0) {
@@ -125,15 +125,15 @@ export function registerWormholeEmitters(): void {
     const request = getRequestWormholes(context.request);
     const manifest = getWormholeManifest();
 
-    if (!request || request.values.size === 0 || !manifest) {
+    if (!request || !manifest || request.values.size === 0) {
       return null;
     }
 
-    const reachable = reachableFor(island, manifest);
+    const candidates = reachableFor(island, manifest) ?? request.values.keys();
     const entries: Record<string, unknown> = {};
     let count = 0;
 
-    for (const name of reachable ?? request.values.keys()) {
+    for (const name of candidates) {
       if (!request.values.has(name) || request.emitted.has(name)) {
         continue;
       }

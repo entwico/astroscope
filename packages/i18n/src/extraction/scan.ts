@@ -39,17 +39,18 @@ export async function scan(options: ScanOptions): Promise<KeyStore> {
   const store = new KeyStore(logger, consistency);
 
   const files: string[] = [];
-
-  for await (const entry of fs.promises.glob(GLOB_PATTERN, {
+  const entries = fs.promises.glob(GLOB_PATTERN, {
     cwd: projectRoot,
     exclude: (name) => name === 'node_modules',
-  })) {
+  });
+
+  for await (const entry of entries) {
     files.push(path.resolve(projectRoot, entry));
   }
 
   const results = await Promise.all(
     files.map(async (file) => {
-      let code = await fs.promises.readFile(file, 'utf-8');
+      let code = await fs.promises.readFile(file, 'utf8');
 
       // quick check: skip files without i18n translate import
       if (!code.includes('@astroscope/i18n/translate')) {

@@ -34,7 +34,7 @@ const RESOLVED_CONFIG_ENTRY_VIRTUAL_MODULE_ID = `\0${CONFIG_ENTRY_VIRTUAL_MODULE
 const RESOLVED_INSTRUMENTATION_ENTRY_VIRTUAL_MODULE_ID = `\0${INSTRUMENTATION_ENTRY_VIRTUAL_MODULE_ID}`;
 const RESOLVED_LOG_ENTRY_VIRTUAL_MODULE_ID = `\0${LOG_ENTRY_VIRTUAL_MODULE_ID}`;
 
-const SERVER_ENVIRONMENTS = ['ssr', 'prerender', 'astro'];
+const SERVER_ENVIRONMENTS = new Set(['ssr', 'prerender', 'astro']);
 const DEFAULT_REQUEST_EXCLUDES: ExcludePattern[] = [...RECOMMENDED_EXCLUDES];
 
 function resolveHost(host: string | boolean | undefined): string {
@@ -234,7 +234,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
                 name: '@astroscope/node',
 
                 configEnvironment(environmentName: string) {
-                  if (SERVER_ENVIRONMENTS.includes(environmentName)) {
+                  if (SERVER_ENVIRONMENTS.has(environmentName)) {
                     return { resolve: { noExternal: ['@astroscope/node'] } };
                   }
                 },
@@ -257,8 +257,8 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
                     const runtimeOptions: Omit<RuntimeOptions, 'logging' | 'telemetry'> = {
                       host: resolveHost(astroConfig.server.host),
                       port: astroConfig.server.port ?? 4321,
-                      client: astroConfig.build.client.toString(),
-                      server: astroConfig.build.server.toString(),
+                      client: astroConfig.build.client.href,
+                      server: astroConfig.build.server.href,
                       bodySizeLimit: options.bodySizeLimit ?? DEFAULT_BODY_SIZE_LIMIT,
                       shutdownTimeout: options.shutdownTimeout ?? 10_000,
                       health: healthOptions
@@ -273,13 +273,13 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
                     // exclude patterns may contain RegExp — serialized as code, not JSON
                     const logging = loggingOptions
                       ? `{ exclude: ${serializeExcludePatterns(loggingExclude)}, extended: ${JSON.stringify(
-                          loggingOptions.extended ?? false,
-                        )} }`
+                        loggingOptions.extended ?? false,
+                      )} }`
                       : 'false';
                     const telemetry = telemetryOptions
                       ? `{ exclude: ${serializeExcludePatterns(telemetryExclude)}, prometheus: ${JSON.stringify(
-                          telemetryOptions.prometheus ?? {},
-                        )} }`
+                        telemetryOptions.prometheus ?? {},
+                      )} }`
                       : 'false';
 
                     return `export const options = { ...${JSON.stringify(runtimeOptions)}, logging: ${logging}, telemetry: ${telemetry} };`;
@@ -350,7 +350,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
 
           if (fs.existsSync(manifestPath)) {
             const { transformPrerenderedHtml } = await import('../islands/prerendered.js');
-            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as IslandsManifest;
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as IslandsManifest;
             const transformed = transformPrerenderedHtml(fileURLToPath(astroConfig.build.client), manifest);
 
             if (transformed > 0) {

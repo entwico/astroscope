@@ -4,7 +4,9 @@ import { createIslandsTransformer } from './transform.js';
 import type { IslandsManifest } from './types.js';
 
 function* walkHtmlFiles(dir: string): Generator<string> {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
     const full = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
@@ -25,14 +27,16 @@ export function transformPrerenderedHtml(clientDir: string, manifest: IslandsMan
   let transformed = 0;
 
   for (const file of walkHtmlFiles(clientDir)) {
-    const html = fs.readFileSync(file, 'utf-8');
+    const html = fs.readFileSync(file, 'utf8');
     const rewriter = transformer.createDocumentRewriter();
     const result = rewriter.write(html) + rewriter.end();
 
-    if (result !== html) {
-      fs.writeFileSync(file, result);
-      transformed++;
+    if (result === html) {
+      continue;
     }
+
+    fs.writeFileSync(file, result);
+    transformed++;
   }
 
   return transformed;

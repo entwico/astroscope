@@ -7,7 +7,7 @@ export const CAP_FIELD_NAME = '_cap';
 
 /** `/_cap` and `_cap/` both become `/_cap/`, so endpoints can be appended as plain names */
 export function normalizeCapPath(path: string): string {
-  const trimmed = path.trim().replace(/^\/+|\/+$/g, '');
+  const trimmed = path.trim().replaceAll(/^\/+|\/+$/g, '');
 
   if (!trimmed) {
     throw new Error('@astroscope/cap: path must not be empty or "/"');

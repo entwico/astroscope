@@ -14,7 +14,7 @@ type Node = { tag: string; children: (string | Node)[] };
 
 const tag =
   (name: string) =>
-  (children: (string | Node)[]): Node => ({ tag: name, children });
+    (children: (string | Node)[]): Node => ({ tag: name, children });
 
 describe('partsToNodes', () => {
   test('returns plain text parts as strings', () => {
@@ -68,7 +68,7 @@ describe('partsToNodes', () => {
   });
 
   test('skips bidi isolation parts', () => {
-    const parts = [text('a'), { type: 'bidiIsolation', value: '⁨' } as Part, text('b')];
+    const parts = [text('a'), { type: 'bidiIsolation', value: '\u{2068}' } as Part, text('b')];
 
     expect(partsToNodes(parts, {})).toEqual(['a', 'b']);
   });

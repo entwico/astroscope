@@ -9,8 +9,12 @@
     "typecheck": {
       "dependsOn": ["^build"]
     },
-    "lint": {},
-    "lint:fix": {},
+    "lint": {
+      "dependsOn": ["@astroscope/eslint-plugin#build"]
+    },
+    "lint:fix": {
+      "dependsOn": ["@astroscope/eslint-plugin#build"]
+    },
     "test": {
       "dependsOn": ["build"]
     }

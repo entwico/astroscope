@@ -25,7 +25,9 @@ function throughParse5(html: string): Promise<{ out: string; attrs: Record<strin
     const chunks: string[] = [];
     const attrs: Record<string, string>[] = [];
 
-    stream.on('data', (chunk: string | Buffer) => chunks.push(chunk.toString()));
+    stream.on('data', (chunk: string | Buffer) => {
+      chunks.push(chunk.toString());
+    });
     stream.on('startTag', (tag, raw) => {
       if (tag.tagName === 'astro-island') {
         attrs.push(Object.fromEntries(tag.attrs.map((attr) => [attr.name, attr.value])));

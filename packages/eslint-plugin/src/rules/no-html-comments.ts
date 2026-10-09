@@ -51,11 +51,9 @@ export const noHtmlComments = createRule({
         context.report({
           node: rawNode as unknown as TSESTree.Node,
           messageId: 'htmlComment',
-          ...(canAutofix
-            ? {
-                fix: (fixer) => fixer.replaceTextRange([start, end], `{/*${value}*/}`),
-              }
-            : {}),
+          ...(canAutofix && {
+            fix: (fixer) => fixer.replaceTextRange([start, end], `{/*${value}*/}`),
+          }),
         });
       },
     };

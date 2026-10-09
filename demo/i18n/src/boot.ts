@@ -79,7 +79,7 @@ const mockTranslations: Record<string, RawTranslations> = {
   },
 };
 
-async function fetchTranslations(locale: string): Promise<RawTranslations> {
+function fetchTranslations(locale: string): RawTranslations {
   // in production, this would call your actual CMS
   console.log(`[i18n] fetching translations for locale: ${locale}`);
   return mockTranslations[locale] ?? mockTranslations['en'] ?? {};
@@ -92,10 +92,8 @@ export async function onStartup() {
 
   console.log('[i18n] loading translations...');
 
-  const [en, de] = await Promise.all([fetchTranslations('en'), fetchTranslations('de')]);
-
-  i18n.setTranslations('en', en);
-  i18n.setTranslations('de', de);
+  i18n.setTranslations('en', fetchTranslations('en'));
+  i18n.setTranslations('de', fetchTranslations('de'));
 
   console.log('[i18n] translations ready');
 }

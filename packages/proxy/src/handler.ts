@@ -94,7 +94,7 @@ async function proxyRequest(
   for (const [key, value] of Object.entries(resHeaders)) {
     if (Array.isArray(value)) {
       value.forEach((v) => responseHeaders.append(key, v));
-    } else if (value != null) {
+    } else if (value !== undefined) {
       responseHeaders.set(key, value);
     }
   }
@@ -113,11 +113,13 @@ async function proxyRequest(
   let streamClosed = false;
 
   const cleanup = () => {
-    if (!streamClosed) {
-      streamClosed = true;
-      request.signal?.removeEventListener('abort', cleanup);
-      safeDestroyBody(resBody);
+    if (streamClosed) {
+      return;
     }
+
+    streamClosed = true;
+    request.signal?.removeEventListener('abort', cleanup);
+    safeDestroyBody(resBody);
   };
 
   const stream = new ReadableStream({
@@ -135,13 +137,15 @@ async function proxyRequest(
       });
 
       resBody.on('end', () => {
-        if (!streamClosed && !request.signal?.aborted) {
-          streamClosed = true;
-          try {
-            controller.close();
-          } catch {
-            // controller might already be closed due to cancellation
-          }
+        if (streamClosed || request.signal?.aborted) {
+          return;
+        }
+
+        streamClosed = true;
+        try {
+          controller.close();
+        } catch {
+          // controller might already be closed due to cancellation
         }
       });
 

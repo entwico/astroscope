@@ -1,6 +1,9 @@
 import type { WormholeManifest } from './extraction/types.js';
 
-/** public url or dist-relative file name of a chunk → manifest chunk name, e.g. `…/_astro/Counter.abc.js` → `Counter.abc` */
+/**
+ * public url or dist-relative file name of a chunk → manifest chunk name,
+ * e.g. `…/_astro/Counter.abc.js` → `Counter.abc`
+ */
 export function chunkName(url: string): string {
   return url.slice(url.lastIndexOf('/') + 1).replace(/\.js$/, '');
 }
@@ -13,7 +16,9 @@ export function namesInClosure(closure: Iterable<string>, manifest: WormholeMani
   const names = new Set<string>();
 
   for (const url of closure) {
-    for (const name of manifest.chunks[chunkName(url)] ?? []) {
+    const chunkReads = manifest.chunks[chunkName(url)] ?? [];
+
+    for (const name of chunkReads) {
       if (name === '*') {
         return null;
       }

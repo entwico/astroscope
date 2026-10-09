@@ -105,11 +105,14 @@ function charsetOf(contentType: string): string | undefined {
   return match?.[1]?.toLowerCase();
 }
 
+// eslint-disable-next-line unicorn/text-encoding-identifier-case -- http charset labels as clients send them
+const UTF8_CHARSETS = new Set(['utf-8', 'utf8']);
+
 /** no declared charset means astro's utf-8 encoder produced the body */
 function isUtf8Compatible(contentType: string): boolean {
   const charset = charsetOf(contentType);
 
-  return charset === undefined || charset === 'utf-8' || charset === 'utf8';
+  return charset === undefined || UTF8_CHARSETS.has(charset);
 }
 
 function withUtf8Charset(contentType: string): string {

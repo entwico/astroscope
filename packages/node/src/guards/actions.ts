@@ -1,5 +1,6 @@
 import type { MaybePromise } from '@entwico/dash';
 import { z } from 'astro/zod';
+// eslint-disable-next-line @astroscope/no-astro-define-action -- this is the wrapper the rule points consumers to
 import { type ActionAPIContext, type ActionClient, defineAction as defineAstroAction } from 'astro:actions';
 import { type Guard, type GuardShapes, type GuardedContext, type Proofs, collectInput, runGuards } from './guard.js';
 

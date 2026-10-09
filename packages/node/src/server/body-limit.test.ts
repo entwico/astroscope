@@ -41,16 +41,21 @@ describe('enforceBodyLimit', () => {
 
   test('lets bodies at or under the limit, and requests without one, through', async () => {
     const baseUrl = await startServer(1024);
+    const atLimit = await fetch(baseUrl, { method: 'POST', body: 'x'.repeat(1024) });
 
-    expect(await (await fetch(baseUrl, { method: 'POST', body: 'x'.repeat(1024) })).text()).toBe('received 1024');
-    expect(await (await fetch(baseUrl)).text()).toBe('received 0');
+    expect(await atLimit.text()).toBe('received 1024');
+
+    const bodyless = await fetch(baseUrl);
+
+    expect(await bodyless.text()).toBe('received 0');
   });
 
   test('0 and Infinity disable the limit', async () => {
-    for (const limit of [0, Number.POSITIVE_INFINITY]) {
+    for (const limit of [0, Infinity]) {
       const baseUrl = await startServer(limit);
+      const res = await fetch(baseUrl, { method: 'POST', body: 'x'.repeat(4096) });
 
-      expect((await fetch(baseUrl, { method: 'POST', body: 'x'.repeat(4096) })).status).toBe(200);
+      expect(res.status).toBe(200);
     }
   });
 });

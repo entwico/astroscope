@@ -36,7 +36,7 @@ function createGraph(modules: Record<string, Module>): ModuleGraph {
         },
       } as unknown as Rolldown.ModuleInfo;
     },
-    resolve: async (source) => (source.startsWith('/') ? { id: source } : { id: `/resolved${source.slice(1)}` }),
+    resolve: (source) => Promise.resolve({ id: source.startsWith('/') ? source : `/resolved${source.slice(1)}` }),
   };
 }
 
@@ -121,7 +121,7 @@ describe('collectRouteIslands', () => {
 
     expect([...routes.get('/')!]).toEqual(['/src/Island.tsx']);
   });
-  test("the walk stops at astro's application manifest, which imports every page", async () => {
+  test('the walk stops at astro\'s application manifest, which imports every page', async () => {
     const graph = createGraph({
       '\0virtual:astro:actions/entrypoint': { imports: ['/src/actions/index.ts'] },
       '/src/actions/index.ts': { imports: ['/astro/actions/runtime/server.js'] },

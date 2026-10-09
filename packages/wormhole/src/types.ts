@@ -7,8 +7,8 @@ import type { APIContext } from 'astro';
  * **Security:** wormhole data is serialized into an inline `<script>` tag and sent to the browser.
  * Never store secrets (tokens, API keys, credentials) in a wormhole.
  *
- * The stored value is exposed as deeply readonly (`ReadonlyDeep` of `@entwico/dash`) — the only way to change it is `set()`
- * (client) or the middleware's per-request values (server), which keeps subscribers in sync.
+ * The stored value is exposed as deeply readonly (`ReadonlyDeep` of `@entwico/dash`) — the only way to
+ * change it is `set()` (client) or the middleware's per-request values (server), which keeps subscribers in sync.
  */
 // `in out` forces invariance: methods are bivariant in TS, so without it a
 // Wormhole<A> unifies into Wormhole<A | B> and mismatched open() data slips through

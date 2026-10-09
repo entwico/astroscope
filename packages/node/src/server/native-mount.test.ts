@@ -29,10 +29,12 @@ function enableLogCapture(): void {
 
 async function startServer(): Promise<string> {
   const server = createServer((req, res) => {
-    if (!dispatchNativeMount(req, res)) {
-      res.statusCode = 404;
-      res.end('fallthrough');
+    if (dispatchNativeMount(req, res)) {
+      return;
     }
+
+    res.statusCode = 404;
+    res.end('fallthrough');
   });
 
   servers.push(server);
@@ -51,12 +53,12 @@ describe('mountNativeHandler', () => {
     const unregister = mountNativeHandler({ prefix: '/api' }, (_req, res) => void res.end('mounted'));
     const url = await startServer();
 
-    expect(await (await fetch(`${url}/api`)).text()).toBe('mounted');
+    expect(await fetchText(`${url}/api`)).toBe('mounted');
 
     unregister();
     unregister();
 
-    expect(await (await fetch(`${url}/api`)).text()).toBe('fallthrough');
+    expect(await fetchText(`${url}/api`)).toBe('fallthrough');
   });
 
   test('clearNativeMounts removes every mount', async () => {
@@ -67,9 +69,15 @@ describe('mountNativeHandler', () => {
 
     const url = await startServer();
 
-    expect(await (await fetch(`${url}/a`)).text()).toBe('fallthrough');
+    expect(await fetchText(`${url}/a`)).toBe('fallthrough');
   });
 });
+
+async function fetchText(url: string): Promise<string> {
+  const res = await fetch(url);
+
+  return res.text();
+}
 
 describe('dispatchNativeMount routing', () => {
   test('returns false when no mount matches', async () => {
@@ -85,10 +93,10 @@ describe('dispatchNativeMount routing', () => {
 
     const url = await startServer();
 
-    expect(await (await fetch(`${url}/oidc`)).text()).toBe('oidc:/oidc');
-    expect(await (await fetch(`${url}/oidc/auth`)).text()).toBe('oidc:/oidc/auth');
-    expect(await (await fetch(`${url}/oidc?client_id=1`)).text()).toBe('oidc:/oidc?client_id=1');
-    expect(await (await fetch(`${url}/oidcx`)).text()).toBe('fallthrough');
+    expect(await fetchText(`${url}/oidc`)).toBe('oidc:/oidc');
+    expect(await fetchText(`${url}/oidc/auth`)).toBe('oidc:/oidc/auth');
+    expect(await fetchText(`${url}/oidc?client_id=1`)).toBe('oidc:/oidc?client_id=1');
+    expect(await fetchText(`${url}/oidcx`)).toBe('fallthrough');
   });
 
   test('the longest matching prefix wins regardless of registration order', async () => {
@@ -97,8 +105,8 @@ describe('dispatchNativeMount routing', () => {
 
     const url = await startServer();
 
-    expect(await (await fetch(`${url}/api/v2/users`)).text()).toBe('long');
-    expect(await (await fetch(`${url}/api/v1/users`)).text()).toBe('short');
+    expect(await fetchText(`${url}/api/v2/users`)).toBe('long');
+    expect(await fetchText(`${url}/api/v1/users`)).toBe('short');
   });
 
   test('predicate mounts are consulted only when no prefix mount matches', async () => {
@@ -107,8 +115,8 @@ describe('dispatchNativeMount routing', () => {
 
     const url = await startServer();
 
-    expect(await (await fetch(`${url}/p/x`)).text()).toBe('prefix');
-    expect(await (await fetch(`${url}/q`)).text()).toBe('predicate');
+    expect(await fetchText(`${url}/p/x`)).toBe('prefix');
+    expect(await fetchText(`${url}/q`)).toBe('predicate');
   });
 
   test('predicate mounts run in registration order', async () => {
@@ -119,8 +127,8 @@ describe('dispatchNativeMount routing', () => {
 
     const url = await startServer();
 
-    expect(await (await fetch(`${url}/path-a`)).text()).toBe('first');
-    expect(await (await fetch(`${url}/other`)).text()).toBe('second');
+    expect(await fetchText(`${url}/path-a`)).toBe('first');
+    expect(await fetchText(`${url}/other`)).toBe('second');
   });
 });
 
@@ -142,9 +150,7 @@ describe('dispatchNativeMount error handling', () => {
 
   test('a rejecting async handler yields a logged 500', async () => {
     enableLogCapture();
-    mountNativeHandler({ prefix: '/fail' }, async () => {
-      throw new Error('async boom');
-    });
+    mountNativeHandler({ prefix: '/fail' }, () => Promise.reject(new Error('async boom')));
 
     const url = await startServer();
     const res = await fetch(`${url}/fail`);

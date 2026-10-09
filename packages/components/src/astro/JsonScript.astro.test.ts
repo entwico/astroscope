@@ -32,7 +32,7 @@ describe('JsonScript', () => {
     const body = scriptBody(html);
 
     expect(body).not.toContain('<');
-    expect(body).toContain('\\u003c');
+    expect(body).toContain(String.raw`\u003c`);
   });
 
   test('the escaped block parses back to the exact original', async () => {

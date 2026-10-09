@@ -5,6 +5,8 @@ packages:
 
 overrides:
   vite: ^8
+  # eslint-config pins the published plugin; the repo lints with its own
+  '@astroscope/eslint-plugin': workspace:*
 
 allowBuilds:
   '@tailwindcss/oxide': true

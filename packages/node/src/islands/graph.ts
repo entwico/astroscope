@@ -62,6 +62,6 @@ export function createChunkGraph(manifest: IslandsManifest): ChunkGraph {
   return {
     staticClosure: createClosure(manifest.chunks, (entry) => entry.i ?? []),
     fullClosure: createClosure(manifest.chunks, (entry) => [...(entry.i ?? []), ...(entry.d ?? [])]),
-    has: (fileName) => fileName in manifest.chunks,
+    has: (fileName) => Object.hasOwn(manifest.chunks, fileName),
   };
 }

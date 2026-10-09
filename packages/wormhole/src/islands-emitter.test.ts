@@ -27,13 +27,13 @@ function createIsland(overrides: Partial<IslandInfo> = {}): IslandInfo {
   };
 }
 
-function createContext(): APIContext {
+function createRequestContext(): APIContext {
   return { request: new Request('http://localhost/') } as APIContext;
 }
 
 async function setup(manifest: WormholeManifest | null, values: Record<string, unknown>) {
-  (globalThis as Record<symbol, unknown>)[REGISTRY] = [];
-  (globalThis as Record<symbol, unknown>)[DOCUMENT_REGISTRY] = [];
+  vi.stubGlobal(REGISTRY, []);
+  vi.stubGlobal(DOCUMENT_REGISTRY, []);
 
   mocks.manifest = manifest;
 
@@ -45,7 +45,7 @@ async function setup(manifest: WormholeManifest | null, values: Record<string, u
   registerWormholeEmitters();
 
   const emitter = ((globalThis as Record<symbol, unknown>)[REGISTRY] as IslandEmitter[])[0]!;
-  const context = createContext();
+  const context = createRequestContext();
 
   setRequestWormholes(context.request, { values: new Map(Object.entries(values)), emitted: new Set() });
 
@@ -87,7 +87,7 @@ describe('registerWormholeEmitters', () => {
       { counter: 1 },
     );
 
-    expect(unknownRequest.emitter(createIsland(), createContext())).toBeNull();
+    expect(unknownRequest.emitter(createIsland(), createRequestContext())).toBeNull();
   });
 
   test('emits a merge script for reachable open wormholes only', async () => {
@@ -150,7 +150,7 @@ describe('createWormholeDocumentEmitter', () => {
 
     const unknownRequest = await setup({ chunks: {}, scripts: [], routes: {} }, { counter: 1 });
 
-    expect(unknownRequest.createWormholeDocumentEmitter(false)(createContext())).toBeNull();
+    expect(unknownRequest.createWormholeDocumentEmitter(false)(createRequestContext())).toBeNull();
   });
 
   test('dev delivers everything open as head content', async () => {

@@ -63,41 +63,41 @@ export function renderIsland(
 
 // a boundary failing inside the stream is left to the client (react emits the
 // fallback with the client-render marker); the shell failing rejects the render
-function renderStream(
+async function renderStream(
   Component: WeakKey,
   vnode: ReactNode,
   options: RenderOptions,
   metadata?: AstroComponentMetadata,
 ): Promise<string> {
   const errors: unknown[] = [];
+  let html: string;
 
-  return ReactDOM.renderToReadableStream(vnode, {
-    ...options,
-    onError: (error) => {
-      errors.push(error);
+  try {
+    const stream = await ReactDOM.renderToReadableStream(vnode, {
+      ...options,
+      onError: (error) => {
+        errors.push(error);
 
-      return undefined;
-    },
-  })
-    .then(readToString)
-    .then(
-      (html) => {
-        for (const error of errors) {
-          recordRenderFailure(Component, 'boundary', error);
-          log.error(
-            { err: error, component: componentName(Component), componentUrl: metadata?.componentUrl },
-            'react island boundary failed during server render, left to the client',
-          );
-        }
-
-        return html;
+        return;
       },
-      (error: unknown) => {
-        recordRenderFailure(Component, 'root', error);
+    });
 
-        throw error;
-      },
+    html = await readToString(stream);
+  } catch (error) {
+    recordRenderFailure(Component, 'root', error);
+
+    throw error;
+  }
+
+  for (const error of errors) {
+    recordRenderFailure(Component, 'boundary', error);
+    log.error(
+      { err: error, component: componentName(Component), componentUrl: metadata?.componentUrl },
+      'react island boundary failed during server render, left to the client',
     );
+  }
+
+  return html;
 }
 
 async function readToString(stream: ReadableStream<Uint8Array>): Promise<string> {

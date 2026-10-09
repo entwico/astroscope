@@ -23,7 +23,7 @@ export const noServerActionCalls: Rule.RuleModule = {
       directCall:
         'actions cannot be called in astro server code — this runs the mutation on every page render and throws `ActionCalledFromServerError` at runtime. Submit via `<form action={actions.<name>}>`, call it from client code, or read the submitted result with `Astro.getActionResult()`.',
       callAction:
-        "`Astro.callAction()` runs the action handler during server rendering — the mutation fires on plain GET renders without the action endpoint's POST-only and origin checks, and the page becomes coupled to the controller. Move the shared logic into its own module and call it from both the action handler and the astro code.",
+        '`Astro.callAction()` runs the action handler during server rendering — the mutation fires on plain GET renders without the action endpoint\'s POST-only and origin checks, and the page becomes coupled to the controller. Move the shared logic into its own module and call it from both the action handler and the astro code.',
     },
     schema: [],
   },

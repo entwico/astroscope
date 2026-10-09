@@ -38,9 +38,9 @@ function getServerDefaults(config: AstroConfig | null): { host: string; port: nu
     host:
       typeof config?.server?.host === 'string'
         ? config.server.host
-        : config?.server?.host === true
-          ? '0.0.0.0'
-          : 'localhost',
+        : (config?.server?.host === true
+            ? '0.0.0.0'
+            : 'localhost'),
     port: config?.server?.port ?? 4321,
   };
 }

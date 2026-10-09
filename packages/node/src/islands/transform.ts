@@ -33,7 +33,7 @@ const IMMEDIATE_DIRECTIVES = new Set(['load', 'only']);
 
 /** urls cannot contain `</script>`, but escape `<` anyway so no value ever can */
 function jsonForScript(value: unknown): string {
-  return JSON.stringify(value).replace(/</g, '\\u003c');
+  return JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
 }
 
 type ResolvedChunk = { prefix: string; fileName: string };
@@ -58,17 +58,19 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
     }
 
     for (const fileName of fileNames) {
-      if (url.endsWith(fileName)) {
-        const boundary = url.length - fileName.length;
+      if (!url.endsWith(fileName)) {
+        continue;
+      }
 
-        if (boundary === 0 || url[boundary - 1] === '/') {
-          const resolved = { prefix: url.slice(0, boundary), fileName };
+      const boundary = url.length - fileName.length;
 
-          // only hits are cached
-          resolveCache.set(url, resolved);
+      if (boundary === 0 || url[boundary - 1] === '/') {
+        const resolved = { prefix: url.slice(0, boundary), fileName };
 
-          return resolved;
-        }
+        // only hits are cached
+        resolveCache.set(url, resolved);
+
+        return resolved;
       }
     }
 
@@ -108,7 +110,9 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
       if (rendererUrl) {
         urls.add(rendererUrl);
 
-        for (const f of renderer ? closure(renderer.fileName) : []) {
+        const rendererClosure = renderer ? closure(renderer.fileName) : [];
+
+        for (const f of rendererClosure) {
           urls.add(renderer!.prefix + f);
         }
       }
@@ -201,10 +205,12 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
         let prepend = html;
 
         for (const url of links) {
-          if (!emittedLinks.has(url)) {
-            emittedLinks.add(url);
-            prepend += linkTag(url);
+          if (emittedLinks.has(url)) {
+            continue;
           }
+
+          emittedLinks.add(url);
+          prepend += linkTag(url);
         }
 
         return { prepend: prepend || undefined };

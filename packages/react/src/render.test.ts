@@ -89,7 +89,7 @@ describe('renderIsland', () => {
     expect(logError).not.toHaveBeenCalled();
   });
 
-  test('rethrows render errors instead of retrying', async () => {
+  test('rethrows render errors instead of retrying', () => {
     const Broken = () => {
       throw new Error('boom');
     };

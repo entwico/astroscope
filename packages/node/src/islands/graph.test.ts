@@ -14,9 +14,13 @@ const graph = createChunkGraph({
   },
 });
 
+function sorted(names: string[]): string[] {
+  return names.toSorted((a, b) => a.localeCompare(b));
+}
+
 describe('createChunkGraph', () => {
   test('static closure walks transitive static imports, deduped, self excluded', () => {
-    expect(graph.staticClosure('a.js').sort()).toEqual(['b.js', 'c.js', 'shared.js']);
+    expect(sorted(graph.staticClosure('a.js'))).toEqual(['b.js', 'c.js', 'shared.js']);
   });
 
   test('static closure ignores dynamic imports', () => {
@@ -24,12 +28,12 @@ describe('createChunkGraph', () => {
   });
 
   test('full closure crosses dynamic import boundaries', () => {
-    expect(graph.fullClosure('a.js').sort()).toEqual(['b.js', 'c.js', 'lazy.js', 'shared.js']);
+    expect(sorted(graph.fullClosure('a.js'))).toEqual(['b.js', 'c.js', 'lazy.js', 'shared.js']);
   });
 
   test('survives import cycles', () => {
-    expect(graph.staticClosure('x.js').sort()).toEqual(['y.js']);
-    expect(graph.staticClosure('y.js').sort()).toEqual(['x.js']);
+    expect(sorted(graph.staticClosure('x.js'))).toEqual(['y.js']);
+    expect(sorted(graph.staticClosure('y.js'))).toEqual(['x.js']);
   });
 
   test('unknown chunks resolve to an empty closure', () => {

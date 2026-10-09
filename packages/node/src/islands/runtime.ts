@@ -76,7 +76,8 @@ function fire(componentUrl: string): void {
     }
 
     imported.add(url);
-    import(url).catch(() => undefined);
+    // eslint-disable-next-line unicorn/prefer-await -- fire-and-forget: the imports must start in parallel, the component's own import reports failures
+    import(url).catch(() => {});
   }
 
   inject(links);
@@ -92,10 +93,12 @@ function directiveValue(el: Element): unknown {
 
 function unobserve(componentUrl: string): void {
   for (const [el, url] of observed) {
-    if (url === componentUrl) {
-      observer!.unobserve(el);
-      observed.delete(el);
+    if (url !== componentUrl) {
+      continue;
     }
+
+    observer!.unobserve(el);
+    observed.delete(el);
   }
 }
 
@@ -112,14 +115,18 @@ function observe(el: Element, componentUrl: string): void {
   observer ??= new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
-        if (entry.isIntersecting) {
-          const url = observed.get(entry.target);
-
-          if (url) {
-            unobserve(url);
-            fire(url);
-          }
+        if (!entry.isIntersecting) {
+          continue;
         }
+
+        const url = observed.get(entry.target);
+
+        if (!url) {
+          continue;
+        }
+
+        unobserve(url);
+        fire(url);
       }
     },
     { rootMargin: '100% 0px' },
@@ -149,40 +156,45 @@ function gate(el: Element): void {
     return;
   }
 
-  if (fired.has(componentUrl) || !scope.__islands__?.[componentUrl]) {
+  const entry = scope.__islands__?.[componentUrl];
+
+  if (!entry || fired.has(componentUrl)) {
     return;
   }
 
   const directive = (el.getAttribute('client') ?? '').replace(/-x$/, '');
 
-  if (directive === 'media') {
-    const value = directiveValue(el);
+  switch (directive) {
+    case 'media': {
+      const value = directiveValue(el);
 
-    if (typeof value === 'string') {
-      const query = matchMedia(value);
+      if (typeof value === 'string') {
+        const query = matchMedia(value);
 
-      if (query.matches) {
-        fire(componentUrl);
-      } else {
-        query.addEventListener('change', () => fire(componentUrl), { once: true });
+        if (query.matches) {
+          fire(componentUrl);
+        } else {
+          query.addEventListener('change', () => fire(componentUrl), { once: true });
+        }
+
+        return;
       }
+
+      break;
+    }
+    case 'visible': {
+      observe(el, componentUrl);
 
       return;
     }
-  }
+    case 'load':
+    case 'only': {
+      // immediate islands normally get server-emitted link tags instead; if one
+      // carries gate data anyway, fire right away
+      fire(componentUrl);
 
-  if (directive === 'visible') {
-    observe(el, componentUrl);
-
-    return;
-  }
-
-  if (directive === 'load' || directive === 'only') {
-    // immediate islands normally get server-emitted link tags instead; if one
-    // carries gate data anyway, fire right away
-    fire(componentUrl);
-
-    return;
+      return;
+    }
   }
 
   // idle, a malformed media query, and unknown directives
@@ -203,6 +215,7 @@ function scan(root: ParentNode): void {
   }
 }
 
+// eslint-disable-next-line unicorn/no-computed-property-existence-check -- shipped browser code: a truthy check runs where Object.hasOwn may not exist
 if (!scope[INSTALLED]) {
   scope[INSTALLED] = true;
 

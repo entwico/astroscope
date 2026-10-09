@@ -2,9 +2,9 @@ import { t } from '@astroscope/i18n/translate';
 import { useState } from 'react';
 
 export type ProductCardProps = {
-  name: string;
-  price: string;
-  image: string;
+  readonly name: string;
+  readonly price: string;
+  readonly image: string;
 };
 
 export default function ProductCard({ name, price, image }: ProductCardProps) {

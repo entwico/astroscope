@@ -72,7 +72,9 @@ function collectImports(program: unknown): Map<string, string> {
 
     if (!specifier) return;
 
-    for (const spec of decl.specifiers ?? []) {
+    const specifiers = decl.specifiers ?? [];
+
+    for (const spec of specifiers) {
       if (spec.importKind === 'type') continue;
 
       if (typeof spec.local?.name === 'string') {

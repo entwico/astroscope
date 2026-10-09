@@ -1,10 +1,10 @@
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import { createIslandsTransformer } from './transform';
 import type { IslandsManifest } from './types';
 
 const REGISTRY = Symbol.for('@astroscope/node.islandEmitters');
 
-(globalThis as Record<symbol, unknown>)[REGISTRY] = [];
+vi.stubGlobal(REGISTRY, []);
 
 const manifest: IslandsManifest = {
   runtimeSource: '/* gate runtime */',
@@ -79,7 +79,7 @@ const docs = {
   ),
 };
 
-async function run(chunks: string[]): Promise<number> {
+function run(chunks: string[]): number {
   const rewriter = transformer.createDocumentRewriter();
   let out = 0;
 
@@ -92,20 +92,20 @@ async function run(chunks: string[]): Promise<number> {
 
 test('islands rewriter, 50 KB document', async ({ bench }) => {
   await bench.compare(
-    bench('no islands', async () => {
-      await run(docs.plain);
+    bench('no islands', () => {
+      run(docs.plain);
     }),
-    bench('1 immediate island', async () => {
-      await run(docs.one);
+    bench('1 immediate island', () => {
+      run(docs.one);
     }),
-    bench('20 immediate islands', async () => {
-      await run(docs.twentyImmediate);
+    bench('20 immediate islands', () => {
+      run(docs.twentyImmediate);
     }),
-    bench('20 deferred islands', async () => {
-      await run(docs.twentyDeferred);
+    bench('20 deferred islands', () => {
+      run(docs.twentyDeferred);
     }),
-    bench('20 immediate islands, 2 KB props each', async () => {
-      await run(docs.twentyWithProps);
+    bench('20 immediate islands, 2 KB props each', () => {
+      run(docs.twentyWithProps);
     }),
   );
 });

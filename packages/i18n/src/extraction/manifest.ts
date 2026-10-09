@@ -28,15 +28,13 @@ export function getGlobalState(): GlobalI18nState {
   const g = globalThis as Record<string, unknown>;
 
   // in dev mode, initialize global state if not present
-  if (!g[I18N_MANIFEST_GLOBAL_KEY]) {
-    g[I18N_MANIFEST_GLOBAL_KEY] = {
-      extractedKeys: [],
-      chunkManifest: {},
-      scriptChunks: [],
-      projectRoot: '',
-      version: 0,
-    };
-  }
+  g[I18N_MANIFEST_GLOBAL_KEY] ??= {
+    extractedKeys: [],
+    chunkManifest: {},
+    scriptChunks: [],
+    projectRoot: '',
+    version: 0,
+  } satisfies GlobalI18nState;
 
   return g[I18N_MANIFEST_GLOBAL_KEY] as GlobalI18nState;
 }

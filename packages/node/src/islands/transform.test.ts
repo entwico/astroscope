@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { registerIslandEmitter } from './emitters';
 import { createIslandsTransformer, insertIntoHead } from './transform';
 import type { IslandsManifest } from './types';
@@ -20,19 +20,23 @@ function island(client: string, componentUrl = '/_astro/Cart.aaa.js'): string {
   return `<astro-island component-url="${componentUrl}" renderer-url="/_astro/client.ccc.js" client="${client}" opts="{}"></astro-island>`;
 }
 
-async function apply(html: string): Promise<string> {
+function apply(html: string): string {
   const rewriter = createIslandsTransformer(manifest).createDocumentRewriter();
 
   return rewriter.write(html) + rewriter.end();
 }
 
 beforeEach(() => {
-  (globalThis as Record<symbol, unknown>)[REGISTRY] = [];
+  vi.stubGlobal(REGISTRY, []);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('createIslandsTransformer', () => {
-  test('emits deduplicated modulepreload links before an immediate island', async () => {
-    const out = await apply(`<body>${island('load')}</body>`);
+  test('emits deduplicated modulepreload links before an immediate island', () => {
+    const out = apply(`<body>${island('load')}</body>`);
     const links = out.match(/<link rel="modulepreload" fetchpriority="low" href="([^"]+)">/g) ?? [];
 
     expect(links).toHaveLength(3);
@@ -42,19 +46,19 @@ describe('createIslandsTransformer', () => {
     expect(out.indexOf('<link')).toBeLessThan(out.indexOf('<astro-island'));
   });
 
-  test('does not preload dynamic imports', async () => {
-    expect(await apply(island('load'))).not.toContain('Lazy.ddd.js');
+  test('does not preload dynamic imports', () => {
+    expect(apply(island('load'))).not.toContain('Lazy.ddd.js');
   });
 
-  test('emits each link once per document across immediate islands', async () => {
-    const out = await apply(island('load') + island('load', '/_astro/Menu.eee.js'));
+  test('emits each link once per document across immediate islands', () => {
+    const out = apply(island('load') + island('load', '/_astro/Menu.eee.js'));
 
     expect(out.match(/href="\/_astro\/shared\.bbb\.js"/g)).toHaveLength(1);
     expect(out.match(/href="\/_astro\/client\.ccc\.js"/g)).toHaveLength(1);
   });
 
-  test('inlines the gate runtime and registers preload data for a deferred island', async () => {
-    const out = await apply(island('visible'));
+  test('inlines the gate runtime and registers preload data for a deferred island', () => {
+    const out = apply(island('visible'));
 
     expect(out).toContain('<script>/* gate runtime */</script>');
     expect(out).toMatch(
@@ -66,55 +70,55 @@ describe('createIslandsTransformer', () => {
     expect(out).toContain(island('visible'));
   });
 
-  test('inlines the runtime once and registers each component once', async () => {
-    const out = await apply(island('visible') + island('visible') + island('idle', '/_astro/Menu.eee.js'));
+  test('inlines the runtime once and registers each component once', () => {
+    const out = apply(island('visible') + island('visible') + island('idle', '/_astro/Menu.eee.js'));
 
     expect(out.match(/<script>\/\* gate runtime \*\/<\/script>/g)).toHaveLength(1);
     expect(out.match(/\(self\.__islands__\?\?=\{\}\)/g)).toHaveLength(2);
   });
 
-  test('pages without deferred islands never carry the runtime', async () => {
-    expect(await apply(island('load'))).not.toContain('/* gate runtime */');
+  test('pages without deferred islands never carry the runtime', () => {
+    expect(apply(island('load'))).not.toContain('/* gate runtime */');
   });
 
-  test('treats -x suffixed directives like their base directive', async () => {
-    expect(await apply(island('load-x'))).toContain('<link');
-    expect(await apply(island('idle-x'))).toContain('__islands__');
+  test('treats -x suffixed directives like their base directive', () => {
+    expect(apply(island('load-x'))).toContain('<link');
+    expect(apply(island('idle-x'))).toContain('__islands__');
   });
 
-  test('maps closures through the prefix observed on the component url', async () => {
-    const out = await apply(island('load', 'https://cdn.example.com/base/_astro/Cart.aaa.js'));
+  test('maps closures through the prefix observed on the component url', () => {
+    const out = apply(island('load', 'https://cdn.example.com/base/_astro/Cart.aaa.js'));
 
     expect(out).toContain('href="https://cdn.example.com/base/_astro/shared.bbb.js"');
   });
 
-  test('leaves islands with unknown component urls untouched', async () => {
+  test('leaves islands with unknown component urls untouched', () => {
     const html = island('load', '/_astro/Unknown.zzz.js');
 
-    expect(await apply(html)).toBe(html);
+    expect(apply(html)).toBe(html);
   });
 
-  test('merges links from registered emitters', async () => {
+  test('merges links from registered emitters', () => {
     registerIslandEmitter((info) => ({
       links: [`/_i18n/de/${info.componentUrl.split('/').pop()}`],
     }));
 
-    const immediate = await apply(island('load'));
+    const immediate = apply(island('load'));
 
     expect(immediate).toContain('href="/_i18n/de/Cart.aaa.js"');
 
-    const deferred = await apply(island('visible'));
+    const deferred = apply(island('visible'));
 
     expect(deferred).toMatch(/\["\/_astro\/Cart\.aaa\.js"\]=\{"l":\[[^\]]*\/_i18n\/de\/Cart\.aaa\.js[^\]]*\]\}/);
   });
 
-  test('registers emitter imports for a deferred island, subtracted from the links', async () => {
+  test('registers emitter imports for a deferred island, subtracted from the links', () => {
     registerIslandEmitter(() => ({
       links: ['/_i18n/de/Cart.aaa.js'],
       imports: ['/_i18n/de/Cart.aaa.js', '/_i18n/de/Lazy.ddd.js'],
     }));
 
-    const out = await apply(island('visible'));
+    const out = apply(island('visible'));
     const entry = /\["\/_astro\/Cart\.aaa\.js"\]=(\{.*?\});<\/script>/.exec(out)?.[1];
 
     expect(entry).toBeDefined();
@@ -126,19 +130,19 @@ describe('createIslandsTransformer', () => {
     expect(parsed.l).toContain('/_astro/shared.bbb.js');
   });
 
-  test('immediate islands ignore emitter imports', async () => {
+  test('immediate islands ignore emitter imports', () => {
     registerIslandEmitter(() => ({ imports: ['/_i18n/de/Lazy.ddd.js'] }));
 
-    expect(await apply(island('load'))).not.toContain('/_i18n/de/Lazy.ddd.js');
+    expect(apply(island('load'))).not.toContain('/_i18n/de/Lazy.ddd.js');
   });
 
-  test('a throwing emitter is dropped without breaking the page', async () => {
+  test('a throwing emitter is dropped without breaking the page', () => {
     registerIslandEmitter(() => {
       throw new Error('emitter exploded');
     });
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const out = await apply(island('load'));
+    const out = apply(island('load'));
 
     expect(out).toContain('<link');
     expect(out).toContain('<astro-island');
@@ -146,23 +150,23 @@ describe('createIslandsTransformer', () => {
     errorSpy.mockRestore();
   });
 
-  test('emitter html is prepended before the tag for every directive and occurrence', async () => {
+  test('emitter html is prepended before the tag for every directive and occurrence', () => {
     let n = 0;
 
     registerIslandEmitter(() => ({ html: `<script>d${n++}</script>` }));
 
-    const immediate = await apply(island('load'));
+    const immediate = apply(island('load'));
 
     expect(immediate).toMatch(/<script>d0<\/script>(<link [^>]+>)+<astro-island/);
 
-    const deferred = await apply(island('visible') + island('visible'));
+    const deferred = apply(island('visible') + island('visible'));
 
     // both occurrences carry their html, only the first the registry script
     expect(deferred.match(/<script>d\d<\/script>/g)).toHaveLength(2);
     expect(deferred.match(/\(self\.__islands__\?\?=\{\}\)/g)).toHaveLength(1);
   });
 
-  test('emitters receive the full closure including dynamic imports', async () => {
+  test('emitters receive the full closure including dynamic imports', () => {
     const seen: string[][] = [];
 
     registerIslandEmitter((info) => {
@@ -171,7 +175,7 @@ describe('createIslandsTransformer', () => {
       return null;
     });
 
-    await apply(island('load'));
+    apply(island('load'));
 
     expect(seen[0]).toContain('/_astro/Lazy.ddd.js');
   });

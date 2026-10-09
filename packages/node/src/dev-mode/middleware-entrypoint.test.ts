@@ -5,14 +5,15 @@ import { onRequest } from './middleware-entrypoint';
 const STATE_KEY = Symbol.for('@astroscope/node/generation');
 
 beforeEach(() => {
-  (globalThis as Record<symbol, unknown>)[STATE_KEY] = undefined;
+  vi.stubGlobal(STATE_KEY, undefined);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
-function createContext(stamp: string | null): { request: Request; url: URL } {
+function createApiContext(stamp: string | null): { request: Request; url: URL } {
   const headers = new Headers();
 
   if (stamp !== null) headers.set(GEN_HEADER, stamp);
@@ -25,7 +26,7 @@ function createContext(stamp: string | null): { request: Request; url: URL } {
 
 describe('onRequest', () => {
   test('passes through when next() resolves', async () => {
-    const ctx = createContext('0');
+    const ctx = createApiContext('0');
     const expected = new Response('ok');
 
     const result = await onRequest(ctx as never, () => Promise.resolve(expected));
@@ -36,7 +37,7 @@ describe('onRequest', () => {
   test('rethrows when stamp matches the current generation', async () => {
     incrementGeneration(); // current = 1
 
-    const ctx = createContext('1');
+    const ctx = createApiContext('1');
     const boom = new Error('real bug');
 
     await expect(onRequest(ctx as never, () => Promise.reject(boom))).rejects.toBe(boom);
@@ -45,7 +46,7 @@ describe('onRequest', () => {
   test('rethrows when no stamp is present (we only suppress when we have a clear stale signal)', async () => {
     incrementGeneration();
 
-    const ctx = createContext(null);
+    const ctx = createApiContext(null);
     const boom = new Error('real bug');
 
     await expect(onRequest(ctx as never, () => Promise.reject(boom))).rejects.toBe(boom);
@@ -55,7 +56,7 @@ describe('onRequest', () => {
     incrementGeneration();
     incrementGeneration(); // current = 2
 
-    const ctx = createContext('1');
+    const ctx = createApiContext('1');
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const boom = new Error('singleton used after dispose');
 

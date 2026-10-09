@@ -45,7 +45,7 @@ export async function preparePlatform(options: PreparePlatformOptions): Promise<
 
   const g = globalThis as Record<symbol, unknown>;
 
-  if (!g[INSTRUMENTATION_KEY]) {
+  if (!Object.hasOwn(g, INSTRUMENTATION_KEY)) {
     g[INSTRUMENTATION_KEY] = true;
 
     if (options.telemetry) {

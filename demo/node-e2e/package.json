@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "astro build"
+    "build": "astro build",
+    "lint": "eslint src astro.config.ts --cache",
+    "lint:fix": "eslint src astro.config.ts --fix"
   },
   "dependencies": {
     "@astroscope/node": "workspace:*",

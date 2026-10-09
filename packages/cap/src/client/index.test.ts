@@ -19,7 +19,7 @@ afterEach(() => {
 function solver(...results: (string | null)[]) {
   let count = 0;
 
-  return vi.fn(async () => (results.length ? results.shift()! : `token-${++count}`));
+  return vi.fn(() => Promise.resolve(results.length > 0 ? results.shift()! : `token-${++count}`));
 }
 
 describe('createCapSession', () => {

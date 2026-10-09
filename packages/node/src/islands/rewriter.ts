@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/prefer-code-point, unicorn/no-break-in-nested-loop -- byte-level html scanner on the hot path: `charCodeAt` and in-loop `break` are deliberate */
 /**
  * Streaming scanner that prepends handler html before `<astro-island …>` opening
  * tags. Everything else, the tag included, passes through byte-verbatim.
@@ -28,37 +29,37 @@ const RAW_TEXT = new Set(['style', 'textarea', 'title', 'xmp', 'iframe', 'noembe
 const RAW_TAIL = 9;
 
 // the named references astro's escaper emits; any other stays literal, which at worst mismatches a manifest url
-const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'' };
 
 // numeric references in the C1 control range map to windows-1252 code points
 const C1_REMAP: Record<number, number> = {
-  0x80: 0x20ac,
-  0x82: 0x201a,
-  0x83: 0x0192,
-  0x84: 0x201e,
-  0x85: 0x2026,
-  0x86: 0x2020,
-  0x87: 0x2021,
-  0x88: 0x02c6,
-  0x89: 0x2030,
-  0x8a: 0x0160,
-  0x8b: 0x2039,
-  0x8c: 0x0152,
-  0x8e: 0x017d,
-  0x91: 0x2018,
-  0x92: 0x2019,
-  0x93: 0x201c,
-  0x94: 0x201d,
-  0x95: 0x2022,
-  0x96: 0x2013,
-  0x97: 0x2014,
-  0x98: 0x02dc,
-  0x99: 0x2122,
-  0x9a: 0x0161,
-  0x9b: 0x203a,
-  0x9c: 0x0153,
-  0x9e: 0x017e,
-  0x9f: 0x0178,
+  0x80: 0x20_AC,
+  0x82: 0x20_1A,
+  0x83: 0x01_92,
+  0x84: 0x20_1E,
+  0x85: 0x20_26,
+  0x86: 0x20_20,
+  0x87: 0x20_21,
+  0x88: 0x02_C6,
+  0x89: 0x20_30,
+  0x8A: 0x01_60,
+  0x8B: 0x20_39,
+  0x8C: 0x01_52,
+  0x8E: 0x01_7D,
+  0x91: 0x20_18,
+  0x92: 0x20_19,
+  0x93: 0x20_1C,
+  0x94: 0x20_1D,
+  0x95: 0x20_22,
+  0x96: 0x20_13,
+  0x97: 0x20_14,
+  0x98: 0x02_DC,
+  0x99: 0x21_22,
+  0x9A: 0x01_61,
+  0x9B: 0x20_3A,
+  0x9C: 0x01_53,
+  0x9E: 0x01_7E,
+  0x9F: 0x01_78,
 };
 
 type Mode =
@@ -73,20 +74,21 @@ type Mode =
 const DATA: Mode = { kind: 'data' };
 
 export function encodeAttribute(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 }
 
 function isWhitespace(code: number): boolean {
-  return code === 0x20 || code === 0x09 || code === 0x0a || code === 0x0c || code === 0x0d;
+  // eslint-disable-next-line unicorn/prefer-includes-over-repeated-comparisons -- hot path, the comparisons stay in registers
+  return code === 0x20 || code === 0x09 || code === 0x0A || code === 0x0C || code === 0x0D;
 }
 
 function isLetter(code: number): boolean {
-  return (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a);
+  return (code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A);
 }
 
 /** whitespace, `/` or `>`: what ends a tag name and what may follow an end tag name in raw text */
 function isTagEnd(code: number): boolean {
-  return isWhitespace(code) || code === 0x2f || code === 0x3e;
+  return isWhitespace(code) || code === 0x2F || code === 0x3E;
 }
 
 function decodeAttribute(value: string): string {
@@ -95,16 +97,16 @@ function decodeAttribute(value: string): string {
   }
 
   return value
-    .replace(/\r\n?/g, '\n')
-    .replace(/\0/g, '�')
-    .replace(/&(?:#[xX]([0-9a-fA-F]+)|#([0-9]+)|([a-zA-Z][a-zA-Z0-9]*));/g, (match, hex, dec, name) => {
+    .replaceAll(/\r\n?/g, '\n')
+    .replaceAll('\u{0}', '�')
+    .replaceAll(/&(?:#[xX]([0-9a-fA-F]+)|#([0-9]+)|([a-zA-Z][a-zA-Z0-9]*));/g, (match, hex, dec, name) => {
       if (name) {
         return NAMED_ENTITIES[name] ?? match;
       }
 
-      const code = parseInt(hex ?? dec, hex ? 16 : 10);
+      const code = Number.parseInt(hex ?? dec, hex ? 16 : 10);
 
-      if (code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) {
+      if (code === 0 || code > 0x10_FF_FF || (code >= 0xD8_00 && code <= 0xDF_FF)) {
         return '�';
       }
 
@@ -158,21 +160,21 @@ function scanAttributes(buf: string, i: number, attrs: Record<string, string> | 
   const len = buf.length;
 
   for (;;) {
-    while (i < len && (isWhitespace(buf.charCodeAt(i)) || buf.charCodeAt(i) === 0x2f)) i++;
+    while (i < len && (isWhitespace(buf.charCodeAt(i)) || buf.charCodeAt(i) === 0x2F)) i++;
 
     if (i >= len) return -1;
-    if (buf.charCodeAt(i) === 0x3e) return i + 1;
+    if (buf.charCodeAt(i) === 0x3E) return i + 1;
 
     const nameStart = i;
 
     // a leading `=` is part of the attribute name
-    if (buf.charCodeAt(i) === 0x3d) i++;
+    if (buf.charCodeAt(i) === 0x3D) i++;
 
     while (i < len) {
       const code = buf.charCodeAt(i);
 
       // everything above `>` (letters, `_`, non-ascii) is a name character; only `=`, `/`, `>` and whitespace end it
-      if (code <= 0x3e && (code === 0x3d || isTagEnd(code))) break;
+      if (code <= 0x3E && (code === 0x3D || isTagEnd(code))) break;
 
       i++;
     }
@@ -188,7 +190,7 @@ function scanAttributes(buf: string, i: number, attrs: Record<string, string> | 
     let valueStart = i;
     let valueEnd = i;
 
-    if (buf.charCodeAt(i) === 0x3d) {
+    if (buf.charCodeAt(i) === 0x3D) {
       i++;
 
       while (i < len && isWhitespace(buf.charCodeAt(i))) i++;
@@ -200,7 +202,7 @@ function scanAttributes(buf: string, i: number, attrs: Record<string, string> | 
       if (quote === 0x22 || quote === 0x27) {
         const close = buf.indexOf(String.fromCharCode(quote), i + 1);
 
-        if (close < 0) return -1;
+        if (close === -1) return -1;
 
         valueStart = i + 1;
         valueEnd = close;
@@ -208,7 +210,7 @@ function scanAttributes(buf: string, i: number, attrs: Record<string, string> | 
       } else {
         valueStart = i;
 
-        while (i < len && !isWhitespace(buf.charCodeAt(i)) && buf.charCodeAt(i) !== 0x3e) i++;
+        while (i < len && !isWhitespace(buf.charCodeAt(i)) && buf.charCodeAt(i) !== 0x3E) i++;
 
         if (i >= len) return -1;
 
@@ -216,12 +218,12 @@ function scanAttributes(buf: string, i: number, attrs: Record<string, string> | 
       }
     }
 
-    if (attrs) {
-      const name = buf.slice(nameStart, nameEnd).toLowerCase();
+    if (!attrs) continue;
 
-      if (!(name in attrs)) {
-        defineLazyAttribute(attrs, name, buf.slice(valueStart, valueEnd));
-      }
+    const name = buf.slice(nameStart, nameEnd).toLowerCase();
+
+    if (!Object.hasOwn(attrs, name)) {
+      defineLazyAttribute(attrs, name, buf.slice(valueStart, valueEnd));
     }
   }
 }
@@ -275,10 +277,12 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
     let i = 0;
 
     const flush = (to: number): void => {
-      if (to > emitted) {
-        out += buf.slice(emitted, to);
-        emitted = to;
+      if (!(to > emitted)) {
+        return;
       }
+
+      out += buf.slice(emitted, to);
+      emitted = to;
     };
 
     // holds `buf` from `at` for the next write
@@ -299,7 +303,7 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
         case 'bogus': {
           const close = buf.indexOf('>', i);
 
-          if (close < 0) {
+          if (close === -1) {
             i = len;
           } else {
             i = close + 1;
@@ -312,11 +316,11 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
         case 'cdata': {
           const close = buf.indexOf(']]>', i);
 
-          if (close >= 0) {
+          if (close === -1) {
+            hold(Math.max(i, len - 2));
+          } else {
             i = close + 3;
             mode = DATA;
-          } else {
-            hold(Math.max(i, len - 2));
           }
 
           break;
@@ -325,7 +329,7 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
         case 'comment': {
           const dashes = buf.indexOf('-->', i);
           const bang = buf.indexOf('--!>', mode.bangAt);
-          const close = dashes >= 0 && (bang < 0 || dashes < bang) ? dashes + 3 : bang >= 0 ? bang + 4 : -1;
+          const close = dashes !== -1 && (bang === -1 || dashes < bang) ? dashes + 3 : (bang === -1 ? -1 : bang + 4);
 
           if (close >= 0) {
             i = close;
@@ -375,13 +379,13 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
             const lt = buf.indexOf('<', k);
             const dashes = mode.escape === 0 ? -1 : buf.indexOf('-->', k);
 
-            if (dashes >= 0 && (lt < 0 || dashes < lt)) {
+            if (dashes >= 0 && (lt === -1 || dashes < lt)) {
               mode = { kind: 'script', escape: 0 };
               k = dashes + 3;
               continue;
             }
 
-            if (lt < 0) {
+            if (lt === -1) {
               cut = Math.max(k, len - RAW_TAIL + 1);
               break;
             }
@@ -419,7 +423,7 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
         case 'data': {
           const lt = buf.indexOf('<', i);
 
-          if (lt < 0) {
+          if (lt === -1) {
             i = len;
             break;
           }
@@ -451,13 +455,13 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
             break;
           }
 
-          if (next === 0x3f) {
+          if (next === 0x3F) {
             i = lt + 2;
             mode = { kind: 'bogus' };
             break;
           }
 
-          if (next === 0x2f) {
+          if (next === 0x2F) {
             if (lt + 2 >= len) {
               hold(lt);
               break;
@@ -477,7 +481,7 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
               i = end;
 
               if (tag!.name === 'template' && templateDepth > 0) templateDepth--;
-            } else if (after === 0x3e) {
+            } else if (after === 0x3E) {
               i = lt + 3;
             } else {
               i = lt + 2;

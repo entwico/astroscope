@@ -95,7 +95,7 @@ function bindLazily<T>(create: () => T, noop: T): () => T | undefined {
       const created = create();
 
       if (created === noop) {
-        return undefined;
+        return;
       }
 
       instrument = created;

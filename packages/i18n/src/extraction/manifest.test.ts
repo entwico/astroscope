@@ -79,9 +79,9 @@ describe('getManifest', () => {
   test('keeps paths containing colons intact', () => {
     const state = getGlobalState();
 
-    state.extractedKeys = [{ key: 'a', meta: { fallback: 'A' }, files: ['C:\\project\\src\\a.ts:12'] }];
+    state.extractedKeys = [{ key: 'a', meta: { fallback: 'A' }, files: [String.raw`C:\project\src\a.ts:12`] }];
 
-    expect(getManifest().keys[0]?.files).toEqual(['C:\\project\\src\\a.ts:12']);
+    expect(getManifest().keys[0]?.files).toEqual([String.raw`C:\project\src\a.ts:12`]);
   });
 
   test('does not mutate the stored keys', () => {

@@ -6,7 +6,7 @@
 import { t } from '@astroscope/i18n/translate';
 import CircularB from './CircularB.js';
 
-export default function CircularA({ showB = true }: { showB?: boolean }) {
+export default function CircularA({ showB = true }: { readonly showB?: boolean }) {
   return (
     <div style={{ padding: '1rem', border: '2px solid #6366f1', borderRadius: '8px' }}>
       <h4>{t('circular.a.title', 'Component A')}</h4>

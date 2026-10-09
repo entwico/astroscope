@@ -9,16 +9,16 @@ const createRule = ESLintUtils.RuleCreator<PluginDocs>(
 
 // directly serializable as plain JSON-ish data
 const SERIALIZABLE_PRIMITIVE_FLAGS =
-  ts.TypeFlags.String |
-  ts.TypeFlags.Number |
-  ts.TypeFlags.Boolean |
-  ts.TypeFlags.StringLiteral |
-  ts.TypeFlags.NumberLiteral |
-  ts.TypeFlags.BooleanLiteral |
-  ts.TypeFlags.EnumLiteral |
-  ts.TypeFlags.Enum |
-  ts.TypeFlags.Null |
-  ts.TypeFlags.Undefined;
+  ts.TypeFlags.String
+  | ts.TypeFlags.Number
+  | ts.TypeFlags.Boolean
+  | ts.TypeFlags.StringLiteral
+  | ts.TypeFlags.NumberLiteral
+  | ts.TypeFlags.BooleanLiteral
+  | ts.TypeFlags.EnumLiteral
+  | ts.TypeFlags.Enum
+  | ts.TypeFlags.Null
+  | ts.TypeFlags.Undefined;
 
 // can't be decided — skip rather than risk a false positive
 const UNDECIDABLE_FLAGS = ts.TypeFlags.Any | ts.TypeFlags.Unknown;
@@ -28,7 +28,7 @@ const NON_SERIALIZABLE_PRIMITIVE_FLAGS =
   ts.TypeFlags.BigInt | ts.TypeFlags.BigIntLiteral | ts.TypeFlags.ESSymbol | ts.TypeFlags.UniqueESSymbol;
 
 function constituents(type: ts.Type): ts.Type[] {
-  return type.isUnion() ? type.types.flatMap(constituents) : [type];
+  return type.isUnion() ? type.types.flatMap((member) => constituents(member)) : [type];
 }
 
 function isTupleType(type: ts.Type): boolean {
@@ -213,7 +213,7 @@ export const islandNotSerializable = createRule<[], 'notSerializable'>({
           }
         }
 
-        const names = [...out].sort();
+        const names = [...out].toSorted((a, b) => a.localeCompare(b));
 
         if (names.length === 0) {
           return;

@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/prefer-event-target -- an EventEmitter stands in for chokidar's watcher, vite's hot channel and node's http server */
 import EventEmitter from 'node:events';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GEN_HEADER, incrementGeneration } from './generation';
@@ -72,6 +73,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('setupBootWatch', () => {
@@ -229,7 +231,7 @@ describe('setupBootWatch', () => {
     test('does not crash and does not schedule when the boot module is missing from the graph', () => {
       const server = createMockServer();
 
-      server.environments.ssr.moduleGraph.getModulesByFile = vi.fn(() => undefined);
+      server.environments.ssr.moduleGraph.getModulesByFile = vi.fn(() => {});
 
       const scheduler = createMockScheduler();
 
@@ -258,8 +260,7 @@ describe('setupBootWatch', () => {
             runner: { import: vi.fn() },
             moduleGraph: {
               getModulesByFile: vi.fn((file: string) =>
-                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined,
-              ),
+                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined),
             },
             hot: { api: { outsideEmitter: astroOutsideEmitter } },
           },
@@ -372,10 +373,7 @@ describe('setupBootWatch', () => {
       const scheduler = new RestartScheduler(0, localLogger);
 
       // gate the first restart so we can fire more events while it's pending
-      let releaseFirst!: () => void;
-      const firstDone = new Promise<void>((resolve) => {
-        releaseFirst = resolve;
-      });
+      const { promise: firstDone, resolve: releaseFirst } = Promise.withResolvers<void>();
 
       server.restart.mockImplementationOnce(async () => {
         await firstDone;
@@ -468,8 +466,7 @@ describe('setupBootWatch', () => {
             runner: { import: vi.fn() },
             moduleGraph: {
               getModulesByFile: vi.fn((file: string) =>
-                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined,
-              ),
+                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined),
             },
             hot: { api: { outsideEmitter: astroOutsideEmitter } },
           },
@@ -534,8 +531,7 @@ describe('setupBootWatch', () => {
             runner: { import: vi.fn() },
             moduleGraph: {
               getModulesByFile: vi.fn((file: string) =>
-                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined,
-              ),
+                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined),
             },
             hot: { api: { outsideEmitter: ssrOutsideEmitter } },
           },
@@ -606,8 +602,7 @@ describe('setupBootWatch', () => {
             runner: { import: vi.fn() },
             moduleGraph: {
               getModulesByFile: vi.fn((file: string) =>
-                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined,
-              ),
+                file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined),
             },
             hot: { api: { outsideEmitter: ssrOutsideEmitter } },
           },
@@ -650,13 +645,16 @@ describe('setupBootWatch', () => {
           runner: { import: vi.fn() },
           moduleGraph: {
             getModulesByFile: vi.fn((file: string) =>
-              file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined,
-            ),
+              file === '/project/src/boot.ts' ? new Set([bootMod]) : undefined),
           },
           hot: { api: { outsideEmitter: ssrOutsideEmitter } },
         },
       },
-      middlewares: { use: (fn: unknown) => middlewares.push(fn) },
+      middlewares: {
+        use: (fn: unknown) => {
+          middlewares.push(fn);
+        },
+      },
     };
     const scheduler = createMockScheduler() as unknown as RestartScheduler;
 
@@ -833,19 +831,12 @@ describe('installBootGate', () => {
 });
 
 function createDeferred<T = void>() {
-  let resolve!: (value: T) => void;
-  let reject!: (err: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-
-  return { promise, resolve, reject };
+  return Promise.withResolvers<T>();
 }
 
 describe('installGenStamp', () => {
   beforeEach(() => {
-    (globalThis as Record<symbol, unknown>)[STATE_KEY] = undefined;
+    vi.stubGlobal(STATE_KEY, undefined);
   });
 
   type Layer = { route: string; handle: (req: unknown, res: unknown, next: () => void) => void };

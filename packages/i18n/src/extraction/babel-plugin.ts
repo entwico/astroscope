@@ -67,18 +67,18 @@ function extractMeta(t: typeof BabelTypes, node: Expression, report: ReportFn): 
       if (name === 'fallback') {
         const value = getStringValue(t, prop.value as Node);
 
-        if (value !== null) {
-          meta.fallback = value;
-        } else {
+        if (value === null) {
           report('the fallback is not a static string');
+        } else {
+          meta.fallback = value;
         }
       } else if (name === 'description') {
         const value = getStringValue(t, prop.value as Node);
 
-        if (value !== null) {
-          meta.description = value;
-        } else {
+        if (value === null) {
           report('the description is not a static string');
+        } else {
+          meta.description = value;
         }
       } else if (name === 'variables' && t.isObjectExpression(prop.value)) {
         meta.variables = extractVariables(t, prop.value, report);
@@ -115,34 +115,34 @@ function extractVariables(
 
     const varName = prop.key.name;
 
-    if (t.isObjectExpression(prop.value)) {
-      const varDef: VariableDef = {};
+    if (!t.isObjectExpression(prop.value)) continue;
 
-      for (const varProp of prop.value.properties) {
-        if (t.isSpreadElement(varProp)) {
-          report(`variable "${varName}" contains a spread element`);
-          continue;
-        }
+    const varDef: VariableDef = {};
 
-        if (!t.isObjectProperty(varProp)) continue;
-        if (!t.isIdentifier(varProp.key)) continue;
-
-        const varPropName = varProp.key.name;
-        const value = getStringValue(t, varProp.value as Node);
-
-        if (value !== null) {
-          if (varPropName === 'fallback') {
-            varDef.fallback = value;
-          } else if (varPropName === 'description') {
-            varDef.description = value;
-          }
-        } else if (varPropName === 'fallback' || varPropName === 'description') {
-          report(`variable "${varName}.${varPropName}" is not a static string`);
-        }
+    for (const varProp of prop.value.properties) {
+      if (t.isSpreadElement(varProp)) {
+        report(`variable "${varName}" contains a spread element`);
+        continue;
       }
 
-      result[varName] = varDef;
+      if (!t.isObjectProperty(varProp)) continue;
+      if (!t.isIdentifier(varProp.key)) continue;
+
+      const varPropName = varProp.key.name;
+      const value = getStringValue(t, varProp.value as Node);
+
+      if (value !== null) {
+        if (varPropName === 'fallback') {
+          varDef.fallback = value;
+        } else if (varPropName === 'description') {
+          varDef.description = value;
+        }
+      } else if (varPropName === 'fallback' || varPropName === 'description') {
+        report(`variable "${varName}.${varPropName}" is not a static string`);
+      }
     }
+
+    result[varName] = varDef;
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
@@ -186,14 +186,14 @@ export function i18nExtractPlugin({ types: t }: { types: typeof BabelTypes }): P
         // strip fallback in production
         // t('key', 'fallback') → t('key')
         // t('key', 'fallback', values) → t('key', undefined, values)
-        if (state.opts.stripFallbacks && args.length >= 2) {
-          const firstArg = args[0]!;
+        if (!state.opts.stripFallbacks || args.length < 2) return;
 
-          if (args.length === 2) {
-            path.node.arguments = [firstArg];
-          } else {
-            path.node.arguments = [firstArg, t.identifier('undefined'), args[2]!];
-          }
+        const firstArg = args[0]!;
+
+        if (args.length === 2) {
+          path.node.arguments = [firstArg];
+        } else {
+          path.node.arguments = [firstArg, t.identifier('undefined'), args[2]!];
         }
       },
     },

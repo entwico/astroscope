@@ -5,8 +5,8 @@ import { test, vi } from 'vitest';
 vi.mock('astro:react:opts', () => ({ default: {} }));
 vi.mock('@astroscope/node/log', () => ({ log: { error: () => {} } }));
 
-const upstream = (await import('@astrojs/react/server.js')).default;
-const ours = (await import('./server.js')).default;
+const { default: upstream } = await import('@astrojs/react/server.js');
+const { default: ours } = await import('./server.js');
 
 type Renderer = typeof ours;
 
@@ -29,8 +29,7 @@ function Tree({ items }: { items: number }) {
         { key: i, className: i % 2 ? 'odd' : 'even' },
         React.createElement('a', { href: `/item/${i}` }, `item ${i}`),
         React.createElement('span', null, i),
-      ),
-    ),
+      )),
   );
 }
 

@@ -26,7 +26,7 @@ export function stripSsrEffectsPlugin(): Plugin {
       if (!options?.ssr) return null;
       if (id.includes('/node_modules/')) return null;
 
-      const cleanId = id.split('?')[0] ?? id;
+      const cleanId = id.split('?', 1)[0] ?? id;
 
       if (!TRANSFORMABLE.test(cleanId)) return null;
       if (!code.includes('useEffect') && !code.includes('useLayoutEffect') && !code.includes('useInsertionEffect')) {
@@ -58,7 +58,9 @@ export function stripSsrEffectsPlugin(): Plugin {
 
         if (typeof src !== 'string' || !REACT_SOURCE.test(src)) return;
 
-        for (const spec of node.specifiers ?? []) {
+        const specifiers = node.specifiers ?? [];
+
+        for (const spec of specifiers) {
           if (spec.type === 'ImportSpecifier') {
             const imported = spec.imported?.name ?? spec.imported?.value;
 
@@ -111,9 +113,7 @@ function walk(node: any, visit: (n: any) => void): void {
 
   if (typeof node.type === 'string') visit(node);
 
-  for (const key of Object.keys(node)) {
-    const v = node[key];
-
+  for (const v of Object.values(node)) {
     if (Array.isArray(v)) for (const item of v) walk(item, visit);
     else if (v && typeof v === 'object') walk(v, visit);
   }

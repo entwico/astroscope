@@ -46,7 +46,7 @@ export default function ContactForm() {
         />
       </label>
       <div className="min-h-14.5">
-        <CapWidget cap={widget} required labels={{ initialState: "I'm human" }} />
+        <CapWidget cap={widget} required labels={{ initialState: 'I\'m human' }} />
       </div>
       <button className="btn btn-primary">Send</button>
       {status && <span className="text-sm">{status}</span>}

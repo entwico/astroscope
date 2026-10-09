@@ -32,14 +32,18 @@ function applyFallback(key: string, meta: TranslationMeta, fallback: FallbackBeh
   }
 
   switch (fallback) {
-    case 'key':
+    case 'key': {
       return key;
-    case 'fallback':
+    }
+    case 'fallback': {
       return meta.fallback || key;
-    case 'throw':
+    }
+    case 'throw': {
       throw new Error(`Missing translation for key: ${key}`);
-    default:
+    }
+    default: {
       return meta.fallback || key;
+    }
   }
 }
 

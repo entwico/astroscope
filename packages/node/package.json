@@ -131,7 +131,8 @@
     "happy-dom": "^20.14.0",
     "parse5-html-rewriting-stream": "^8.0.1",
     "tsdown": "^0.23.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.0"
   },
   "peerDependencies": {
     "astro": "^7.0.0",

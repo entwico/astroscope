@@ -14,7 +14,7 @@ describe('SmoothHashScroll', () => {
     const html = await container.renderToString(SmoothHashScroll);
 
     expect(html).toContain('addEventListener');
-    expect(html).toContain("scrollIntoView({ behavior: 'smooth' })");
+    expect(html).toContain('scrollIntoView({ behavior: \'smooth\' })');
   });
 
   test('ignores modifier-key and non-primary clicks', async () => {

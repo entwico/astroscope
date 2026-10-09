@@ -40,6 +40,7 @@ describe('componentName', () => {
     expect(componentName(React.memo(Plain))).toBe('Plain');
     expect(
       componentName(
+        // eslint-disable-next-line @eslint-react/no-forward-ref -- exercises the `render` branch of componentName, which forwardRef wrappers still produce
         React.forwardRef(function Inner() {
           return null;
         }),

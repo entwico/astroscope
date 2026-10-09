@@ -4,7 +4,10 @@ import { type Guard, type GuardedContext, type Proofs, collectInput, isDenial, r
 import { readGuardInput } from './input.js';
 
 export type GuardedRouteOptions<Guards extends readonly Guard[]> = {
-  /** run in order before the handler; a denial answers per the request: json for api callers, the page response for a browser */
+  /**
+   * run in order before the handler; a denial answers per the request:
+   * json for api callers, the page response for a browser
+   */
   guards: Guards;
   handler: (context: GuardedContext<APIContext, Proofs<Guards>>) => Response | Promise<Response>;
 };

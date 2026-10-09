@@ -8,7 +8,7 @@ import { ignoredSuffixes } from './ignored.js';
 import type { RestartScheduler } from './scheduler.js';
 import { getAstroHotEnv } from './vite-env.js';
 
-const RESTART_HTML = readFileSync(fileURLToPath(new URL('./restart-page.html', import.meta.url)), 'utf8');
+const RESTART_HTML = readFileSync(fileURLToPath(new URL('restart-page.html', import.meta.url)), 'utf8');
 
 export function setupBootWatch(server: ViteDevServer, entries: string[], scheduler: RestartScheduler): void {
   const entryFilePaths = entries.map((entry) => path.resolve(server.config.root, entry));

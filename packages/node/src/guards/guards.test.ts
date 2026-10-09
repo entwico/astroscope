@@ -11,15 +11,15 @@ vi.mock('astro:actions', () => {
   const statuses: Record<string, number> = { BAD_REQUEST: 400, UNAUTHORIZED: 401, FORBIDDEN: 403, NOT_FOUND: 404 };
 
   class ActionError extends Error {
+    static codeToStatus(code: string) {
+      return statuses[code] ?? 500;
+    }
+
     code: string;
 
     constructor({ code, message }: { code: string; message?: string }) {
       super(message ?? code);
       this.code = code;
-    }
-
-    static codeToStatus(code: string) {
-      return statuses[code] ?? 500;
     }
   }
 
@@ -31,14 +31,14 @@ vi.mock('astro:actions', () => {
     input?: z.ZodType;
     handler: (input: unknown, ctx: unknown) => unknown;
   }) => {
-    return async (raw: unknown, ctx: unknown) => {
-      if (!input) return handler(raw, ctx);
+    return (raw: unknown, ctx: unknown) => {
+      if (!input) return Promise.resolve(handler(raw, ctx));
 
       const parsed = input.safeParse(raw);
 
-      if (!parsed.success) throw new ActionError({ code: 'BAD_REQUEST', message: 'invalid input' });
+      if (!parsed.success) return Promise.reject(new ActionError({ code: 'BAD_REQUEST', message: 'invalid input' }));
 
-      return handler(parsed.data, ctx);
+      return Promise.resolve(handler(parsed.data, ctx));
     };
   };
 
@@ -52,7 +52,7 @@ type Locals = { user?: User | undefined };
 // a browser navigation; everything else in these tests is an api caller
 const browser: RequestInit = { headers: { accept: 'text/html,*/*' } };
 
-function createContext(locals: Locals = {}, init: RequestInit = {}, path = '/x'): APIContext {
+function createApiContext(locals: Locals = {}, init: RequestInit = {}, path = '/x'): APIContext {
   return {
     request: new Request(`https://example.com${path}`, init),
     url: new URL(`https://example.com${path}`),
@@ -105,8 +105,8 @@ describe('defineAction', () => {
 
     const user = { id: 'u1', admin: false };
 
-    expect(await action({ name: 'x' }, createContext({ user }))).toBe('x:u1');
-    await expect(action({ name: 'x' }, createContext())).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(await action({ name: 'x' }, createApiContext({ user }))).toBe('x:u1');
+    await expect(action({ name: 'x' }, createApiContext())).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   test('merges guard input into the schema and strips it before the handler', async () => {
@@ -117,11 +117,11 @@ describe('defineAction', () => {
       handler,
     }) as unknown as Action;
 
-    expect(await action({ name: 'x', _secret: 'open sesame' }, createContext())).toEqual({ name: 'x' });
+    expect(await action({ name: 'x', _secret: 'open sesame' }, createApiContext())).toEqual({ name: 'x' });
     expect(handler).toHaveBeenCalledWith({ name: 'x' }, expect.anything());
 
-    await expect(action({ name: 'x', _secret: 'nope' }, createContext())).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    await expect(action({ name: 'x' }, createContext())).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(action({ name: 'x', _secret: 'nope' }, createApiContext())).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(action({ name: 'x' }, createApiContext())).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   test('keeps a guard field the action declares itself', async () => {
@@ -136,7 +136,7 @@ describe('defineAction', () => {
       handler: (input, ctx) => ({ ...input, loaded: ctx.locals.project.id }),
     }) as unknown as Action;
 
-    expect(await action({ projectId: 'p1', name: 'x' }, createContext())).toEqual({
+    expect(await action({ projectId: 'p1', name: 'x' }, createApiContext())).toEqual({
       projectId: 'p1',
       name: 'x',
       loaded: 'p1',
@@ -146,11 +146,11 @@ describe('defineAction', () => {
   test('creates the schema from the guard input when the action has none', async () => {
     const action = defineAction({ guards: [secret], handler: (input) => input }) as unknown as Action;
 
-    expect(await action({ _secret: 'open sesame', extra: 1 }, createContext())).toEqual({});
+    expect(await action({ _secret: 'open sesame', extra: 1 }, createApiContext())).toEqual({});
   });
 
   test('rejects guard input on a form action without a schema', () => {
-    expect(() => defineAction({ accept: 'form', guards: [secret], handler: () => undefined })).toThrow('form action');
+    expect(() => defineAction({ accept: 'form', guards: [secret], handler: () => {} })).toThrow('form action');
   });
 
   test('extended guards run their parent first and both proofs land on locals', async () => {
@@ -162,11 +162,11 @@ describe('defineAction', () => {
       },
     }) as unknown as Action;
 
-    await action({}, createContext({ user: { id: 'root', admin: true } }));
-    await expect(action({}, createContext({ user: { id: 'u1', admin: false } }))).rejects.toMatchObject({
+    await action({}, createApiContext({ user: { id: 'root', admin: true } }));
+    await expect(action({}, createApiContext({ user: { id: 'u1', admin: false } }))).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
-    await expect(action({}, createContext())).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(action({}, createApiContext())).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 
     expect(seen).toEqual(['root']);
   });
@@ -175,10 +175,10 @@ describe('defineAction', () => {
     const withSchema = defineAction({
       input: z.object({ name: z.string() }),
       guards: [secret, authenticated],
-      handler: () => undefined,
+      handler: () => {},
     });
-    const withoutSchema = defineAction({ guards: [secret], handler: () => undefined });
-    const unguarded = defineAction({ input: z.object({ name: z.string() }), handler: () => undefined });
+    const withoutSchema = defineAction({ guards: [secret], handler: () => {} });
+    const unguarded = defineAction({ input: z.object({ name: z.string() }), handler: () => {} });
 
     expectTypeOf(withSchema).parameter(0).toEqualTypeOf<{ name: string; _secret: string }>();
     expectTypeOf(withoutSchema).parameter(0).toEqualTypeOf<{ _secret: string }>();
@@ -202,12 +202,18 @@ describe('defineRoute', () => {
   test('answers a denial with its status and a json error', async () => {
     const route = defineRoute({ guards: [admin], handler: () => new Response('ok') });
 
-    const denied = await route(createContext({ user: { id: 'u1', admin: false } }));
+    const denied = await route(createApiContext({ user: { id: 'u1', admin: false } }));
 
     expect(denied.status).toBe(403);
     expect(await denied.json()).toEqual({ error: { code: 'FORBIDDEN', message: 'FORBIDDEN' } });
-    expect((await route(createContext())).status).toBe(401);
-    expect(await (await route(createContext({ user: { id: 'root', admin: true } }))).text()).toBe('ok');
+
+    const anonymous = await route(createApiContext());
+
+    expect(anonymous.status).toBe(401);
+
+    const granted = await route(createApiContext({ user: { id: 'root', admin: true } }));
+
+    expect(await granted.text()).toBe('ok');
   });
 
   test('reads guard input from a json or form body and leaves the body readable', async () => {
@@ -216,7 +222,7 @@ describe('defineRoute', () => {
       handler: async (ctx) => new Response(await ctx.request.text()),
     });
 
-    const json = createContext(
+    const json = createApiContext(
       {},
       {
         method: 'POST',
@@ -225,9 +231,11 @@ describe('defineRoute', () => {
       },
     );
 
-    expect(await (await route(json)).text()).toContain('"name":"x"');
+    const echoed = await route(json);
 
-    const form = createContext(
+    expect(await echoed.text()).toContain('"name":"x"');
+
+    const form = createApiContext(
       {},
       {
         method: 'POST',
@@ -236,24 +244,27 @@ describe('defineRoute', () => {
       },
     );
 
-    expect((await route(form)).status).toBe(403);
+    const rejected = await route(form);
 
-    const empty = createContext({}, { method: 'POST' });
+    expect(rejected.status).toBe(403);
 
-    expect((await route(empty)).status).toBe(400);
+    const empty = createApiContext({}, { method: 'POST' });
+    const noInput = await route(empty);
+
+    expect(noInput.status).toBe(400);
   });
 });
 
 describe('guard', () => {
   test('destructures into the denial or the proofs', async () => {
-    const granted = await guard(createContext({ user: { id: 'u1', admin: false } }, browser), [authenticated]);
+    const granted = await guard(createApiContext({ user: { id: 'u1', admin: false } }, browser), [authenticated]);
 
     if (granted.denied) throw new Error('unexpected denial');
 
     expectTypeOf(granted.user).toEqualTypeOf<User>();
     expect(granted.user.id).toBe('u1');
 
-    const { denied, user } = await guard(createContext({}, browser), [authenticated]);
+    const { denied, user } = await guard(createApiContext({}, browser), [authenticated]);
 
     expectTypeOf(user).toEqualTypeOf<User | undefined>();
     expect(denied?.status).toBe(302);
@@ -261,59 +272,59 @@ describe('guard', () => {
   });
 
   test('the denying guard picks the page response, inherited by extensions unless overridden', async () => {
-    const asAnonymous = await guard(createContext({}, browser), [admin]);
-    const asUser = await guard(createContext({ user: { id: 'u1', admin: false } }, browser), [admin]);
+    const asAnonymous = await guard(createApiContext({}, browser), [admin]);
+    const asUser = await guard(createApiContext({ user: { id: 'u1', admin: false } }, browser), [admin]);
 
     expect(asAnonymous.denied?.headers.get('location')).toBe('/login');
     expect(await asUser.denied?.text()).toBe('rewritten');
 
     const plain = defineGuard({ name: 'plain', check: () => deny('NOT_FOUND', 'gone') });
-    const fallback = await guard(createContext({}, browser), [plain]);
+    const fallback = await guard(createApiContext({}, browser), [plain]);
 
     expect(fallback.denied?.status).toBe(404);
     expect(await fallback.denied?.text()).toBe('gone');
   });
 
   test('answers per the request: the page response for a browser, json for everything else', async () => {
-    const asApi = await guard(createContext(), [authenticated]);
+    const asApi = await guard(createApiContext(), [authenticated]);
 
     expect(asApi.denied?.status).toBe(401);
     expect(await asApi.denied?.json()).toEqual({ error: { code: 'UNAUTHORIZED', message: 'UNAUTHORIZED' } });
 
     const route = defineRoute({ guards: [authenticated], handler: () => new Response('ok') });
-    const asBrowser = await route(createContext({}, browser));
+    const asBrowser = await route(createApiContext({}, browser));
 
     expect(asBrowser.status).toBe(302);
     expect(asBrowser.headers.get('location')).toBe('/login');
   });
 
   test('answers 400 when a request carries no guard input', async () => {
-    const { denied } = await guard(createContext({}, { method: 'GET' }), [secret]);
+    const { denied } = await guard(createApiContext({}, { method: 'GET' }), [secret]);
 
     expect(denied?.status).toBe(400);
   });
 });
 
 describe('createGuardMiddleware', () => {
-  const next = vi.fn(async () => new Response('page'));
+  const next = vi.fn(() => Promise.resolve(new Response('page')));
   const middleware = createGuardMiddleware([
     { match: [{ prefix: '/admin' }], guards: [admin] },
     { match: [{ prefix: '/app' }, { exact: '/me' }], guards: [authenticated] },
   ]);
 
   test('runs the guards of every matching rule and answers the first denial as a page would', async () => {
-    const anonymous = (await middleware(createContext({}, browser, '/admin/users'), next)) as Response;
+    const anonymous = (await middleware(createApiContext({}, browser, '/admin/users'), next)) as Response;
 
     expect(anonymous.headers.get('location')).toBe('/login');
 
     const alice = (await middleware(
-      createContext({ user: { id: 'u1', admin: false } }, browser, '/admin'),
+      createApiContext({ user: { id: 'u1', admin: false } }, browser, '/admin'),
       next,
     )) as Response;
 
     expect(await alice.text()).toBe('rewritten');
 
-    const me = (await middleware(createContext({ user: { id: 'u1', admin: false } }, {}, '/me'), next)) as Response;
+    const me = (await middleware(createApiContext({ user: { id: 'u1', admin: false } }, {}, '/me'), next)) as Response;
 
     expect(await me.text()).toBe('page');
   });
@@ -323,7 +334,7 @@ describe('createGuardMiddleware', () => {
     const spy = defineGuard({ name: 'spy', check });
     const guarded = createGuardMiddleware([{ match: [{ prefix: '/app' }], guards: [spy] }]);
 
-    await guarded(createContext({}, {}, '/public'), next);
+    await guarded(createApiContext({}, {}, '/public'), next);
 
     expect(check).not.toHaveBeenCalled();
   });
@@ -333,7 +344,7 @@ describe('per-request memo', () => {
   test('a guard that passed runs once per request, its proofs replayed', async () => {
     const check = vi.fn(() => ({ loaded: Math.random() }));
     const loader = defineGuard({ name: 'loader', check });
-    const ctx = createContext({ user: { id: 'u1', admin: false } });
+    const ctx = createApiContext({ user: { id: 'u1', admin: false } });
 
     const first = await guard(ctx, [loader]);
     const second = await guard(ctx, [loader, authenticated]);
@@ -342,18 +353,21 @@ describe('per-request memo', () => {
     expect(second.loaded).toBe(first.loaded);
     expect(ctx.locals).toMatchObject({ loaded: first.loaded, user: { id: 'u1' } });
 
-    await guard(createContext(), [loader]);
+    await guard(createApiContext(), [loader]);
 
     expect(check).toHaveBeenCalledTimes(2);
   });
 
   test('a denial is not remembered', async () => {
-    const ctx = createContext();
+    const ctx = createApiContext();
+    const { denied } = await guard(ctx, [authenticated]);
 
-    expect((await guard(ctx, [authenticated])).denied?.status).toBe(401);
+    expect(denied?.status).toBe(401);
 
     (ctx.locals as Locals).user = { id: 'u1', admin: false };
 
-    expect((await guard(ctx, [authenticated])).user?.id).toBe('u1');
+    const { user } = await guard(ctx, [authenticated]);
+
+    expect(user?.id).toBe('u1');
   });
 });

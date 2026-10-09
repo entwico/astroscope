@@ -50,7 +50,9 @@ export type I18nClientState = {
  *
  * @example
  * t('checkout.title', 'Order Summary')
- * t('cart.items', '.input {$count :number}\n.match $count\none {{{$count} item}}\n* {{{$count} items}}', { count: itemCount })
+ * t('cart.items', '.input {$count :number}\n.match $count\none {{{$count} item}}\n* {{{$count} items}}', {
+ *   count: itemCount,
+ * })
  * t('cart.total', { fallback: 'Total: {$amount}' }, { amount: '$49.99' })
  */
 export type TranslateFunction = (
