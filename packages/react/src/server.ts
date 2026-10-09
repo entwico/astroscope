@@ -46,7 +46,7 @@ function renderToStaticMarkup(
     slots[name] = React.createElement(StaticHtml, { hydrate: needsHydration(metadata), value, name });
   }
 
-  // create newProps to avoid mutating `props` before they are serialized
+  // `props` is serialized for hydration later, so the slots go on a copy
   const newProps = { ...props, ...slots };
   const newChildren = children ?? props['children'];
 

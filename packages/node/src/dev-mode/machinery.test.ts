@@ -155,10 +155,7 @@ describe('dev machinery configureServer', () => {
 
     const { plugin } = getStartupPlugin();
 
-    // initial configureServer — starts old module
     await (plugin.configureServer as never as ConfigureServer)(createMockServer());
-
-    // restart-induced configureServer — must shut down old first, then start new
     await (plugin.configureServer as never as ConfigureServer)(createMockServer());
 
     expect(order).toEqual(['startup-old', 'shutdown-old', 'startup-new']);
@@ -231,12 +228,9 @@ describe('dev machinery configureServer', () => {
 
     await (plugin.configureServer as never as ConfigureServer)(createMockServer());
 
-    // restart with broken new module — pre-restart shutdown succeeds, new startup throws,
-    // best-effort shutdown of new module runs, and the error is re-thrown so vite keeps
-    // the old http server alive.
+    // re-thrown so vite keeps the old http server alive
     await expect((plugin.configureServer as never as ConfigureServer)(createMockServer())).rejects.toThrow('boom');
 
-    // shutdown call sequence: old (pre-restart) + new (best-effort cleanup of failed startup)
     expect(mockedRunShutdown).toHaveBeenCalledTimes(2);
     expect(mockedRunShutdown).toHaveBeenNthCalledWith(1, oldModule, expect.anything());
     expect(mockedRunShutdown).toHaveBeenNthCalledWith(2, newModule, expect.anything());
@@ -306,18 +300,15 @@ describe('dev machinery configureServer', () => {
     const newModule: BootModule = { onStartup: vi.fn(), onShutdown: vi.fn() };
 
     mockedSsrImport.mockResolvedValueOnce(oldModule).mockResolvedValueOnce(newModule);
-    // pre-restart shutdown of the OLD module rejects — must not abort the restart
     mockedRunShutdown.mockRejectedValueOnce(new Error('old shutdown blew up'));
 
     const { plugin, logger } = getStartupPlugin();
 
     await (plugin.configureServer as never as ConfigureServer)(createMockServer());
 
-    // restart-induced configureServer — pre-restart shutdown rejects, but new startup must still run
     await (plugin.configureServer as never as ConfigureServer)(createMockServer());
 
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('shutdown'));
-    // new module's startup ran despite the old shutdown failing
     expect(mockedRunStartup).toHaveBeenLastCalledWith(newModule, expect.anything());
   });
 

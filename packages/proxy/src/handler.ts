@@ -81,7 +81,6 @@ async function proxyRequest(
       signal: request.signal,
     });
   } catch (error) {
-    // handle client abort gracefully - return empty response since client is gone
     if (error instanceof Error && error.name === 'AbortError') {
       return new Response(null, { status: 499 }); // 499 = Client Closed Request (nginx convention)
     }

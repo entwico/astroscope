@@ -10,6 +10,6 @@
   },
   "dependencies": {
     "@astroscope/node": "workspace:*",
-    "astro": "^7.3.2"
+    "astro": "^7.3.7"
   }
 }

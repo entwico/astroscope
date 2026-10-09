@@ -278,7 +278,6 @@ describe('setupBootWatch', () => {
     });
   });
 
-  // exercises the full watcher → scheduler → server.restart() chain with a real RestartScheduler.
   describe('end-to-end burst (real scheduler)', () => {
     function createMockServerWithRestart(deps: string[]) {
       const watcher = new EventEmitter();
@@ -317,7 +316,6 @@ describe('setupBootWatch', () => {
 
       setupBootWatch(server as never, ['src/boot.ts'], scheduler);
 
-      // three boot-dep events in the same tick
       server.watcher.emit('change', '/project/src/boot.ts');
       server.watcher.emit('change', '/project/src/server/config.ts');
       server.watcher.emit('change', '/project/src/server/some-module.ts');
@@ -381,7 +379,6 @@ describe('setupBootWatch', () => {
 
       setupBootWatch(server as never, ['src/boot.ts'], scheduler);
 
-      // first burst
       server.watcher.emit('change', '/project/src/boot.ts');
       server.watcher.emit('change', '/project/src/server/config.ts');
 
@@ -393,7 +390,6 @@ describe('setupBootWatch', () => {
       expect(firstLog).toContain('config.ts');
       expect(firstLog).not.toContain('some-module.ts');
 
-      // second burst arrives while the first restart is still pending
       server.watcher.emit('change', '/project/src/server/some-module.ts');
 
       // give the debouncer a tick — it should fire and queue (not start) another restart
@@ -407,7 +403,6 @@ describe('setupBootWatch', () => {
 
       await vi.waitFor(() => expect(server.restart).toHaveBeenCalledTimes(2));
 
-      // follow-up log names ONLY the second burst's paths
       expect(localLogger.info).toHaveBeenCalledTimes(2);
       const secondLog = localLogger.info.mock.calls[1]![0] as string;
       expect(secondLog).toContain('some-module.ts');
@@ -447,7 +442,7 @@ describe('setupBootWatch', () => {
     });
 
     test('listens on the astro env when ssr env is non-runnable (Astro 6)', () => {
-      // Astro 6 exposes a separate 'astro' environment for its module runner;
+      // astro 6 exposes a separate 'astro' environment for its module runner;
       // the 'ssr' env exists but is non-runnable. Boot lives in the 'astro'
       // env's module cache, and full-reloads come through that env's hot channel.
       const watcher = new EventEmitter();
@@ -493,9 +488,7 @@ describe('setupBootWatch', () => {
     });
 
     test('forwards a full-reload even when triggeredBy is a boot dep — vite still wipes the SSR module cache', () => {
-      // a full-reload always clears the SSR module runner's cache, so we MUST schedule
-      // a restart regardless of whether the watcher will independently fire for the
-      // same file. the debouncer collapses both into a single restart.
+      // the debouncer collapses the watcher event and the full-reload into one restart
       const server = createMockServer({ bootDeps: ['/project/src/services.ts'] });
       const scheduler = createMockScheduler();
 
@@ -556,7 +549,6 @@ describe('setupBootWatch', () => {
       await new Promise((r) => setTimeout(r, 80));
 
       expect(server.restart).toHaveBeenCalledTimes(1);
-      // log mentions both — the boot dep change AND the SSR full-reload
       const msg = localLogger.info.mock.calls[0]![0] as string;
       expect(msg).toContain('boot dep changed: src/services.ts');
       expect(msg).toContain('vite SSR full-reload');

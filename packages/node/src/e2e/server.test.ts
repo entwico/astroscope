@@ -651,7 +651,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       expect(body['native']).toBe(true);
       expect(body['method']).toBe('GET');
       expect(body['url']).toBe('/native/echo?x=1');
-      // the fake-koa shim could never provide this
+      // comes from the real socket, not a synthesized request
       expect(body['remoteAddress']).toBeTruthy();
     });
 

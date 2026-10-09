@@ -2,13 +2,13 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { type CheerioAPI, load } from 'cheerio';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-const DEV_PORT = 14321;
-const PROD_PORT = 14322;
+const DEV_PORT = 14_321;
+const PROD_PORT = 14_322;
 
 let devServer: ChildProcess | null = null;
 let prodServer: ChildProcess | null = null;
 
-async function waitForServer(port: number, timeout = 30000): Promise<void> {
+async function waitForServer(port: number, timeout = 30_000): Promise<void> {
   const start = Date.now();
 
   while (Date.now() - start < timeout) {
@@ -26,11 +26,17 @@ async function waitForServer(port: number, timeout = 30000): Promise<void> {
   throw new Error(`Server on port ${port} did not start within ${timeout}ms`);
 }
 
+async function fetchText(url: string): Promise<string> {
+  const res = await fetch(url);
+
+  return res.text();
+}
+
 function extractBadgeCount($: CheerioAPI, label: string): number | null {
   const badge = $(`.collapse-title:contains('${label}')`).find('.badge').text();
   const match = badge.match(/(\d+)/);
 
-  return match ? parseInt(match[1]!, 10) : null;
+  return match ? Number(match[1]) : null;
 }
 
 function extractManifestJson($: CheerioAPI, label: string): unknown {
@@ -67,7 +73,7 @@ beforeAll(async () => {
   });
 
   await Promise.all([waitForServer(DEV_PORT), waitForServer(PROD_PORT)]);
-}, 60000);
+}, 60_000);
 
 afterAll(() => {
   devServer?.kill();
@@ -77,8 +83,8 @@ afterAll(() => {
 describe('dev/prod parity', () => {
   test('same key count', async () => {
     const [devHtml, prodHtml] = await Promise.all([
-      fetch(`http://localhost:${DEV_PORT}/`).then((r) => r.text()),
-      fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text()),
+      fetchText(`http://localhost:${DEV_PORT}/`),
+      fetchText(`http://localhost:${PROD_PORT}/`),
     ]);
 
     const devCount = extractBadgeCount(load(devHtml), 'Extracted Keys');
@@ -89,24 +95,17 @@ describe('dev/prod parity', () => {
     expect(devCount).toBe(prodCount);
   });
 
-  test('same chunk count', async () => {
-    const [devHtml, prodHtml] = await Promise.all([
-      fetch(`http://localhost:${DEV_PORT}/`).then((r) => r.text()),
-      fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text()),
-    ]);
-
-    const devCount = extractBadgeCount(load(devHtml), 'Chunk Manifest');
+  test('the production build has translation chunks', async () => {
+    const prodHtml = await fetchText(`http://localhost:${PROD_PORT}/`);
     const prodCount = extractBadgeCount(load(prodHtml), 'Chunk Manifest');
 
-    // dev mode has no chunks (all inline), prod has chunks
     expect(prodCount).toBeGreaterThan(0);
-    console.log(`Dev chunks: ${devCount}, Prod chunks: ${prodCount}`);
   });
 });
 
 describe('manifest structure', () => {
   test('chunks manifest maps chunk names to key arrays', async () => {
-    const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
+    const html = await fetchText(`http://localhost:${PROD_PORT}/`);
     const chunks = extractManifestJson(load(html), 'Chunk Manifest') as Record<string, string[]>;
 
     expect(chunks).not.toBeNull();
@@ -122,16 +121,15 @@ describe('manifest structure', () => {
 
 describe('SSR translations', () => {
   test('renders English translations by default', async () => {
-    const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
+    const html = await fetchText(`http://localhost:${PROD_PORT}/`);
     const $ = load(html);
 
-    // check SSR-rendered content from t('home.title')
     expect($('h3:contains("Welcome to our Store")').length).toBe(1);
     expect($('p:contains("Find the best products here")').length).toBe(1);
   });
 
   test('renders German translations with locale param', async () => {
-    const html = await fetch(`http://localhost:${PROD_PORT}/?locale=de`).then((r) => r.text());
+    const html = await fetchText(`http://localhost:${PROD_PORT}/?locale=de`);
     const $ = load(html);
 
     expect($('h3:contains("Willkommen in unserem Shop")').length).toBe(1);
@@ -141,7 +139,7 @@ describe('SSR translations', () => {
 
 describe('client i18n state', () => {
   test('prod pages carry per-island hash merge scripts before their islands', async () => {
-    const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
+    const html = await fetchText(`http://localhost:${PROD_PORT}/`);
 
     expect(html).toContain('window.__i18n__??=');
     expect(html).toContain('"locale":"en"');
@@ -154,7 +152,7 @@ describe('client i18n state', () => {
   });
 
   test('prod pages preload translation chunks alongside component chunks', async () => {
-    const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
+    const html = await fetchText(`http://localhost:${PROD_PORT}/`);
 
     // immediate islands get link tags, deferred islands register eager imports
     expect(html).toMatch(/<link rel="modulepreload" fetchpriority="low" href="\/_i18n\/en\/[^"]+\.js">/);
@@ -163,7 +161,7 @@ describe('client i18n state', () => {
   });
 
   test('dev pages ship full translations in the head, before any island', async () => {
-    const html = await fetch(`http://localhost:${DEV_PORT}/`).then((r) => r.text());
+    const html = await fetchText(`http://localhost:${DEV_PORT}/`);
     const state = html.indexOf('window.__i18n__');
 
     expect(state).toBeGreaterThan(-1);
@@ -175,7 +173,7 @@ describe('client i18n state', () => {
 
 describe('key count sanity', () => {
   test('key count is reasonable (> 30)', async () => {
-    const html = await fetch(`http://localhost:${DEV_PORT}/`).then((r) => r.text());
+    const html = await fetchText(`http://localhost:${DEV_PORT}/`);
     const count = extractBadgeCount(load(html), 'Extracted Keys');
 
     expect(count).not.toBeNull();
@@ -183,10 +181,10 @@ describe('key count sanity', () => {
   });
 
   test('all expected components have keys extracted', async () => {
-    const html = await fetch(`http://localhost:${PROD_PORT}/`).then((r) => r.text());
+    const html = await fetchText(`http://localhost:${PROD_PORT}/`);
     const chunks = extractManifestJson(load(html), 'Chunk Manifest') as Record<string, string[]>;
 
-    const chunkNames = Object.keys(chunks).map((c) => c.split('.')[0]);
+    const chunkNames = Object.keys(chunks).map((c) => c.split('.', 1)[0]);
 
     expect(chunkNames).toContain('Cart');
     expect(chunkNames).toContain('Newsletter');

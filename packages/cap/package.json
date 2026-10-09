@@ -63,18 +63,18 @@
   "dependencies": {
     "@cap.js/wasm": "^0.0.8",
     "cap-widget": "^0.1.58",
-    "pako": "^2.1.0"
+    "pako": "^3.0.2"
   },
   "devDependencies": {
     "@astroscope/node": "workspace:^",
-    "@types/node": "^26.5.0",
-    "@types/react": "^19.2.18",
-    "astro": "^7.3.2",
-    "react": "^19.2.8",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "astro": "^7.3.7",
+    "react": "^19.3.0",
     "tsdown": "^0.23.0",
     "typescript": "^6.0.3",
-    "vite": "^8.2.2",
-    "vitest": "^5.0.0"
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
   },
   "peerDependencies": {
     "@astroscope/node": "workspace:^",

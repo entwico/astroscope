@@ -41,6 +41,7 @@ npm install @astroscope/wormhole
 
 ```ts
 // astro.config.ts
+import { defineConfig } from 'astro/config';
 import node from '@astroscope/node';
 import wormhole from '@astroscope/wormhole';
 
@@ -187,7 +188,7 @@ Exported helper type mapping a registry shape to its value types. The recursivel
 
 ## How it works
 
-At build time the integration scans the code for `wormholes.<name>` reads: server modules are attributed to the routes whose page or endpoint reaches them, client modules to the emitted chunks. It also generates the types for the `wormholes` proxy from your registry. At runtime the middleware runs, in parallel, the handlers of everything the request's route can reach — frontmatter and endpoint reads, the islands the page hydrates (via `@astroscope/node`'s route map), its `<script>` blocks — and each island's data is embedded in the HTML right before it, so it is always there before the island's code runs, even while the page is still streaming. Routes the build could not attribute (dev, astro's own routes) load everything. On the client, `set()` updates the shared data and notifies subscribers, keeping islands and scripts in sync.
+Routes the build could not attribute (dev, astro's own routes) load everything. On the client, `set()` updates the shared data and notifies subscribers, keeping islands and scripts in sync.
 
 Each handler runs under its own `wormhole <name>` span beneath the request span — they run in parallel, and the trace shows which one holds the page's first byte — and records `astro.wormhole.handler.duration` {`astro.wormhole.name`}. A throwing handler is counted on `astro.wormhole.handler.failures` {`astro.wormhole.name`, `error.type`}, logged with its name, and fails the request. All through the adapter's telemetry, so nothing runs without its SDK.
 

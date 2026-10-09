@@ -159,8 +159,7 @@ export function i18nExtractPlugin({ types: t }: { types: typeof BabelTypes }): P
     name: '@astroscope/i18n/extract',
     visitor: {
       CallExpression(path: NodePath<BabelTypes.CallExpression>, state: PluginState) {
-        // check if callee is 't' identifier
-        // we assume that it was not aliased / reassigned
+        // matched by name only — an aliased or reassigned `t` is invisible here
         if (!path.get('callee').isIdentifier({ name: 't' })) return;
 
         const args = path.node.arguments;

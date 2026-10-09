@@ -81,7 +81,6 @@ describe('KeyStore', () => {
       expect(store.extractedKeys).toHaveLength(2);
       expect(store.extractedKeys.map((k) => k.key)).toEqual(['title', 'description']);
 
-      // title should have both locations
       const titleKey = store.extractedKeys.find((k) => k.key === 'title');
       expect(titleKey?.files).toEqual(['a.ts:10', 'a.ts:30']);
 

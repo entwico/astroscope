@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 vi.mock('virtual:@astroscope/cap/config', () => ({ path: '/_cap/' }));
 vi.mock('@cap.js/wasm/browser/cap_wasm_bg.wasm?url', () => ({ default: '/wasm' }));
 vi.mock('@cap.js/wasm/browser/hashwx.wasm?url', () => ({ default: '/hashwx' }));
-vi.mock('pako/dist/pako_inflate.min.js?url', () => ({ default: '/pako' }));
+vi.mock('pako/browser/inflate?url', () => ({ default: '/pako' }));
 
 const { createCapSession } = await import('./index');
 

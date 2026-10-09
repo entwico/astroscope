@@ -9,12 +9,12 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
  * the register scripts as eager imports.
  */
 
-const PROD_PORT = 14331;
+const PROD_PORT = 14_331;
 const BASE = `http://localhost:${PROD_PORT}`;
 
 let prodServer: ChildProcess | null = null;
 
-async function waitForServer(port: number, timeout = 30000): Promise<void> {
+async function waitForServer(port: number, timeout = 30_000): Promise<void> {
   const start = Date.now();
 
   while (Date.now() - start < timeout) {
@@ -30,6 +30,12 @@ async function waitForServer(port: number, timeout = 30000): Promise<void> {
   }
 
   throw new Error(`Server on port ${port} did not start within ${timeout}ms`);
+}
+
+async function fetchText(url: string): Promise<string> {
+  const res = await fetch(url);
+
+  return res.text();
 }
 
 type RegistryEntry = { l: string[]; i?: string[] };
@@ -65,7 +71,7 @@ beforeAll(async () => {
   });
 
   await waitForServer(PROD_PORT);
-}, 60000);
+}, 60_000);
 
 afterAll(() => {
   prodServer?.kill();
@@ -73,7 +79,7 @@ afterAll(() => {
 
 describe('gate runtime delivery', () => {
   test('the runtime is inlined before the first register script, never fetched', async () => {
-    const html = await fetch(`${BASE}/deferred`).then((r) => r.text());
+    const html = await fetchText(`${BASE}/deferred`);
 
     expect(html).toContain('@astroscope/node.islandsRuntime');
     expect(html).not.toMatch(/<script[^>]*src="[^"]*islands-runtime/);
@@ -91,7 +97,7 @@ describe('gate runtime delivery', () => {
 
 describe('deferred islands — translation chunks as eager imports', () => {
   test('every register carries its translations in the import set, never as preload links', async () => {
-    const html = await fetch(`${BASE}/deferred`).then((r) => r.text());
+    const html = await fetchText(`${BASE}/deferred`);
     const registers = parseRegisters(html);
 
     expect(Object.keys(registers).length).toBeGreaterThanOrEqual(3);
@@ -106,7 +112,7 @@ describe('deferred islands — translation chunks as eager imports', () => {
   });
 
   test('a chunk shared between islands rides every island that reaches it', async () => {
-    const html = await fetch(`${BASE}/deferred`).then((r) => r.text());
+    const html = await fetchText(`${BASE}/deferred`);
     // CircularB's t() keys live in the CircularA chunk both islands share
     const imports = registerFor(parseRegisters(html), 'CircularB').i;
 
@@ -114,7 +120,7 @@ describe('deferred islands — translation chunks as eager imports', () => {
   });
 
   test('a lazy chunk behind a dynamic import is covered by the import set', async () => {
-    const html = await fetch(`${BASE}/deferred`).then((r) => r.text());
+    const html = await fetchText(`${BASE}/deferred`);
     const imports = registerFor(parseRegisters(html), 'LazyLoadDemo').i;
 
     expect(imports).toContainEqual(expect.stringMatching(/\/_i18n\/en\/LazyLoadDemo\./));
@@ -122,7 +128,7 @@ describe('deferred islands — translation chunks as eager imports', () => {
   });
 
   test('the locale rides the import urls', async () => {
-    const html = await fetch(`${BASE}/deferred?locale=de`).then((r) => r.text());
+    const html = await fetchText(`${BASE}/deferred?locale=de`);
     const imports = registerFor(parseRegisters(html), 'Newsletter').i;
 
     expect(imports).toContainEqual(expect.stringMatching(/\/_i18n\/de\/Newsletter\./));
@@ -143,13 +149,13 @@ describe('rewritten pages', () => {
 
 describe('immediate islands — untouched ideal path', () => {
   test('static-closure translations stay server-emitted preload links', async () => {
-    const html = await fetch(`${BASE}/`).then((r) => r.text());
+    const html = await fetchText(`${BASE}/`);
 
     expect(html).toMatch(/<link rel="modulepreload" fetchpriority="low" href="\/_i18n\/en\/Cart\.[^"]+\.js">/);
   });
 
   test('an eagerly imported translation chunk is servable and idempotent', async () => {
-    const html = await fetch(`${BASE}/deferred`).then((r) => r.text());
+    const html = await fetchText(`${BASE}/deferred`);
     const imports = registerFor(parseRegisters(html), 'Newsletter').i!;
     const res = await fetch(`${BASE}${imports.find((imp) => imp.includes('/Newsletter.'))}`);
 

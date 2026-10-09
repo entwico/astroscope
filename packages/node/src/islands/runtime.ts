@@ -8,8 +8,8 @@
  * An entry is `{l, i}`: `l` urls get `<link rel="modulepreload">` injected, `i`
  * urls (data modules, e.g. translation chunks) are eagerly `import()`ed so the
  * component's own awaited import hits the module cache. A plain array entry
- * (the old protocol, possible across a deploy boundary via a client router)
- * means links only.
+ * (a document from an earlier deploy, swapped in by a client router) means
+ * links only.
  *
  * Executes at parse time; islands are picked up as they stream in or get
  * swapped in later, and fire by their directive's own scheduling: idle/unknown

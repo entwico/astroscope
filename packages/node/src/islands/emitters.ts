@@ -23,8 +23,8 @@ function documentRegistry(): DocumentEmitter[] {
 }
 
 /**
- * Register an emitter that contributes preload links and/or attributes for every
- * island the islands middleware sees. Registration is process-wide — call it once
+ * Register an emitter that contributes preload links, eager imports and/or inline
+ * html for every island the islands middleware sees. Registration is process-wide — call it once
  * during boot or module initialization, not per request.
  */
 export function registerIslandEmitter(emitter: IslandEmitter): void {

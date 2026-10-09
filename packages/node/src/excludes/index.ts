@@ -31,9 +31,6 @@ export const ASTRO_STATIC_EXCLUDES: ExcludePattern[] = [
   { prefix: '/_i18n/' },
 ];
 
-/**
- * Common static asset paths.
- */
 export const STATIC_EXCLUDES: ExcludePattern[] = [
   { exact: '/favicon.ico' },
   { exact: '/robots.txt' },
@@ -45,7 +42,6 @@ export const STATIC_EXCLUDES: ExcludePattern[] = [
 
 /**
  * Recommended excludes for middleware.
- * Includes dev paths and Astro internals.
  *
  * @example
  * ```ts
@@ -60,9 +56,6 @@ export const STATIC_EXCLUDES: ExcludePattern[] = [
  */
 export const RECOMMENDED_EXCLUDES: ExcludePattern[] = [...DEV_EXCLUDES, ...ASTRO_STATIC_EXCLUDES];
 
-/**
- * Check if a request should be excluded based on patterns or a function.
- */
 export function shouldExclude(
   ctx: APIContext,
   exclude: readonly StringPattern[] | ((context: APIContext) => boolean) | undefined,

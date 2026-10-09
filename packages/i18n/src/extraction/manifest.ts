@@ -27,7 +27,6 @@ export type GlobalI18nState = {
 export function getGlobalState(): GlobalI18nState {
   const g = globalThis as Record<string, unknown>;
 
-  // in dev mode, initialize global state if not present
   g[I18N_MANIFEST_GLOBAL_KEY] ??= {
     extractedKeys: [],
     chunkManifest: {},

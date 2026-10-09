@@ -8,14 +8,14 @@ const TRANSFORMABLE = /\.(?:[mc]?[jt]sx?)$/;
 const EMPTY_FN = '(()=>{})';
 
 /**
- * in SSR builds, react effect hooks never execute. emptying their callbacks
+ * In SSR builds, react effect hooks never execute. Emptying their callbacks
  * lets rolldown drop dead branches — including dynamic imports of client-only
  * libs (maplibre-gl, hls.js, etc.) — from the server bundle, which in turn
  * stops nft from tracing them at docker-image time.
  *
- * scope is deliberately narrow: first-party code only (no node_modules), only
+ * Scope is deliberately narrow: first-party code only (no node_modules), only
  * in the SSR pass, and binding-aware (the React import must resolve to the
- * real react package). raw chunks where bundling has erased the binding are
+ * real react package). Raw chunks where bundling has erased the binding are
  * left alone — that's NFT's domain, not ours.
  */
 export function stripSsrEffectsPlugin(): Plugin {

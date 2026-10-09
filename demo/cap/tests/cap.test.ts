@@ -3,15 +3,15 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { startCapStub } from '../stub/cap-service.mjs';
 
-const DEV_PORT = 14361;
-const PROD_PORT = 14362;
-const STUB_PORT = 14363;
+const DEV_PORT = 14_361;
+const PROD_PORT = 14_362;
+const STUB_PORT = 14_363;
 
 let devServer: ChildProcess | null = null;
 let prodServer: ChildProcess | null = null;
 let stub: ReturnType<typeof startCapStub> | null = null;
 
-async function waitForServer(port: number, timeout = 30000): Promise<void> {
+async function waitForServer(port: number, timeout = 30_000): Promise<void> {
   const start = Date.now();
 
   while (Date.now() - start < timeout) {
@@ -59,7 +59,7 @@ beforeAll(async () => {
   });
 
   await Promise.all([waitForServer(DEV_PORT), waitForServer(PROD_PORT)]);
-}, 60000);
+}, 60_000);
 
 afterAll(async () => {
   // astro dev daemonizes under @astroscope/node — killing the wrapper is not enough
@@ -98,11 +98,10 @@ async function rpcResult(res: Response): Promise<unknown> {
 
 // what the browser does through the proxy: fetch a challenge, redeem a solution — the stub takes any
 async function solve(port: number): Promise<string> {
-  const challenge = (await (await post(port, '/_cap/challenge', {})).json()) as { token: string };
-  const redeemed = (await (await post(port, '/_cap/redeem', { token: challenge.token, solutions: [1, 2] })).json()) as {
-    success: boolean;
-    token: string;
-  };
+  const challenged = await post(port, '/_cap/challenge', {});
+  const challenge = (await challenged.json()) as { token: string };
+  const redeem = await post(port, '/_cap/redeem', { token: challenge.token, solutions: [1, 2] });
+  const redeemed = (await redeem.json()) as { success: boolean; token: string };
 
   expect(redeemed.success).toBe(true);
 
@@ -127,8 +126,11 @@ describe.each([
     });
 
     test('exposes nothing else of the service', async () => {
-      expect((await post(port, '/_cap/siteverify', { secret: 'demo-secret', response: 'x' })).status).toBe(404);
-      expect((await fetch(`http://localhost:${port}/_cap/challenge`)).status).toBe(404);
+      const siteverify = await post(port, '/_cap/siteverify', { secret: 'demo-secret', response: 'x' });
+      const challenge = await fetch(`http://localhost:${port}/_cap/challenge`);
+
+      expect(siteverify.status).toBe(404);
+      expect(challenge.status).toBe(404);
     });
   });
 
@@ -147,8 +149,11 @@ describe.each([
     });
 
     test('a missing token is an input error, a bad token a rejection', async () => {
-      expect((await post(port, '/_actions/subscribe', { email: 'a@example.com' })).status).toBe(400);
-      expect((await post(port, '/_actions/subscribe', { email: 'a@example.com', _cap: 'nope' })).status).toBe(403);
+      const missing = await post(port, '/_actions/subscribe', { email: 'a@example.com' });
+      const bad = await post(port, '/_actions/subscribe', { email: 'a@example.com', _cap: 'nope' });
+
+      expect(missing.status).toBe(400);
+      expect(bad.status).toBe(403);
     });
 
     test('a rate limiter in front refuses a flood before siteverify is asked', async () => {
@@ -156,7 +161,9 @@ describe.each([
       const statuses: number[] = [];
 
       for (let i = 0; i < 4; i++) {
-        statuses.push((await post(port, '/_actions/contact', { name: 'x', message: 'y', _cap: 'invented' })).status);
+        const response = await post(port, '/_actions/contact', { name: 'x', message: 'y', _cap: 'invented' });
+
+        statuses.push(response.status);
       }
 
       expect(statuses).toEqual([403, 403, 403, 429]);
@@ -166,7 +173,9 @@ describe.each([
     test('an endpoint reads the token from the body', async () => {
       const _cap = await solve(port);
 
-      expect(await (await post(port, '/api/inquiry', { _cap })).json()).toEqual({ received: true });
+      const json = await post(port, '/api/inquiry', { _cap });
+
+      expect(await json.json()).toEqual({ received: true });
 
       const form = await fetch(`http://localhost:${port}/api/inquiry`, {
         method: 'POST',
@@ -175,7 +184,10 @@ describe.each([
       });
 
       expect(form.status).toBe(200);
-      expect((await post(port, '/api/inquiry', { _cap: 'nope' })).status).toBe(403);
+
+      const bad = await post(port, '/api/inquiry', { _cap: 'nope' });
+
+      expect(bad.status).toBe(403);
     });
 
     test('a page guards its own post', async () => {
@@ -211,11 +223,11 @@ describe('third-party requests', () => {
   const bundle = chunks.map((chunk) => chunk.source).join('\n');
 
   // hosts a client chunk may name without making a request: xml namespaces, react's error
-  // message urls, pako's banner comment, and cap's own, which the tests below pin down
-  const ALLOWED_HOSTS = new Set(['www.w3.org', 'react.dev', 'github.com', 'cdn.jsdelivr.net', 'trycap.dev']);
+  // message urls, and cap's own, which the tests below pin down
+  const ALLOWED_HOSTS = new Set(['www.w3.org', 'react.dev', 'cdn.jsdelivr.net', 'trycap.dev']);
 
-  const urls = [...bundle.matchAll(/https?:\/\/[^"'` )]+/g)];
-  const assigned = new Set([...bundle.matchAll(/window\.(CAP_[A-Z_]+)=/g)].map((match) => match[1]));
+  const urls = bundle.matchAll(/https?:\/\/[^"'` )]+/g).toArray();
+  const assigned = new Set(bundle.matchAll(/window\.(CAP_[A-Z_]+)=/g).map((match) => match[1]));
 
   test('the client chunks name no unexpected host', () => {
     const hosts = new Set(urls.map((match) => new URL(match[0]).host));
@@ -242,7 +254,10 @@ describe('third-party requests', () => {
   });
 
   test('the overriding assets are emitted and served from the origin', async () => {
-    const emitted = [...bundle.matchAll(/\/_astro\/[\w.-]+\.(?:wasm|js)/g)].map((match) => match[0]);
+    const emitted = bundle
+      .matchAll(/\/_astro\/[\w.-]+\.(?:wasm|js)/g)
+      .map((match) => match[0])
+      .toArray();
 
     for (const asset of ['cap_wasm_bg', 'hashwx', 'pako_inflate']) {
       const url = emitted.find((candidate) => candidate.includes(asset));

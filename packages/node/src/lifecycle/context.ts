@@ -1,6 +1,5 @@
 import type { BootContext } from './types.js';
 
-// keyed on globalThis via Symbol.for so the vite-runner and native module instances share it
 const STORE_KEY = Symbol.for('@astroscope/node/boot-context');
 
 export function setBootContext(context: BootContext): void {

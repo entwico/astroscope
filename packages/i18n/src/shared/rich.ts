@@ -141,11 +141,8 @@ export function partsToNodes<T>(parts: Part[], components: RichComponents<T>): (
       // plain text content - MessageTextPart.value is a string
       target.push(part.value as string);
     } else if (part.type === 'bidiIsolation') {
-      // BiDi isolates - skip them (they're control characters for text direction)
-      // could optionally include them for proper BiDi handling
+      // bidi isolation marks are direction control characters, not content
     } else {
-      // handle other part types (number, string, fallback, unknown, etc.)
-      // they all have a value property we can stringify
       if ('value' in part && part.value !== undefined && part.value !== null) {
         const stringValue = String(part.value);
 

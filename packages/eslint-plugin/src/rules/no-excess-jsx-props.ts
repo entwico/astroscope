@@ -416,8 +416,7 @@ export const noExcessJsxProps = createRule({
         // lowercase → intrinsic HTML element, not our surface
         if (/^[a-z]/.test(tag.name)) return;
 
-        // SSR-only components never serialize props to the browser
-        // only client: matters for hydration
+        // only hydrated components serialize props to the browser
         const hydrated = node.attributes.some(
           (a) => a.type === 'JSXAttribute' && a.name.type === 'JSXNamespacedName' && a.name.namespace.name === 'client',
         );

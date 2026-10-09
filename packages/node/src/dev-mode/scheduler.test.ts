@@ -53,7 +53,6 @@ describe('RestartScheduler', () => {
       scheduler.schedule(server as never, '/project/src/b.ts');
       scheduler.schedule(server as never, '/project/src/c.ts');
 
-      // no log yet — debouncing
       expect(logger.info).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(110);
@@ -187,7 +186,6 @@ describe('RestartScheduler', () => {
       expect(followUp).toContain('src/d.ts');
       expect(followUp).not.toContain('src/a.ts');
 
-      // assert exactly two restarts — not three
       await new Promise((r) => setTimeout(r, 10));
       expect(server.restart).toHaveBeenCalledTimes(2);
 
@@ -238,7 +236,6 @@ describe('RestartScheduler', () => {
 
       expect(server.restart).toHaveBeenCalledTimes(3);
 
-      // each link's log carries ONLY its own paths
       expect(logger.info).toHaveBeenCalledTimes(3);
       expect(logger.info.mock.calls[0]![0]).toContain('src/a.ts');
       expect(logger.info.mock.calls[0]![0]).not.toContain('src/b.ts');
@@ -295,7 +292,6 @@ describe('RestartScheduler', () => {
       expect(server.restart).toHaveBeenCalledTimes(3);
       expect(logger.info).toHaveBeenCalledTimes(3);
 
-      // link 1: a1, a2 only
       const link1 = logger.info.mock.calls[0]![0] as string;
 
       expect(link1).toContain('boot deps changed (2)');
@@ -303,7 +299,6 @@ describe('RestartScheduler', () => {
       expect(link1).toContain('src/a2.ts');
       expect(link1).not.toMatch(/b\d|c\d/);
 
-      // link 2: b1, b2, b3 only
       const link2 = logger.info.mock.calls[1]![0] as string;
 
       expect(link2).toContain('boot deps changed (3)');
@@ -312,7 +307,6 @@ describe('RestartScheduler', () => {
       expect(link2).toContain('src/b3.ts');
       expect(link2).not.toMatch(/a\d|c\d/);
 
-      // link 3: c1 only — singular form
       const link3 = logger.info.mock.calls[2]![0] as string;
 
       expect(link3).toMatch(/^boot dep changed: src\/c1\.ts/);
@@ -454,7 +448,6 @@ describe('RestartScheduler', () => {
       first.resolve();
       await vi.waitFor(() => expect(server.restart).toHaveBeenCalledTimes(2));
 
-      // follow-up log mentions the full-reload, not the boot dep
       expect(logger.info.mock.calls[1]![0]).toContain('vite SSR full-reload');
       expect(logger.info.mock.calls[1]![0]).not.toContain('src/a.ts');
 

@@ -23,9 +23,6 @@ function getStore(): EventStore {
   return store;
 }
 
-/**
- * Register a handler for a boot lifecycle event.
- */
 export function on(event: BootEventName, handler: BootEventHandler): void {
   const store = getStore();
   let handlers = store.listeners.get(event);
@@ -38,18 +35,13 @@ export function on(event: BootEventName, handler: BootEventHandler): void {
   handlers.add(handler);
 }
 
-/**
- * Remove a previously registered handler.
- */
 export function off(event: BootEventName, handler: BootEventHandler): void {
   const store = getStore();
 
   store.listeners.get(event)?.delete(handler);
 }
 
-/**
- * Emit a boot lifecycle event, running all registered handlers sequentially.
- */
+/** handlers run sequentially, each awaited */
 export async function emit(event: BootEventName, context: BootContext): Promise<void> {
   const store = getStore();
   const handlers = store.listeners.get(event);

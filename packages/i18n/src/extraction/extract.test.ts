@@ -171,7 +171,6 @@ describe('extractKeysFromFile', () => {
         stripFallbacks: false,
       });
 
-      // code is still returned but fallback is preserved
       expect(result.code).toContain('Hello World');
     });
   });

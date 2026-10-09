@@ -85,16 +85,15 @@ Besides `src/boot.ts`, three more files are picked up automatically when they ex
 env loading → src/config.ts → src/instrumentation.ts → src/log.ts → boot → warmup → listen
 ```
 
-**Env loading** (platform, position −1): `CONFIG_PATH` env var → `./.env` → none. Existing process env vars win; each outcome is logged.
+**Env loading**: `CONFIG_PATH` env var → `./.env` → none. Existing process env vars win; each outcome is logged.
 
 **`src/config.ts`** — schema + load (e.g. @entwico/zod-conf), nothing else; validation runs at import. On failure: in production the buffered logs are dumped to the console with the error and the process exits 1; in dev the boot gate keeps the holding page up with the error.
 
 ```typescript
 // src/config.ts
-import { conf } from '@entwico/zod-conf';
-import { z } from 'zod';
+import zc from '@entwico/zod-conf';
 
-export const config = conf(z.object({ MONGO_URL: z.string() }));
+export const config = zc.define({ MONGO_URL: zc.env('MONGO_URL').string() }).load({ env: process.env });
 ```
 
 **`src/instrumentation.ts`** — extra instrumentation only (the standard bundle is a platform default, see Telemetry). Loaded once per process — dev restarts are in-process, so changes here need a full dev-server restart.
@@ -158,6 +157,7 @@ The route comes from the route astro matched, which is wrong for a middleware th
 
 ```typescript
 import { overrideRequestRoute } from '@astroscope/node/log';
+import type { MiddlewareHandler } from 'astro';
 
 export const onRequest: MiddlewareHandler = (ctx, next) => {
   const page = lookupPage(ctx.url.pathname);
@@ -184,7 +184,7 @@ The adapter itself emits exactly one info line on startup — `server ready { ho
 - the boot lifecycle gets `startup` (with `boot`/`warmup`/`listen` children) and `shutdown` (with `drain`/`onShutdown`) spans
 - trace exporters are driven by the standard `OTEL_*` env vars; without a configured OTLP endpoint, trace exporting defaults to `none` (no failing localhost exports)
 - `OTEL_SDK_DISABLED=true` turns the SDK off entirely
-- the other astroscope packages record through the same SDK, no-op without it: `astro.island.render.duration`, `astro.island.check.duration`, `astro.island.render.failures` (`@astroscope/react`); `astro.wormhole.handler.duration`, `astro.wormhole.handler.failures` and a `wormhole <name>` span per handler (`@astroscope/wormhole`); `astro.i18n.missing`, `astro.i18n.translations.age` (`@astroscope/i18n`)
+- the other astroscope packages record through the same SDK and are no-ops without it — their instruments are documented with them: [`@astroscope/react`](../react/README.md), [`@astroscope/wormhole`](../wormhole/README.md), [`@astroscope/i18n`](../i18n/README.md)
 
 There is no helper for tracing server-render sections: measuring a subtree's render would require buffering it, which disables streaming. Wrap frontmatter awaits with `tracer.startActiveSpan()` from `@opentelemetry/api` instead — that's where the time lives, and it nests under the request span without touching the stream.
 
@@ -258,6 +258,8 @@ Actions take `guards` in place of Astro's `defineAction` (the `no-astro-define-a
 
 ```typescript
 import { defineAction } from '@astroscope/node/guards';
+import { z } from 'astro/zod';
+import { admin } from '../guards';
 
 export const server = {
   rename: defineAction({
@@ -274,6 +276,7 @@ Endpoints wrap the same way. The body is read only when a guard in the list decl
 
 ```typescript
 import { defineRoute } from '@astroscope/node/guards';
+import { admin } from '../../guards';
 
 export const POST = defineRoute({
   guards: [admin],
@@ -286,6 +289,7 @@ A page's frontmatter is the handler, so it asks and returns:
 ```astro
 ---
 import { guard } from '@astroscope/node/guards';
+import { admin } from '../guards';
 
 const { denied, user } = await guard(Astro, [admin]);
 
@@ -302,6 +306,9 @@ Whole areas are guarded from the middleware, with the same guards and the same d
 ```typescript
 // src/middleware.ts
 import { createGuardMiddleware } from '@astroscope/node/guards';
+import { sequence } from 'astro:middleware';
+import { admin, authenticated } from './guards';
+import { sessionMiddleware } from './session';
 
 export const onRequest = sequence(
   sessionMiddleware,
@@ -325,6 +332,7 @@ A fixed window per key, in memory and per process: the `max`-th request within `
 Put it first in a list, so a flood is refused before a guard that costs something runs:
 
 ```typescript
+import { captcha } from '@astroscope/cap/server';
 import { rateLimit } from '@astroscope/node/guards';
 
 guards: [rateLimit({ max: 5, window: 60_000 }), captcha()],

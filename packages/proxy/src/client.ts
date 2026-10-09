@@ -8,9 +8,6 @@ const DEFAULT_CLIENT_OPTIONS: Required<ClientOptions> = {
   keepAliveTimeout: 60_000,
 };
 
-/**
- * Creates an undici agent with the given options
- */
 export function createHttpAgent(options?: ClientOptions): Agent {
   const config = { ...DEFAULT_CLIENT_OPTIONS, ...options };
 

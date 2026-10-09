@@ -71,7 +71,7 @@ export const server = {
 };
 ```
 
-The guard adds `_cap` to the input schema itself. Pair it with `rateLimit` from `@astroscope/node/guards`, placed first: Cap rate-limits challenge and redeem per visitor, but a request with an invented token still costs a siteverify call, and a flood of those is refused by the limiter before any call is made (`guards: [rateLimit({ max: 5, window: 60_000 }), captcha()]`). Endpoints use `defineRoute({ guards: [captcha()], handler })`, pages `const { denied } = await guard(Astro, [captcha()]); if (denied) return denied;` — see `@astroscope/node/guards`. On a json or form body the token is read from the `_cap` field.
+The guard adds `_cap` to the input schema itself. Put `rateLimit` ahead of it: Cap rate-limits challenge and redeem per visitor, but a request with an invented token still costs a siteverify call, and a flood of those is refused by the limiter before any call is made. The same `captcha()` goes into `defineRoute` for endpoints and `guard(Astro, [...])` for pages — see [`@astroscope/node/guards`](../node/README.md#guards) for `rateLimit`, `defineRoute` and `guard`. On a json or form body the token is read from the `_cap` field.
 
 ### 4. Solve on the client
 
@@ -153,7 +153,7 @@ Endpoints and pages answer per the request: `{ error: { code, message } }` for a
 ## Notes
 
 - **Logging**: rejected tokens log at `info`. An unreachable or misconfigured Cap service logs at `error`.
-- **No third-party requests**: both wasm solvers (`@cap.js/wasm`) and the pako fallback for browsers without `DecompressionStream` are served from your origin, nothing is fetched from a CDN. The visible widget's vendor credits link no longer reports the page url and referrer on click and carries `rel="noreferrer"`. Browsers without WebAssembly or Web Workers can't solve.
+- **No third-party requests**: both wasm solvers (`@cap.js/wasm`) and the pako fallback for browsers without `DecompressionStream` are served from your origin, nothing is fetched from a CDN. The visible widget's vendor credits link reports no page url or referrer on click and carries `rel="noreferrer"`. Browsers without WebAssembly or Web Workers can't solve.
 - **Privacy policy**: two first-party processings to name — the visitor's IP is forwarded to your Cap service for rate limiting, and Cap's instrumentation step runs a bot-detection script from your service in a sandboxed iframe and sends its browser signals back to it.
 - **Content Security Policy**: the solver needs `worker-src blob:` and `'wasm-unsafe-eval'`, and Cap's instrumentation step runs an inline script in a sandboxed `srcdoc` iframe (`window.CAP_SCRIPT_NONCE` passes a nonce through).
 

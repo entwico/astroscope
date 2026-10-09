@@ -1,7 +1,7 @@
 import capWasmUrl from '@cap.js/wasm/browser/cap_wasm_bg.wasm?url';
 import hashwxWasmUrl from '@cap.js/wasm/browser/hashwx.wasm?url';
 import type { Cap } from 'cap-widget';
-import pakoUrl from 'pako/dist/pako_inflate.min.js?url';
+import pakoUrl from 'pako/browser/inflate?url';
 import { path } from 'virtual:@astroscope/cap/config';
 
 declare global {

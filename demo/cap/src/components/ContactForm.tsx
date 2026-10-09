@@ -33,6 +33,7 @@ export default function ContactForm() {
           className="input input-bordered"
           value={name}
           onChange={(event) => setName(event.target.value)}
+          maxLength={100}
           required
         />
       </label>
@@ -42,6 +43,7 @@ export default function ContactForm() {
           className="textarea textarea-bordered"
           value={message}
           onChange={(event) => setMessage(event.target.value)}
+          maxLength={2000}
           required
         />
       </label>

@@ -1,13 +1,13 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-const DEV_PORT = 14341;
-const PROD_PORT = 14342;
+const DEV_PORT = 14_341;
+const PROD_PORT = 14_342;
 
 let devServer: ChildProcess | null = null;
 let prodServer: ChildProcess | null = null;
 
-async function waitForServer(port: number, timeout = 30000): Promise<void> {
+async function waitForServer(port: number, timeout = 30_000): Promise<void> {
   const start = Date.now();
 
   while (Date.now() - start < timeout) {
@@ -49,7 +49,7 @@ beforeAll(async () => {
   });
 
   await Promise.all([waitForServer(DEV_PORT), waitForServer(PROD_PORT)]);
-}, 60000);
+}, 60_000);
 
 afterAll(() => {
   // astro dev daemonizes under @astroscope/node — killing the wrapper is not enough
@@ -58,9 +58,17 @@ afterAll(() => {
   prodServer?.kill();
 });
 
-const page = (port: number, path = '/') => fetch(`http://localhost:${port}${path}`).then((r) => r.text());
-const loads = (port: number) =>
-  fetch(`http://localhost:${port}/api/loads`).then((r) => r.json() as Promise<Record<string, number>>);
+async function page(port: number, path = '/'): Promise<string> {
+  const res = await fetch(`http://localhost:${port}${path}`);
+
+  return res.text();
+}
+
+async function loads(port: number): Promise<Record<string, number>> {
+  const res = await fetch(`http://localhost:${port}/api/loads`);
+
+  return res.json() as Promise<Record<string, number>>;
+}
 
 describe('server-side reads', () => {
   test('frontmatter renders wormhole values', async () => {
@@ -154,11 +162,11 @@ describe('prod loading (per route)', () => {
     ) as { routes: Record<string, string[]>; scripts: string[] };
 
     // frontmatter reads plus the page script's
-    expect(manifest.routes['/']?.toSorted()).toEqual(['config', 'counter', 'stats']);
+    expect(manifest.routes['/']?.toSorted((a, b) => a.localeCompare(b))).toEqual(['config', 'counter', 'stats']);
     expect(manifest.routes['/plain']).toEqual([]);
     expect(manifest.routes['/api/loads']).toEqual([]);
     expect(manifest.routes['/_actions/[...path]']).toEqual(['counter']);
-    expect(manifest.scripts.toSorted()).toEqual(['counter', 'stats']);
+    expect(manifest.scripts.toSorted((a, b) => a.localeCompare(b))).toEqual(['counter', 'stats']);
   });
 });
 

@@ -13,10 +13,7 @@ function contextLogger(store: LogStore): Logger {
   return store.requestStorage.getStore()?.logger ?? store.root ?? (fallbackLogger ??= pino({ level: 'info' }));
 }
 
-/**
- * Generate a short request ID.
- * @internal
- */
+/** @internal */
 export function generateReqId(): string {
   return randomUUID().slice(0, 8);
 }
@@ -31,27 +28,16 @@ function bufferEntry(store: LogStore, level: BufferedEntry['level'], bindings: B
   store.buffer.push({ level, bindings, args, time: Date.now() });
 }
 
-/**
- * Log proxy interface — context-aware logging via getters.
- */
 export interface LogProxy {
-  /** Log at trace level */
   readonly trace: Logger['trace'];
-  /** Log at debug level */
   readonly debug: Logger['debug'];
-  /** Log at info level */
   readonly info: Logger['info'];
-  /** Log at warn level */
   readonly warn: Logger['warn'];
-  /** Log at error level */
   readonly error: Logger['error'];
-  /** Log at fatal level */
   readonly fatal: Logger['fatal'];
-  /** Create a child logger with additional bindings */
   child(bindings: Bindings): LogProxy;
-  /** Access the current context's raw pino Logger */
+  /** the current context's pino logger */
   readonly raw: Logger;
-  /** Access the root logger (no request context) */
   readonly root: Logger;
 }
 

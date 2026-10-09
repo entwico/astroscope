@@ -95,7 +95,6 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
       const reqId = resolveReqId(req);
       const reqData: Record<string, unknown> = { method, url: pathname };
 
-      // extended logging includes potentially sensitive data
       if (logging.extended) {
         reqData['query'] = queryIndex === -1 ? '' : url.slice(queryIndex + 1);
         reqData['headers'] = req.headers;

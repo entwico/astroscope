@@ -12,7 +12,7 @@ declare module '@cap.js/wasm/browser/hashwx.wasm?url' {
   export default url;
 }
 
-declare module 'pako/dist/pako_inflate.min.js?url' {
+declare module 'pako/browser/inflate?url' {
   const url: string;
   export default url;
 }

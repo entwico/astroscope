@@ -23,6 +23,7 @@ npm install @astroscope/react
 // astro.config.ts
 import node from '@astroscope/node';
 import react from '@astroscope/react';
+import { defineConfig } from 'astro/config';
 
 export default defineConfig({
   output: 'server',
@@ -35,7 +36,7 @@ Requires `@astroscope/node` (for the `log` proxy) and React 19.
 
 ## Options
 
-All `@astrojs/react` options (`include`, `exclude`, `babel`) pass through. `experimentalReactChildren` and `experimentalDisableStreaming` are not supported: the renderer here already renders synchronously.
+All `@astrojs/react` options (`include`, `exclude`, `compiler`) pass through; `compiler` needs `oxc-transform-react` installed. `experimentalReactChildren` and `experimentalDisableStreaming` are not supported: the renderer here already renders synchronously.
 
 | Option         | Default | Description                                    |
 | -------------- | ------- | ---------------------------------------------- |

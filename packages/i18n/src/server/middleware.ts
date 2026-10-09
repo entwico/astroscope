@@ -55,9 +55,7 @@ function createChunkResponse(pathname: string): Response | undefined {
 
   const path = pathname.slice(I18N_ENDPOINT_PREFIX.length);
 
-  // attempt to parse as efficient as possible
-  // expected path format: {locale}/{chunkName}.{hash}.js
-  // avoiding regex or split for performance
+  // {locale}/{chunkName}.{hash}.js — sliced by hand, this runs for every chunk request
   const slashIdx = path.indexOf('/');
 
   if (slashIdx === -1) {

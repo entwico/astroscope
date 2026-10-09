@@ -145,7 +145,7 @@ import { JsonScript } from '@astroscope/components/astro';
 <JsonScript type="application/json" id="bootstrap" data={{ featureFlags: { beta: true } }} />
 ```
 
-The data is `JSON.stringify`'d and every `<` is escaped to `<`, so a value containing `</script>` cannot break out of the tag. The browser still parses it back to the exact original.
+The data is `JSON.stringify`'d and every `<` is escaped to `\u003c`, so a value containing `</script>` cannot break out of the tag. The browser still parses it back to the exact original.
 
 `type` defaults to `application/json`. Use it for any non-executable JSON data block the browser reads but never runs — a client-side script reads it via `JSON.parse(el.textContent)`:
 
@@ -176,7 +176,7 @@ import { WithNoBfCache } from '@astroscope/components/astro';
 </WithNoBfCache>
 ```
 
-It sets a `Cache-Control: no-store` response header **and** registers `pageshow`/`pagehide` handlers.
+It sets a `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` response header **and** registers `pageshow`/`pagehide` handlers.
 
 ### `<SmoothHashScroll>`
 

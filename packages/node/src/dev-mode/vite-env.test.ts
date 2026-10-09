@@ -46,7 +46,7 @@ describe('ssrImport', () => {
     expect(astro.runner.import).toHaveBeenCalledWith('/boot.ts');
   });
 
-  test('works with plain objects from a different vite install (duck typing)', async () => {
+  test('accepts a runnable environment shape from a different vite install', async () => {
     // simulates consumer bringing its own vite copy: env is a valid runnable
     // shape but would fail `instanceof RunnableDevEnvironment` against our vite
     const ssr = {

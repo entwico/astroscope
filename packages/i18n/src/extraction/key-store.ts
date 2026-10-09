@@ -42,7 +42,6 @@ export class KeyStore {
    * Check new keys for inconsistencies with existing occurrences.
    */
   private checkConsistency(newKeys: ExtractedKeyOccurrence[]): void {
-    // build a map of existing keys (first occurrence for each key)
     const existingByKey = new Map<string, ExtractedKeyOccurrence>();
 
     for (const occ of this.occurrences) {
@@ -126,8 +125,7 @@ export class KeyStore {
    * Report an inconsistency via logger.
    */
   private reportInconsistency(inc: KeyInconsistency): void {
-    // create a unique key for this inconsistency to avoid duplicate reports
-    // use key+field only (not locations) to report once per inconsistent key
+    // keyed on key+field, not locations — one report per inconsistent key
     const incKey = `${inc.key}:${inc.field}`;
 
     if (this.reportedInconsistencies.has(incKey)) return;
@@ -154,7 +152,6 @@ export class KeyStore {
     const newKeyStrings = keys.map((k) => k.key);
     const oldKeys = this.fileToKeys.get(filename);
 
-    // log key changes on HMR
     if (oldKeys) {
       const uniqueNew = [...new Set(newKeyStrings)];
       const uniqueOld = [...new Set(oldKeys)];
@@ -172,7 +169,6 @@ export class KeyStore {
       }
     }
 
-    // remove old occurrences for this file (if any)
     if (oldKeys) {
       for (let i = this.occurrences.length - 1; i >= 0; i--) {
         if (this.occurrences[i]?.file === filename) {

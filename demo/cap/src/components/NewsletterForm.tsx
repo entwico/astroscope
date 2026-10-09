@@ -34,6 +34,7 @@ export default function NewsletterForm() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           onFocus={cap.prepare}
+          maxLength={200}
           required
         />
       </label>

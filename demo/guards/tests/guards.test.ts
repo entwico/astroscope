@@ -1,13 +1,13 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
-const DEV_PORT = 14351;
-const PROD_PORT = 14352;
+const DEV_PORT = 14_351;
+const PROD_PORT = 14_352;
 
 let devServer: ChildProcess | null = null;
 let prodServer: ChildProcess | null = null;
 
-async function waitForServer(port: number, timeout = 30000): Promise<void> {
+async function waitForServer(port: number, timeout = 30_000): Promise<void> {
   const start = Date.now();
 
   while (Date.now() - start < timeout) {
@@ -49,7 +49,7 @@ beforeAll(async () => {
   });
 
   await Promise.all([waitForServer(DEV_PORT), waitForServer(PROD_PORT)]);
-}, 60000);
+}, 60_000);
 
 afterAll(() => {
   // astro dev daemonizes under @astroscope/node — killing the wrapper is not enough
@@ -70,7 +70,7 @@ const mutating = (port: number, user: Who, body?: unknown): RequestInit => ({
     origin: `http://localhost:${port}`,
     ...as(user),
   },
-  ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  ...(body !== undefined && { body: JSON.stringify(body) }),
 });
 
 const rpc = (port: number, name: string, user: Who, input?: unknown) =>
@@ -120,8 +120,11 @@ describe.each([
     });
 
     test('an admin action runs the parent guard first', async () => {
-      expect((await rpc(port, 'promote', undefined, { name: 'bob' })).status).toBe(401);
-      expect((await rpc(port, 'promote', 'alice', { name: 'bob' })).status).toBe(403);
+      const anonymous = await rpc(port, 'promote', undefined, { name: 'bob' });
+      const alice = await rpc(port, 'promote', 'alice', { name: 'bob' });
+
+      expect(anonymous.status).toBe(401);
+      expect(alice.status).toBe(403);
 
       const root = await rpc(port, 'promote', 'root', { name: 'bob' });
 
@@ -134,10 +137,14 @@ describe.each([
       expect(owner.status).toBe(200);
       expect(await rpcResult(owner)).toMatchObject({ id: 'p1', name: `Alpha ${port}`, owner: 'alice' });
 
-      expect((await rpc(port, 'rename', 'alice', { projectId: 'p2', name: 'x' })).status).toBe(403);
-      expect((await rpc(port, 'rename', 'alice', { projectId: 'nope', name: 'x' })).status).toBe(404);
+      const foreign = await rpc(port, 'rename', 'alice', { projectId: 'p2', name: 'x' });
+      const unknown = await rpc(port, 'rename', 'alice', { projectId: 'nope', name: 'x' });
       // validation runs before the guards: a missing input is a 400, not a 401
-      expect((await rpc(port, 'rename', undefined, { name: 'x' })).status).toBe(400);
+      const invalid = await rpc(port, 'rename', undefined, { name: 'x' });
+
+      expect(foreign.status).toBe(403);
+      expect(unknown.status).toBe(404);
+      expect(invalid.status).toBe(400);
     });
   });
 
@@ -148,8 +155,11 @@ describe.each([
       expect(anonymous.status).toBe(401);
       expect(await anonymous.json()).toEqual({ error: { code: 'UNAUTHORIZED', message: 'sign in first' } });
 
-      expect((await api(port, '/api/admin', 'alice')).status).toBe(403);
-      expect(await (await api(port, '/api/admin', 'root')).json()).toEqual({ admin: 'root' });
+      const alice = await api(port, '/api/admin', 'alice');
+      const root = await api(port, '/api/admin', 'root');
+
+      expect(alice.status).toBe(403);
+      expect(await root.json()).toEqual({ admin: 'root' });
     });
 
     test('guard input comes from the body', async () => {
@@ -204,7 +214,9 @@ describe.each([
     });
 
     test('a proven user renders', async () => {
-      expect((await page(port, '/me', undefined)).status).toBe(302);
+      const anonymous = await page(port, '/me', undefined);
+
+      expect(anonymous.status).toBe(302);
 
       const alice = await page(port, '/me', 'alice');
 

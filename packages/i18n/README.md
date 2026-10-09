@@ -148,7 +148,7 @@ export function CheckoutSummary() {
 
 > **Note:** Variables use `{$name}` syntax (with `$` prefix) per MessageFormat 2 specification.
 
-That's it — client delivery is automatic. Use plain `client:*` directives; translations are injected into the page and preloaded per island by `@astroscope/node`, no layout script or special directives needed.
+That's it — client delivery is automatic. Use plain `client:*` directives; translations are injected into the page and preloaded per island by `@astroscope/node`.
 
 ## API
 

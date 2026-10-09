@@ -19,7 +19,6 @@ type NormalizedConfig = {
 };
 
 class I18nSingleton {
-  // normalized user config with defaults applied
   private config: NormalizedConfig | null = null;
 
   // locale -> raw translation strings (before MessageFormat compilation)
@@ -46,9 +45,7 @@ class I18nSingleton {
   // tracks the manifest version to detect when derived caches need invalidation
   private manifestVersion = 0;
 
-  /**
-   * invalidate derived caches when the extraction manifest has changed (dev mode HMR)
-   */
+  /** Invalidate derived caches when the extraction manifest changed (dev HMR). */
   private invalidateIfManifestChanged(): void {
     const { version } = getGlobalState();
 
@@ -138,11 +135,10 @@ class I18nSingleton {
   setTranslations(locale: string, raw: RawTranslations): void {
     this.rawCache.set(locale, raw);
     this.updatedAt.set(locale, Date.now());
-    this.mergedCache.delete(locale); // invalidate merged cache
-    this.compiledCache.delete(locale); // invalidate compiled cache
-    this.hashCache.delete(locale); // invalidate hash cache
+    this.mergedCache.delete(locale);
+    this.compiledCache.delete(locale);
+    this.hashCache.delete(locale);
 
-    // invalidate chunk cache entries for this locale
     for (const key of this.chunkCache.keys()) {
       if (key.startsWith(`${locale}:`)) {
         this.chunkCache.delete(key);
@@ -297,7 +293,6 @@ class I18nSingleton {
       this.compiledCache.delete(locale);
       this.hashCache.delete(locale);
 
-      // clear chunk cache entries for this locale
       for (const key of this.chunkCache.keys()) {
         if (key.startsWith(`${locale}:`)) {
           this.chunkCache.delete(key);

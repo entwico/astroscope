@@ -34,9 +34,6 @@ function getRunnableEnv(server: ViteDevServer): RunnableEnv {
   throw new Error(`no runnable dev environment found — available: ${names.join(', ')}`);
 }
 
-/**
- * load a module via the Vite Environment API.
- */
 export async function ssrImport<T = Record<string, unknown>>(server: ViteDevServer, moduleId: string): Promise<T> {
   return getRunnableEnv(server).runner.import(moduleId) as Promise<T>;
 }

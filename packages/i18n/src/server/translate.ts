@@ -73,8 +73,6 @@ export const t: TranslateFunction = ((
   const ctx = getContext();
 
   if (!ctx) {
-    // no context = probably during build or outside request
-    // use cached compiled fallback to avoid recompiling on every call
     const defaultLocale = i18n.getConfig().defaultLocale;
     const fallbackStr = normalizedMeta.fallback || key;
     const cacheKey = `${defaultLocale}:${fallbackStr}`;
@@ -95,7 +93,6 @@ export const t: TranslateFunction = ((
 
     const fallbackValue = applyFallback(key, normalizedMeta, ctx.fallback);
 
-    // compile and cache the fallback for consistency
     const compiledFallback = compileMessage(ctx.locale, fallbackValue);
 
     ctx.translations[key] = compiledFallback;

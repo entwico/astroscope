@@ -19,7 +19,6 @@ const RESOLVED_VIRTUAL_MODULE_ID = `\0${VIRTUAL_MODULE_ID}`;
 const isResolvedVirtualModuleId = (id: string) =>
   id === RESOLVED_VIRTUAL_MODULE_ID || id.startsWith(`\0${VIRTUAL_MODULE_ID}?`);
 
-// manifest JSON file name (emitted during build)
 const MANIFEST_FILE_NAME = 'i18n-manifest.json';
 
 export type I18nVitePluginOptions = {
@@ -91,15 +90,11 @@ export function i18nVitePlugin(options: I18nVitePluginOptions): Plugin {
     },
 
     async configureServer(server) {
-      // configureServer can be called during astro build's internal dev server
-      // check isProduction to skip eager scanning during build
+      // astro's build runs an internal dev server; its configureServer must not trigger the eager scan
       if (isBuild || server.config.isProduction) {
         return;
       }
 
-      // in dev mode, eagerly scan all files upfront
-      // this ensures all t() calls are found immediately
-      // (otherwise vite loads lazily as files are requested)
       const result = await scan({ projectRoot, logger, consistency });
 
       store.merge(result);
@@ -186,7 +181,6 @@ export function getManifest() { return _getManifest(); }
 
       syncGlobalState();
 
-      // build mode: return transformed code with source map
       // serialize babel's map to a string: vite accepts string source maps and
       // its structural ExistingRawSourceMap type (vite 8) rejects babel's map shape
       if (isBuild && result.code) {
@@ -228,7 +222,7 @@ export function getManifest() { return _getManifest(); }
           }
         }
 
-        const chunkName = chunkIdToName(fileName.replace(/\.js$/, '')); // cut .js extension
+        const chunkName = chunkIdToName(fileName.replace(/\.js$/, ''));
 
         if (keys.size > 0) {
           state.chunkManifest[chunkName] = [...keys];
@@ -292,14 +286,13 @@ export function getManifest() { return _getManifest(); }
 
         if (!chunksWithI18n.has(chunkName)) continue;
 
-        // simple translation loader - just load own translations
+        // the loader awaits the chunk's own translation chunk before the module body runs
         const loaderCode =
           `if(typeof window!=='undefined'&&window.__i18n__){` +
           `const _=window.__i18n__,h=_.hashes[${JSON.stringify(chunkName)}];` +
           `if(h)await import(\`/_i18n/\${_.locale}/${chunkName}.\${h}.js\`);` +
           `}`;
 
-        // inject loader at start of chunk preserving source maps
         const s = new MagicString(chunk.code);
 
         s.prepend(loaderCode);
@@ -325,7 +318,6 @@ export function getManifest() { return _getManifest(); }
     },
 
     writeBundle(outputOptions) {
-      // write the manifest JSON file after bundle is written
       // only emit from client build (has full chunk mapping, runs after server build)
       // write to server directory so it's not publicly accessible (same location as the virtual module)
       // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the vite plugin context

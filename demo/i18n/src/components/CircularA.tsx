@@ -1,7 +1,6 @@
 /**
- * Circular dependency test: A imports B, B imports A (static circular)
- * With hidden <CircularB client:visible /> in index.astro, Vite creates separate chunks
- * that statically import each other, testing circular detection in flattenImports
+ * Circular-import fixture: A and B statically import each other, so the two
+ * islands share chunks with a cyclic import graph.
  */
 import { t } from '@astroscope/i18n/translate';
 import CircularB from './CircularB.js';

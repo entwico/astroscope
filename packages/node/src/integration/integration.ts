@@ -200,7 +200,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
 
         updateConfig({
           build: { redirects: false },
-          // opinionated defaults: no trailing slashes, behind LB
+          // opinionated default: no trailing slashes
           ...(config.trailingSlash === 'ignore' && { trailingSlash: 'never' as const }),
           security: {
             // assumed to run behind LB
