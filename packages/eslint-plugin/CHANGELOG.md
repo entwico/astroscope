@@ -1,5 +1,15 @@
 # @astroscope/eslint-plugin
 
+## 2.2.0
+
+### Minor Changes
+
+- 2f9f809: new `no-astro-define-action` rule (in `recommended`, auto-fixable): `defineAction` must come from `@astroscope/node/guards`
+
+### Patch Changes
+
+- 03649c2: `t-static-meta` also reports a `t()` fallback or description written as a tagged template (`String.raw`), which the i18n extractor cannot read
+
 ## 2.1.1
 
 ### Patch Changes

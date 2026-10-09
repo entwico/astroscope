@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/cap",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Cap captcha for Astro",
   "type": "module",
   "main": "./dist/index.js",

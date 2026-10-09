@@ -1,5 +1,16 @@
 # @astroscope/node
 
+## 4.0.0
+
+### Major Changes
+
+- 2f9f809: `bodySizeLimit` defaults to 1 MiB and applies to every request, in dev too; a larger body is refused with 413
+
+### Minor Changes
+
+- 2f9f809: new `@astroscope/node/guards`: guards for actions (`defineAction` with `guards`), endpoints (`defineRoute`) and pages (`guard(Astro, [...])`) that deny or narrow `locals`, `createGuardMiddleware` for whole areas, and the stock `rateLimit` guard
+- 2f9f809: a wrong trailing slash redirects to the canonical path like duplicate slashes, in dev too; both redirects carry their own route label (`duplicate-slashes`, `trailing-slash`)
+
 ## 3.1.2
 
 ### Patch Changes

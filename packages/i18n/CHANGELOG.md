@@ -1,5 +1,14 @@
 # @astroscope/i18n
 
+## 2.1.2
+
+### Patch Changes
+
+- Updated dependencies [2f9f809]
+- Updated dependencies [2f9f809]
+- Updated dependencies [2f9f809]
+  - @astroscope/node@4.0.0
+
 ## 2.1.1
 
 ### Patch Changes

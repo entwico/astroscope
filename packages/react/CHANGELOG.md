@@ -1,5 +1,18 @@
 # @astroscope/react
 
+## 2.0.0
+
+### Major Changes
+
+- 9937312: `@astrojs/react` 7: the `babel` option is gone (JSX goes through Oxc), the `compiler` option for React Compiler passes through
+
+### Patch Changes
+
+- Updated dependencies [2f9f809]
+- Updated dependencies [2f9f809]
+- Updated dependencies [2f9f809]
+  - @astroscope/node@4.0.0
+
 ## 1.0.0
 
 ### Major Changes
