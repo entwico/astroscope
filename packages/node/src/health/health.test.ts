@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { registerHealthCheck } from './health';
 import { type RegistrableCheck, activateHealthChecks, deactivateHealthChecks, getHealthStore } from './store';
+import { registerHealthCheck } from './index';
 
 const STORE_KEY = Symbol.for('@astroscope/node/health');
 

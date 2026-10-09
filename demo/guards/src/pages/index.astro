@@ -1,0 +1,85 @@
+---
+import '../styles/index.css';
+import { actions } from 'astro:actions';
+import Layout from '../../../shared/Layout.astro';
+import { USER_NAMES } from '../server/users';
+
+const { user } = Astro.locals;
+const next = Astro.url.searchParams.get('next');
+const renamed = Astro.getActionResult(actions.renameForm);
+---
+
+<Layout title="Guards Demo" package="@astroscope/node/guards">
+  <p class="text-lg mb-6">
+    Route guards for actions, endpoints and pages — a guard denies or proves, and what it proves is typed as present only where it passed.
+  </p>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Session</h2>
+      {next && <div class="alert alert-warning">Sign in to open <code>{next}</code>.</div>}
+      <p>
+        {user ? (
+          <>You are <span class="badge badge-primary">{user.name}</span>{user.roles.admin && <span class="badge badge-secondary ml-1">admin</span>}</>
+        ) : (
+          'You are nobody.'
+        )}
+      </p>
+      <form method="POST" action="/api/session" class="flex gap-2 items-center">
+        <input type="hidden" name="next" value={next ?? '/'} />
+        {USER_NAMES.map((name) => (
+          <button class="btn btn-sm btn-outline" name="as" value={name}>Sign in as {name}</button>
+        ))}
+        <button class="btn btn-sm btn-ghost" name="as" value="">Sign out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Pages</h2>
+      <p class="text-sm text-base-content/70">
+        <code class="badge badge-ghost">const &#123; denied, user &#125; = await guard(Astro, [admin]); if (denied) return denied;</code>
+      </p>
+      <div class="flex gap-2">
+        <a href="/me" class="btn btn-sm">/me — authenticated</a>
+        <a href="/admin" class="btn btn-sm">/admin — admin</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Endpoints</h2>
+      <p class="text-sm text-base-content/70">
+        <code class="badge badge-ghost">defineRoute(&#123; guards: [admin], handler &#125;)</code> — a denial answers with the code's status and a json error.
+      </p>
+      <a href="/api/admin" class="btn btn-sm">GET /api/admin</a>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Form action</h2>
+      <p class="text-sm text-base-content/70">
+        <code class="badge badge-ghost">defineAction(&#123; guards: [projectOwner] &#125;)</code> — the guard reads <code>projectId</code> from the input, loads the project and proves it for the handler. Alice owns p1, root owns p2.
+      </p>
+      <form method="POST" action={actions.renameForm} class="flex gap-2 items-end">
+        <label class="form-control">
+          <span class="label-text">Project</span>
+          <select name="projectId" class="select select-bordered select-sm">
+            <option value="p1">p1</option>
+            <option value="p2">p2</option>
+          </select>
+        </label>
+        <label class="form-control">
+          <span class="label-text">New name</span>
+          <input name="name" class="input input-bordered input-sm" value="Renamed" />
+        </label>
+        <button class="btn btn-sm btn-primary">Rename</button>
+      </form>
+      {renamed?.data && <div class="alert alert-success mt-4">Project {renamed.data.id} is now "{renamed.data.name}".</div>}
+      {renamed?.error && <div class="alert alert-error mt-4">{renamed.error.code}: {renamed.error.message}</div>}
+    </div>
+  </div>
+</Layout>

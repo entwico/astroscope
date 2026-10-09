@@ -1,0 +1,23 @@
+---
+import '../styles/index.css';
+import { guard } from '@astroscope/node/guards';
+import Layout from '../../../shared/Layout.astro';
+import { admin } from '../guards';
+
+const { denied, user } = await guard(Astro, [admin]);
+
+if (denied) return denied;
+---
+
+<Layout title="Admin" package="@astroscope/node/guards">
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Admin area</h2>
+      <p>Welcome, <span class="badge badge-secondary">{user.name}</span>.</p>
+      <p class="text-sm text-base-content/70">
+        <code class="badge badge-ghost">admin</code> extends <code class="badge badge-ghost">authenticated</code>: nobody is redirected to sign in, a signed-in non-admin sees a 404 — the denying guard picks the page response.
+      </p>
+    </div>
+  </div>
+  <a href="/" class="btn btn-outline">Back</a>
+</Layout>

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { ExcludePattern } from './excludes';
 import { serializeExcludePatterns } from './serialize';
+import type { ExcludePattern } from './index';
 
 function roundTrip(patterns: ExcludePattern[]): ExcludePattern[] {
   return new Function(`return ${serializeExcludePatterns(patterns)};`)() as ExcludePattern[];

@@ -1,4 +1,4 @@
-import type { ExcludePattern } from './excludes/excludes.js';
+import type { ExcludePattern } from './excludes/index.js';
 
 export interface NodeBootOptions {
   /**
@@ -168,8 +168,10 @@ export interface NodeOptions {
   imageService?: 'on' | 'off' | 'auto' | undefined;
 
   /**
-   * Maximum request body size in bytes. `0` or `Infinity` disables the limit.
-   * @default 1073741824 (1 GiB)
+   * Maximum request body size in bytes, for every request astro handles: a body announced
+   * larger is refused with 413 before anything reads it, a chunked one is cut off at the limit
+   * while being read. Native mounts are not covered. `0` or `Infinity` disables the limit.
+   * @default 1048576 (1 MiB, astro's own default for action bodies)
    */
   bodySizeLimit?: number | undefined;
 

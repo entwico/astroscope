@@ -1,4 +1,4 @@
-import { DURATION_BUCKETS, createCounter, createHistogram, createUpDownCounter } from './telemetry.js';
+import { DURATION_BUCKETS, createCounter, createHistogram, createUpDownCounter } from './index.js';
 
 const httpRequestDuration = createHistogram('http.server.request.duration', {
   description: 'Duration of HTTP server requests',

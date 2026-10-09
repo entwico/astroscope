@@ -195,6 +195,40 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  demo/cap:
+    dependencies:
+      '@astroscope/cap':
+        specifier: workspace:*
+        version: link:../../packages/cap
+      '@astroscope/node':
+        specifier: workspace:*
+        version: link:../../packages/node
+      '@astroscope/react':
+        specifier: workspace:*
+        version: link:../../packages/react
+      astro:
+        specifier: ^7.3.2
+        version: 7.3.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.5.0)(jiti@2.7.0)(yaml@2.9.0)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@astrojs/check':
+        specifier: ^0.9.10
+        version: 0.9.10(prettier-plugin-astro@1.0.0(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(prettier@3.9.6))(prettier@3.9.6)(typescript@6.0.3)
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.7
+        version: 19.2.7(@types/react@19.2.18)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   demo/components:
     dependencies:
       '@astroscope/components':
@@ -228,6 +262,22 @@ importers:
       astro-eslint-parser:
         specifier: ^3.1.0
         version: 3.1.0(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(supports-color@7.2.0)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
+  demo/guards:
+    dependencies:
+      '@astroscope/node':
+        specifier: workspace:*
+        version: link:../../packages/node
+      astro:
+        specifier: ^7.3.2
+        version: 7.3.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.5.0)(jiti@2.7.0)(yaml@2.9.0)
+    devDependencies:
+      '@astrojs/check':
+        specifier: ^0.9.10
+        version: 0.9.10(prettier-plugin-astro@1.0.0(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(prettier@3.9.6))(prettier@3.9.6)(typescript@6.0.3)
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -386,6 +436,43 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+
+  packages/cap:
+    dependencies:
+      '@cap.js/wasm':
+        specifier: ^0.0.8
+        version: 0.0.8
+      cap-widget:
+        specifier: ^0.1.58
+        version: 0.1.58
+      pako:
+        specifier: ^2.1.0
+        version: 2.2.0
+    devDependencies:
+      '@astroscope/node':
+        specifier: workspace:^
+        version: link:../node
+      '@types/node':
+        specifier: ^26.5.0
+        version: 26.5.0
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      astro:
+        specifier: ^7.3.2
+        version: 7.3.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.5.0)(jiti@2.7.0)(yaml@2.9.0)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      tsdown:
+        specifier: ^0.23.0
+        version: 0.23.0(@volar/typescript@2.4.28(typescript@6.0.3))(typescript@6.0.3)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8
+        version: 8.1.0(@types/node@26.5.0)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0)
 
   packages/components:
     devDependencies:
@@ -1093,6 +1180,9 @@ packages:
 
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
+
+  '@cap.js/wasm@0.0.8':
+    resolution: {integrity: sha512-rX+4/v2sz4GKLnygXHOS89O7c4GM2qNQcDJP6Y2cyGwoKjg83bsfWHt1TWr9GBzHpFADvju5fvLWYds21nS8sA==}
 
   '@capsizecss/unpack@4.0.1':
     resolution: {integrity: sha512-CuNiSqg7+e1cO/GjffyMOm5Tt2jUF9CWHHnvQ/UkqvtkGfHdgwEC0wpmq7fkN3gxwpRnrAN0WzO3vREKmNolMQ==}
@@ -3004,6 +3094,9 @@ packages:
   caniuse-lite@1.0.30001799:
     resolution: {integrity: sha512-hG1bReV+OUU+MOqK4t/ZWI0tZOyz3rqS9XuhOUz1cIcbwBKjOyJEJuw9ER5JuNyqxNk8u/JUVbGibBOL1yrjFw==}
 
+  cap-widget@0.1.58:
+    resolution: {integrity: sha512-7iS/Q++AaiVvWR8xvMSxRwGWY+fV1ZADJNwPzLk4P1gibCmCbS5G6MGOtoUjsj9OxI9+0nkewW6gRsOGDCOZZA==}
+
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
 
@@ -4247,6 +4340,9 @@ packages:
   pako@1.0.11:
     resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
 
+  pako@2.2.0:
+    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
+
   parse5-html-rewriting-stream@8.0.1:
     resolution: {integrity: sha512-NaRku2aMpUN1Sh1Gyk1KWUh2A7EJx2c6qYzvwsPtqhoHoaURshdrceYK3LunVCm3WHhm6FS7Vcczbvdh3/UIVw==}
 
@@ -4329,11 +4425,6 @@ packages:
     engines: {node: '>=22.12.0'}
     peerDependencies:
       prettier: ^3.5.3
-
-  prettier@3.9.5:
-    resolution: {integrity: sha512-/FVl766LpUfB5vXgCYOYa0MeV/441Ia99AeICQIQFTY/Nw0roZwULcXpku5i1/m5kt/baz+s4Zogspd839HSMg==}
-    engines: {node: '>=14'}
-    hasBin: true
 
   prettier@3.9.6:
     resolution: {integrity: sha512-OpN0zzVdiaiAhxpuuj5efpIS4sY9j7bY6uR5mnj5yPzGkdkjNKSJeUThPb60Jw29QuAZgA4o+/iB49kFiaBX6g==}
@@ -5857,6 +5948,8 @@ snapshots:
       hashery: 1.5.1
       keyv: 5.6.0
 
+  '@cap.js/wasm@0.0.8': {}
+
   '@capsizecss/unpack@4.0.1':
     dependencies:
       fontkitten: 1.0.3
@@ -7005,8 +7098,8 @@ snapshots:
 
   '@typescript-eslint/project-service@8.68.0(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.68.0(typescript@6.0.3)
-      '@typescript-eslint/types': 8.68.0
+      '@typescript-eslint/tsconfig-utils': 8.70.0(typescript@6.0.3)
+      '@typescript-eslint/types': 8.70.0
       debug: 4.4.3(supports-color@7.2.0)
       typescript: 6.0.3
     transitivePeerDependencies:
@@ -7739,6 +7832,8 @@ snapshots:
 
   caniuse-lite@1.0.30001799: {}
 
+  cap-widget@0.1.58: {}
+
   ccount@2.0.1: {}
 
   chai@6.2.2: {}
@@ -8468,7 +8563,7 @@ snapshots:
 
   happy-dom@20.11.6:
     dependencies:
-      '@types/node': 26.3.0
+      '@types/node': 26.5.0
       '@types/whatwg-mimetype': 3.0.2
       '@types/ws': 8.18.1
       buffer-image-size: 0.6.4
@@ -9106,6 +9201,8 @@ snapshots:
 
   pako@1.0.11: {}
 
+  pako@2.2.0: {}
+
   parse5-html-rewriting-stream@8.0.1:
     dependencies:
       entities: 8.1.0
@@ -9198,8 +9295,6 @@ snapshots:
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
-
-  prettier@3.9.5: {}
 
   prettier@3.9.6: {}
 
@@ -10189,7 +10284,7 @@ snapshots:
       '@vscode/l10n': 0.0.18
       ajv: 8.20.0
       ajv-draft-04: 1.0.0(ajv@8.20.0)
-      prettier: 3.9.5
+      prettier: 3.9.6
       request-light: 0.5.8
       vscode-json-languageservice: 4.1.8
       vscode-languageserver: 9.0.1

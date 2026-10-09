@@ -10,6 +10,7 @@ Opinionated, cloud-friendly Node adapter for Astro: boot lifecycle, health probe
 - **Request logging** — pino at the native handler: real status code, response size, ttfb, aborted connections, static responses included
 - **Telemetry** — OpenTelemetry NodeSDK, undici fetch instrumentation, runtime + host metrics, Prometheus reader
 - **CSRF protection** — origin check for unsafe methods, with path exclusions
+- **Path redirects** — duplicate slashes (`//about`) and a trailing slash that contradicts `trailingSlash` (`/about/`) redirect to the canonical URL, in dev as in prod (astro's dev server answers the latter with a 404 page instead)
 - **Platform entry files** — env loading → `src/config.ts` → `src/instrumentation.ts` → `src/log.ts` → boot, each picked up automatically when the file exists
 - **Island preloading** — each island's JS is preloaded in parallel instead of being discovered module by module, removing the hydration request waterfall ([Island preloading](#island-preloading))
 - **Pre-compressed static serving** — build-time brotli/gzip variants, negotiated per `Accept-Encoding`
@@ -27,7 +28,9 @@ The adapter assumes a container behind a load balancer / reverse proxy (Kubernet
 - **Opens `0.0.0.0:9090` in production** — the health probe server. Meant for the kubelet; do not expose it publicly.
 - **Opens `0.0.0.0:9464` in production** — the Prometheus metrics reader. Same: cluster-internal only.
 - **Trusts any `Host` / `X-Forwarded-Host`** — sets `security.allowedDomains: [{}]` (unless you set it yourself), because the reverse proxy is expected to control these headers. Without one, host header injection is possible.
+- **Trusts `X-Forwarded-For`** — anything that keys on the client address (the cap proxy forwards it to the Cap service for its per-IP rate limits) uses the header as received, because the reverse proxy is expected to set it. Exposed directly, a client can send its own and pick its bucket.
 - **Overrides Astro security and config defaults** — `security.checkOrigin: false` (the embedded CSRF middleware replaces it; `csrf: false` restores Astro's check), `build.redirects: false` (redirects handled at runtime), `trailingSlash: 'never'` (only when yours is at the default `'ignore'`), `astro:assets` disabled when `image.service` is at its default ([Image processing](#image-processing)).
+- **Limits request bodies to 1 MiB** — every request astro handles, pages and endpoints included, not only actions as astro does. An upload route needs `bodySizeLimit` raised (native mounts are not covered).
 - **Standalone only.** No middleware mode — the adapter always owns the server.
 - **No session driver.** Astro sessions are unsupported unless you configure `session.driver` yourself.
 - **No health probes in dev.** The health server only exists in production and `astro preview`.
@@ -147,6 +150,8 @@ Entries logged before the logger is constructed (env loading, config, instrument
 
 Request logging happens at the native handler on `finish`/`close`: real status code, response size, `ttfb`, aborted-vs-completed, and the route pattern (fed back by an internal astro middleware). An incoming `x-request-id` header is passed through (and echoed on the response); otherwise a short id is generated.
 
+Responses the adapter sends itself get a route label of their own: `duplicate-slashes` and `trailing-slash` for the path redirects, `body-limit` for a refused body, and a native mount's `name` for observability.
+
 ### Reporting the route yourself
 
 The route comes from the route astro matched, which is wrong for a middleware that serves a request astro has no page for — one that rewrites via `next(url)`, or answers itself. Astro matches `/404` there, so the request is logged as `/404` despite its `200`, and every such request collapses into one `/404` bucket in the request duration metric. `overrideRequestRoute` lets the middleware report what it actually served:
@@ -222,6 +227,108 @@ export function onStartup() {
 - matching: `prefix` (segment-aware, longest wins) or a `match(req)` predicate consulted after prefixes, in registration order
 - returns an unregister function; mounts are cleared automatically after `onShutdown` (and between dev restart generations)
 - handler errors are logged and answered with a 500 (unless the handler already sent headers)
+
+## Guards
+
+Astro has no route guards: middleware is global and sees only the route pattern, and a page's exports are not loaded before it runs. `@astroscope/node/guards` puts protection where the request lands, with the types to match: a guard either denies or proves something, and what it proves is required on `locals` for the guarded code only. `App.Locals` keeps the honest shape (`user?: User`).
+
+```typescript
+// src/guards.ts
+import { defineGuard, deny } from '@astroscope/node/guards';
+
+export const authenticated = defineGuard({
+  name: 'authenticated',
+  check: (ctx) => ({ user: ctx.locals.user ?? deny('UNAUTHORIZED') }),
+  page: (ctx) => ctx.redirect('/login'),
+});
+
+// runs after `authenticated`, with `ctx.locals.user` already required
+export const admin = authenticated.extend({
+  name: 'admin',
+  check: (ctx) => {
+    if (!ctx.locals.user.roles.admin) deny('FORBIDDEN');
+  },
+  page: (ctx) => ctx.rewrite('/404'),
+});
+```
+
+`deny(code, message?)` throws an `ActionError`; the returned object is the proof. A guard may also load something once and hand it over typed (`check: async (ctx, { projectId }) => ({ project: await loadProject(...) })`), declaring the request fields it needs in `input` (a zod shape).
+
+Actions take `guards` in place of Astro's `defineAction` (the `no-astro-define-action` lint rule enforces the import). Guards run after input validation; fields they declare are merged into the schema and stripped again before the handler:
+
+```typescript
+import { defineAction } from '@astroscope/node/guards';
+
+export const server = {
+  rename: defineAction({
+    input: z.object({ projectId: z.string(), name: z.string() }),
+    guards: [admin],
+    handler: async (input, ctx) => {
+      ctx.locals.user; // User, not User | undefined
+    },
+  }),
+};
+```
+
+Endpoints wrap the same way. The body is read only when a guard in the list declares `input`, then its fields come from a json or form body:
+
+```typescript
+import { defineRoute } from '@astroscope/node/guards';
+
+export const POST = defineRoute({
+  guards: [admin],
+  handler: async (ctx) => Response.json({ by: ctx.locals.user.id }),
+});
+```
+
+A page's frontmatter is the handler, so it asks and returns:
+
+```astro
+---
+import { guard } from '@astroscope/node/guards';
+
+const { denied, user } = await guard(Astro, [admin]);
+
+if (denied) return denied;
+---
+```
+
+After the check `user` is required, before it optional.
+
+A denial answers per the request, on every surface: a browser navigation (`text/html` in `Accept`) gets the denying guard's `page` response, the login redirect above or a 404 rewrite, or the status with the message when the guard has none; any other caller gets `{ error: { code, message } }` with the status. So a page fetched from a script gets a json 401 rather than a redirect it cannot follow, and an endpoint opened in a browser gets the login page. A denial raised by a parent in an `extend()` chain keeps the parent's `page` handler.
+
+Whole areas are guarded from the middleware, with the same guards and the same denial responses:
+
+```typescript
+// src/middleware.ts
+import { createGuardMiddleware } from '@astroscope/node/guards';
+
+export const onRequest = sequence(
+  sessionMiddleware,
+  createGuardMiddleware([
+    { match: [{ prefix: '/app' }], guards: [authenticated] },
+    { match: [{ prefix: '/admin' }], guards: [admin] },
+  ]),
+);
+```
+
+Patterns are the exclude-pattern vocabulary (`prefix`, `exact`, `suffix`, `includes`, `pattern`). It is defence in depth, not a replacement for the page-level call: a middleware cannot narrow `locals`, so pages inside the area still call `guard(Astro, [...])` for the typed proofs. That costs nothing extra — a guard that passed runs once per request, and the page's call gets the remembered proofs.
+
+### Available guards
+
+The package ships the guards that depend on the request alone; the ones that depend on your session shape (`authenticated`, `admin`) stay in the app, and a package ships the guard for its own concern (`captcha()` from `@astroscope/cap/server`).
+
+#### `rateLimit({ max, window, key?, name? })`
+
+A fixed window per key, in memory and per process: the `max`-th request within `window` ms still passes, the next one is denied with `TOO_MANY_REQUESTS` (429) until the window ends. The key is the client address by default; `key(ctx)` picks another subject (a user id, a target email) or returns `undefined` to exempt a request. Per process means per pod, so the total across replicas is bounded by that factor. Buckets of expired windows are dropped once many keys are tracked; live ones are never evicted.
+
+Put it first in a list, so a flood is refused before a guard that costs something runs:
+
+```typescript
+import { rateLimit } from '@astroscope/node/guards';
+
+guards: [rateLimit({ max: 5, window: 60_000 }), captcha()],
+```
 
 ## Exclude patterns
 
@@ -321,7 +428,7 @@ node({
   // in the astro config (see the Image processing section)
   imageService: 'auto',
 
-  bodySizeLimit: 1024 * 1024 * 1024, // request body limit in bytes
+  bodySizeLimit: 1024 * 1024, // request body limit in bytes: 413 when announced larger, cut off when chunked
   shutdownTimeout: 10_000, // ms to wait for in-flight requests on shutdown
 });
 ```
@@ -341,16 +448,16 @@ This only affects the built server. The dev server is Vite's — configure `vite
 
 ## Environment variables
 
-| Variable                                                          | Effect                                                                                                    |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `HOST` / `PORT`                                                   | Override the listen address at runtime                                                                    |
-| `SERVER_CERT_PATH` / `SERVER_KEY_PATH`                            | Serve HTTPS with the given certificate/key (see [HTTPS](#https))                                          |
-| `HEALTH_HOST` / `HEALTH_PORT`                                     | Override the health probe address (when not set in options)                                               |
-| `CONFIG_PATH`                                                     | Env file to load at startup (falls back to `./.env`)                                                      |
-| `OTEL_EXPORTER_PROMETHEUS_HOST` / `OTEL_EXPORTER_PROMETHEUS_PORT` | Override the Prometheus reader address                                                                    |
-| `OTEL_SDK_DISABLED=true`                                          | Disable the telemetry SDK entirely                                                                        |
-| standard `OTEL_*`                                                 | Exporter/resource configuration (e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`)                 |
-| `ASTROSCOPE_NODE_AUTOSTART=disabled`                              | Build the entry without starting the server (exports `startServer()`)                                     |
+| Variable                                                          | Effect                                                                                    |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `HOST` / `PORT`                                                   | Override the listen address at runtime                                                    |
+| `SERVER_CERT_PATH` / `SERVER_KEY_PATH`                            | Serve HTTPS with the given certificate/key (see [HTTPS](#https))                          |
+| `HEALTH_HOST` / `HEALTH_PORT`                                     | Override the health probe address (when not set in options)                               |
+| `CONFIG_PATH`                                                     | Env file to load at startup (falls back to `./.env`)                                      |
+| `OTEL_EXPORTER_PROMETHEUS_HOST` / `OTEL_EXPORTER_PROMETHEUS_PORT` | Override the Prometheus reader address                                                    |
+| `OTEL_SDK_DISABLED=true`                                          | Disable the telemetry SDK entirely                                                        |
+| standard `OTEL_*`                                                 | Exporter/resource configuration (e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`) |
+| `ASTROSCOPE_NODE_AUTOSTART=disabled`                              | Build the entry without starting the server (exports `startServer()`)                     |
 
 ## Shutdown sequence
 

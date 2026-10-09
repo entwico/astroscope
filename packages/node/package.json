@@ -75,6 +75,10 @@
     "./route-middleware": {
       "types": "./dist/route-middleware-entrypoint.d.ts",
       "import": "./dist/route-middleware-entrypoint.js"
+    },
+    "./guards": {
+      "types": "./dist/guards.d.ts",
+      "import": "./dist/guards.js"
     }
   },
   "files": [

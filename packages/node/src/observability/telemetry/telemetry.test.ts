@@ -10,7 +10,7 @@ import {
   createUpDownCounter,
   errorType,
   withSpan,
-} from './telemetry';
+} from './index';
 
 const spans = new tracing.InMemorySpanExporter();
 

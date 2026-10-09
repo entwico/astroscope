@@ -1,0 +1,32 @@
+{
+  "name": "demo-cap",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "astro dev",
+    "start:prod": "node ./dist/server/entry.mjs",
+    "dev": "astro dev",
+    "stub": "node ./stub/cap-service.mjs",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "lint": "eslint src astro.config.ts --cache",
+    "lint:fix": "eslint src astro.config.ts --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@astroscope/cap": "workspace:*",
+    "@astroscope/node": "workspace:*",
+    "@astroscope/react": "workspace:*",
+    "astro": "^7.3.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "typescript": "^6.0.3"
+  }
+}

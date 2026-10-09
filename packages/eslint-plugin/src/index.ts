@@ -8,6 +8,7 @@ import type { ESLint, Linter, Rule } from 'eslint';
 import { i18nConfigs } from './i18n.js';
 import { islandNotSerializable } from './rules/island-not-serializable.js';
 import { islandReadonly } from './rules/island-readonly.js';
+import { noAstroDefineAction } from './rules/no-astro-define-action.js';
 import { noClientDirectiveOnAstroComponent } from './rules/no-client-directive-on-astro-component.js';
 import { noExcessJsxProps } from './rules/no-excess-jsx-props.js';
 import { noHtmlComments } from './rules/no-html-comments.js';
@@ -32,6 +33,7 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config | Linter.C
     'island-not-serializable': islandNotSerializable as unknown as Rule.RuleModule,
     'no-client-directive-on-astro-component': noClientDirectiveOnAstroComponent as unknown as Rule.RuleModule,
     'no-server-action-calls': noServerActionCalls,
+    'no-astro-define-action': noAstroDefineAction,
   },
   configs: {},
 };
@@ -61,6 +63,7 @@ plugin.configs.recommended = [
       '@astroscope/island-not-serializable': 'error',
       '@astroscope/no-client-directive-on-astro-component': 'error',
       '@astroscope/no-server-action-calls': 'error',
+      '@astroscope/no-astro-define-action': 'error',
     },
   },
   {
@@ -71,6 +74,7 @@ plugin.configs.recommended = [
     },
     rules: {
       '@astroscope/prefer-ssr-guard': 'error',
+      '@astroscope/no-astro-define-action': 'error',
     },
   },
 ] satisfies Linter.Config[];

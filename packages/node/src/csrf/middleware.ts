@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'astro';
-import { type ExcludePattern, shouldExclude } from '../excludes/excludes.js';
+import { type ExcludePattern, shouldExclude } from '../excludes/index.js';
 
 const FORBIDDEN_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

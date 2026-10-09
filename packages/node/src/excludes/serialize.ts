@@ -1,4 +1,4 @@
-import type { ExcludePattern } from './excludes.js';
+import type { ExcludePattern } from './index.js';
 
 /**
  * Serialize exclude patterns to JavaScript code for use in virtual modules.

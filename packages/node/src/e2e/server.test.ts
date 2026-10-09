@@ -189,12 +189,16 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
     expect(res.status).toBe(404);
   });
 
-  test('redirects duplicate slashes to the collapsed path, for pages, endpoints and assets alike', async () => {
+  test('redirects duplicate and trailing slashes to the canonical path, for pages, endpoints and assets alike', async () => {
     for (const [from, to] of [
       ['//hello.txt', '/hello.txt'],
-      ['/api//', '/api/'],
+      ['/api//', '/api'],
       ['///static', '/static'],
       ['//native//echo?x=1', '/native/echo?x=1'],
+      ['/static/', '/static'],
+      ['/api/?x=1', '/api?x=1'],
+      ['/hello.txt/', '/hello.txt'],
+      ['/native/echo/', '/native/echo'],
     ]) {
       const res = await fetch(`${baseUrl}${from}`, { redirect: 'manual' });
 
@@ -202,7 +206,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       expect(res.headers.get('location'), from).toBe(to);
     }
 
-    const posted = await fetch(`${baseUrl}//api`, { method: 'POST', redirect: 'manual' });
+    const posted = await fetch(`${baseUrl}/api/`, { method: 'POST', redirect: 'manual' });
 
     expect(posted.status).toBe(308);
     expect(posted.headers.get('location')).toBe('/api');

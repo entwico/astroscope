@@ -37,6 +37,7 @@ export default [
 | `@astroscope/no-html-comments`                       | error    | yes     |            | disallow HTML comments in `.astro` templates — they render into the output HTML   |
 | `@astroscope/no-server-action-calls`                 | error    |         |            | disallow calling actions during server rendering of `.astro` files                |
 | `@astroscope/prefer-ssr-guard`                       | error    | yes     |            | prefer `import.meta.env.SSR` over `typeof window !== 'undefined'` (and friends)   |
+| `@astroscope/no-astro-define-action`                 | error    | yes     |            | require the platform `defineAction` (with guards) instead of the `astro:actions` one |
 
 ## Rule Details
 
@@ -131,6 +132,21 @@ HTML comments (`<!-- -->`) in `.astro` templates render into the served HTML and
 ```
 
 Autofix rewrites `<!-- x -->` → `{/* x */}`. Declines to autofix when the comment body contains `*/` (would terminate the JSX comment early).
+
+### `no-astro-define-action`
+
+`defineAction` from `astro:actions` has no place for guards, so an action defined with it is unguarded by construction and nothing in the type system says so. `@astroscope/node/guards` exports a `defineAction` that takes `guards` and narrows `locals` for the handler; every action goes through it, guarded or not. The other `astro:actions` exports (`ActionError`, `getActionContext`, `actions`) stay legal. The fix rewrites the import, splitting a mixed one.
+
+```ts
+// flagged
+import { defineAction } from 'astro:actions';
+
+// clean
+import { defineAction } from '@astroscope/node/guards';
+import { ActionError } from 'astro:actions';
+```
+
+Option `source` (default `@astroscope/node/guards`) names the module the fix imports from, for a project wrapping the platform's `defineAction` once more.
 
 ### `no-server-action-calls`
 

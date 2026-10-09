@@ -1,5 +1,5 @@
 import type { CreatePreviewServer } from 'astro';
-import type { ServerHandle } from './server.js';
+import type { ServerHandle } from './index.js';
 
 /**
  * `astro preview` support: imports the built server entry with autostart

@@ -7,7 +7,7 @@ import {
   STATIC_EXCLUDES,
   shouldExclude,
   withExcluded,
-} from './excludes';
+} from './index';
 
 function makeContext(url: string): APIContext {
   return { url: new URL(url, 'http://localhost') } as APIContext;

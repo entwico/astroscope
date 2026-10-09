@@ -87,11 +87,18 @@ describe.skipIf(devSkip)('dev-mode restart with in-flight requests', () => {
     expect(await res.json()).toEqual({ native: true, url: '/native/echo' });
   });
 
-  test('duplicate slashes redirect in dev, ahead of native mounts', async () => {
-    const res = await fetch(`${getBaseUrl()}//native//echo?x=1`, { redirect: 'manual' });
+  test('duplicate and trailing slashes redirect in dev, ahead of native mounts and astro', async () => {
+    for (const [from, to] of [
+      ['//native//echo?x=1', '/native/echo?x=1'],
+      ['/native/echo/', '/native/echo'],
+      // astro's own dev middleware answers this with a 404 page; the adapter redirects first
+      ['/slow/?delay=0', '/slow?delay=0'],
+    ]) {
+      const res = await fetch(`${getBaseUrl()}${from}`, { redirect: 'manual' });
 
-    expect(res.status).toBe(301);
-    expect(res.headers.get('location')).toBe('/native/echo?x=1');
+      expect(res.status, from).toBe(301);
+      expect(res.headers.get('location'), from).toBe(to);
+    }
   });
 
   test('getBootContext() is stamped before onStartup across the vite-runner boundary', () => {

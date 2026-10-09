@@ -15,13 +15,14 @@ import type { BootContext } from '../lifecycle/types.js';
 import { createRequestInstrumentation } from '../observability/instrument.js';
 import { dumpEarlyLogs } from '../observability/log/construct.js';
 import { log } from '../observability/log/index.js';
+import { type StartedSpan, startSpan, withSpan } from '../observability/telemetry/index.js';
 import { shutdownTelemetry } from '../observability/telemetry/sdk.js';
-import { type StartedSpan, startSpan, withSpan } from '../observability/telemetry/telemetry.js';
 import { preparePlatform } from '../platform/prepare.js';
 import type { RuntimeOptions } from '../types.js';
+import { enforceBodyLimit } from './body-limit.js';
 import { resolveClientDir } from './client-dir.js';
-import { redirectDuplicateSlashes } from './duplicate-slashes.js';
 import { clearNativeMounts, dispatchNativeMount } from './native-mount.js';
+import { redirectPath } from './path-redirects.js';
 import { createAppHandler } from './serve-app.js';
 import { createStaticHandler } from './serve-static.js';
 
@@ -242,8 +243,9 @@ export async function startServer(overrides?: {
     }
 
     instrument(req, res, () => {
-      if (redirectDuplicateSlashes(req, res)) return;
+      if (redirectPath(req, res, app.manifest.trailingSlash)) return;
       if (dispatchNativeMount(req, res)) return;
+      if (enforceBodyLimit(req, res, runtimeOptions.bodySizeLimit)) return;
 
       staticHandler(req, res, () => void appHandler(req, res));
     });

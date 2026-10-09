@@ -5,15 +5,17 @@ import { defined } from '@entwico/dash';
 import type { AstroConfig, AstroIntegration, IntegrationResolvedRoute } from 'astro';
 import { createIslandWarmup } from '../dev-mode/island-warmup.js';
 import { createDevMachinery } from '../dev-mode/machinery.js';
-import { type ExcludePattern, RECOMMENDED_EXCLUDES } from '../excludes/excludes.js';
+import { type DevRequestHandler, createDevRequestPlugin } from '../dev-mode/request-handler.js';
+import { type ExcludePattern, RECOMMENDED_EXCLUDES } from '../excludes/index.js';
 import { serializeExcludePatterns } from '../excludes/serialize.js';
 import { createIslandsManifestPlugin } from '../islands/manifest-plugin.js';
 import { routeEntrypoints } from '../islands/route-islands.js';
 import type { IslandsManifest } from '../islands/types.js';
 import { createRequestInstrumentation } from '../observability/instrument.js';
 import { preparePlatform } from '../platform/prepare.js';
-import { redirectDuplicateSlashes } from '../server/duplicate-slashes.js';
+import { enforceBodyLimit } from '../server/body-limit.js';
 import { dispatchNativeMount } from '../server/native-mount.js';
+import { redirectPath } from '../server/path-redirects.js';
 import { resolveCommandCacheDir } from '../tweaks/cache-dir.js';
 import { ssrSourcemapPlugin } from '../tweaks/sourcemap.js';
 import type { NodeOptions, RuntimeOptions } from '../types.js';
@@ -84,20 +86,49 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
   const loggingExclude = loggingOptions ? (loggingOptions.exclude ?? DEFAULT_REQUEST_EXCLUDES) : [];
   const telemetryExclude = telemetryOptions ? (telemetryOptions.exclude ?? DEFAULT_REQUEST_EXCLUDES) : [];
 
+  // astro's own default for action bodies; the adapter applies it to every request
+  const DEFAULT_BODY_SIZE_LIMIT = 1024 * 1024;
+
   let astroConfig: AstroConfig | null = null;
+
+  const createDevRequestHandler = (): DevRequestHandler => {
+    const devLogging = loggingOptions && loggingOptions.dev;
+    const devTelemetry = telemetryOptions && telemetryOptions.dev;
+
+    const instrument =
+      devLogging || devTelemetry
+        ? createRequestInstrumentation({
+            logging: devLogging ? { exclude: loggingExclude, extended: loggingOptions.extended ?? false } : false,
+            telemetry: devTelemetry ? { exclude: telemetryExclude } : false,
+          })
+        : undefined;
+
+    return (req, res, next) => {
+      const inner = (): void => {
+        if (redirectPath(req, res, astroConfig?.trailingSlash ?? 'ignore')) return;
+        if (dispatchNativeMount(req, res)) return;
+        if (enforceBodyLimit(req, res, options.bodySizeLimit ?? DEFAULT_BODY_SIZE_LIMIT)) return;
+
+        next();
+      };
+
+      if (instrument) {
+        instrument(req, res, inner);
+      } else {
+        inner();
+      }
+    };
+  };
   let resolvedRoutes: IntegrationResolvedRoute[] = [];
   let bootEntry: string | undefined;
   let configSeam: string | undefined;
   let instrumentationSeam: string | undefined;
   let logSeam: string | undefined;
-  let isDev = false;
 
   return {
     name: '@astroscope/node',
     hooks: {
       'astro:config:setup': ({ command, config, updateConfig, addMiddleware, logger }) => {
-        isDev = command === 'dev';
-
         // route enrichment first so csrf-rejected requests still carry a route
         if (loggingOptions || telemetryOptions) {
           addMiddleware({ order: 'pre', entrypoint: '@astroscope/node/route-middleware' });
@@ -121,6 +152,9 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
 
         const relativeSeam = (abs: string | undefined) =>
           abs ? path.relative(root, abs).split(path.sep).join('/') : undefined;
+
+        // the dev request handler: instrumentation, path redirects and native mounts, ahead of astro
+        const devRequest = command === 'dev' ? [createDevRequestPlugin(createDevRequestHandler())] : [];
 
         const devMachinery =
           command === 'dev' && bootOptions !== false
@@ -187,6 +221,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
           vite: {
             ...(viteCacheDir && { cacheDir: viteCacheDir }),
             plugins: [
+              ...devRequest,
               ...devMachinery,
               ...islandWarmup,
               createIslandsManifestPlugin({
@@ -224,7 +259,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
                       port: astroConfig.server.port ?? 4321,
                       client: astroConfig.build.client.toString(),
                       server: astroConfig.build.server.toString(),
-                      bodySizeLimit: options.bodySizeLimit ?? 1024 * 1024 * 1024,
+                      bodySizeLimit: options.bodySizeLimit ?? DEFAULT_BODY_SIZE_LIMIT,
                       shutdownTimeout: options.shutdownTimeout ?? 10_000,
                       health: healthOptions
                         ? {
@@ -277,33 +312,6 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
               },
             ],
           },
-        });
-      },
-      'astro:server:setup': ({ server }) => {
-        if (!isDev) return;
-
-        const devLogging = loggingOptions && loggingOptions.dev;
-        const devTelemetry = telemetryOptions && telemetryOptions.dev;
-
-        const instrument =
-          devLogging || devTelemetry
-            ? createRequestInstrumentation({
-                logging: devLogging ? { exclude: loggingExclude, extended: loggingOptions.extended ?? false } : false,
-                telemetry: devTelemetry ? { exclude: telemetryExclude } : false,
-              })
-            : undefined;
-
-        server.middlewares.use((req, res, next) => {
-          const inner = (): void => {
-            if (redirectDuplicateSlashes(req, res)) return;
-            if (!dispatchNativeMount(req, res)) next();
-          };
-
-          if (instrument) {
-            instrument(req, res, inner);
-          } else {
-            inner();
-          }
         });
       },
       'astro:config:done': ({ config, setAdapter }) => {

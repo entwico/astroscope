@@ -1,0 +1,25 @@
+{
+  "name": "demo-guards",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "astro dev",
+    "start:prod": "node ./dist/server/entry.mjs",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "lint": "eslint src astro.config.ts --cache",
+    "lint:fix": "eslint src astro.config.ts --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@astroscope/node": "workspace:*",
+    "astro": "^7.3.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^6.0.3"
+  }
+}

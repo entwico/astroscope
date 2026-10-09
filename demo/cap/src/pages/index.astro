@@ -1,0 +1,52 @@
+---
+import '../styles/index.css';
+import Layout from '../../../shared/Layout.astro';
+import ContactForm from '../components/ContactForm';
+import NewsletterForm from '../components/NewsletterForm';
+---
+
+<Layout title="Cap Demo" package="@astroscope/cap">
+  <p class="text-lg mb-6">
+    Proof-of-work captcha behind your own origin. The browser solves against <code class="badge badge-ghost">/_cap/</code>, the token travels as <code class="badge badge-ghost">_cap</code>, the <code class="badge badge-ghost">captcha</code> guard verifies it where the request lands.
+  </p>
+
+  <div class="alert mb-6">
+    <span>Run <code>pnpm stub</code> next to the dev server: it stands in for the cap service and accepts any solution. Point <code>CAP_BASE_URL</code> at a real cap standalone to see the proof of work verified for real.</span>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">
+        Invisible
+        <code class="badge badge-ghost">useCap()</code>
+      </h2>
+      <p class="text-sm text-base-content/70 mb-4">
+        Solving starts when the field gets focus and finishes while you type; <code class="badge badge-ghost">ensure()</code> hands the token to the action call.
+      </p>
+      <NewsletterForm client:load />
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">
+        Widget
+        <code class="badge badge-ghost">&lt;CapWidget&gt;</code>
+      </h2>
+      <p class="text-sm text-base-content/70 mb-4">
+        The checkbox. Its token goes into the action input; after the submit the widget is reset, since the server consumed the token.
+      </p>
+      <ContactForm client:load />
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Plain form</h2>
+      <p class="text-sm text-base-content/70 mb-4">
+        A page that guards its own POST with <code class="badge badge-ghost">guard(Astro, [captcha])</code>, the widget's hidden field carrying the token.
+      </p>
+      <a href="/plain" class="btn btn-sm">/plain</a>
+    </div>
+  </div>
+</Layout>

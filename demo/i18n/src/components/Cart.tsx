@@ -18,7 +18,8 @@ export default function Cart({ itemCount, total }: CartProps) {
             {t(
               'cart.items',
               {
-                fallback: '.input {$count :number}\n.match $count\none {{{$count} item in cart}}\n* {{{$count} items in cart}}',
+                fallback:
+                  '.input {$count :number}\n.match $count\none {{{$count} item in cart}}\n* {{{$count} items in cart}}',
                 description: 'Item count with pluralization',
                 variables: {
                   count: { fallback: '3', description: 'Number of items in cart' },

@@ -1,0 +1,26 @@
+---
+import '../styles/index.css';
+import { guard } from '@astroscope/node/guards';
+import Layout from '../../../shared/Layout.astro';
+import { authenticated } from '../guards';
+
+const { denied, user } = await guard(Astro, [authenticated]);
+
+if (denied) return denied;
+---
+
+<Layout title="Me" package="@astroscope/node/guards">
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Signed in</h2>
+      <p>
+        You are <span class="badge badge-primary">{user.name}</span>
+        {user.roles.admin && <span class="badge badge-secondary">admin</span>}
+      </p>
+      <p class="text-sm text-base-content/70">
+        <code class="badge badge-ghost">guard(Astro, [authenticated])</code> proved the user, so <code class="badge badge-ghost">user</code> is typed as present in this page.
+      </p>
+    </div>
+  </div>
+  <a href="/" class="btn btn-outline">Back</a>
+</Layout>

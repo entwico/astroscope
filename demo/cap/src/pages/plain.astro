@@ -1,0 +1,51 @@
+---
+import '../styles/index.css';
+import { captcha } from '@astroscope/cap/server';
+import { guard } from '@astroscope/node/guards';
+import Layout from '../../../shared/Layout.astro';
+
+let message: string | undefined;
+
+if (Astro.request.method === 'POST') {
+  const { denied } = await guard(Astro, [captcha()]);
+
+  if (denied) return denied;
+
+  message = 'Verified — the form post carried a valid token.';
+}
+---
+
+<Layout title="Plain form" package="@astroscope/cap">
+  <p class="text-lg mb-6">
+    No React, no script of yours: the widget writes its token into a hidden <code class="badge badge-ghost">_cap</code> field, and the page guards its own POST.
+  </p>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      {message && <div class="alert alert-success">{message}</div>}
+      <form method="POST" class="flex flex-col gap-4 items-start">
+        <label class="form-control">
+          <span class="label-text">Name</span>
+          <input name="name" class="input input-bordered" required />
+        </label>
+        <div class="min-h-14.5">
+          <cap-widget required></cap-widget>
+        </div>
+        <button class="btn btn-primary">Send</button>
+      </form>
+    </div>
+  </div>
+  <a href="/" class="btn btn-outline">Back</a>
+</Layout>
+
+<script>
+  import { CAP_API_ENDPOINT, CAP_FIELD_NAME, registerCapWidget } from '@astroscope/cap/client';
+
+  // attributes go on before the element upgrades: the widget reads them when it connects
+  for (const widget of document.querySelectorAll('cap-widget')) {
+    widget.setAttribute('data-cap-api-endpoint', CAP_API_ENDPOINT);
+    widget.setAttribute('data-cap-hidden-field-name', CAP_FIELD_NAME);
+  }
+
+  void registerCapWidget();
+</script>

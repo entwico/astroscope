@@ -1,0 +1,88 @@
+{
+  "name": "@astroscope/cap",
+  "version": "0.0.0",
+  "description": "Cap captcha for Astro \u2014 invisible or widget, verified by a guard on actions, endpoints and pages",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware-entrypoint.d.ts",
+      "import": "./dist/middleware-entrypoint.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/entwico/astroscope",
+    "directory": "packages/cap"
+  },
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "captcha",
+    "cap",
+    "proof-of-work",
+    "actions",
+    "guards"
+  ],
+  "author": "admin@entwico.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/entwico/astroscope/issues"
+  },
+  "homepage": "https://github.com/entwico/astroscope/tree/main/packages/cap#readme",
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --cache",
+    "lint:fix": "eslint src --fix"
+  },
+  "dependencies": {
+    "@cap.js/wasm": "^0.0.8",
+    "cap-widget": "^0.1.58",
+    "pako": "^2.1.0"
+  },
+  "devDependencies": {
+    "@astroscope/node": "workspace:^",
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "astro": "^7.3.2",
+    "react": "^19.2.8",
+    "tsdown": "^0.23.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2"
+  },
+  "peerDependencies": {
+    "@astroscope/node": "workspace:^",
+    "astro": "^7.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}

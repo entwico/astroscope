@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createMatcher } from '@entwico/dash/match';
 import { ROOT_CONTEXT, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
 import type { Logger } from 'pino';
-import type { ExcludePattern } from '../excludes/excludes.js';
+import type { ExcludePattern } from '../excludes/index.js';
 import { generateReqId } from './log/index.js';
 import { type RequestRecord, getLogStore } from './log/store.js';
 import {
