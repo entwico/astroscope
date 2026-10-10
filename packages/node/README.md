@@ -149,7 +149,7 @@ Entries logged before the logger is constructed (env loading, config, instrument
 
 Request logging happens at the native handler on `finish`/`close`: real status code, response size, `ttfb`, aborted-vs-completed, and the route pattern (fed back by an internal astro middleware). An incoming `x-request-id` header is passed through (and echoed on the response); otherwise a short id is generated.
 
-Responses the adapter sends itself get a route label of their own: `duplicate-slashes` and `trailing-slash` for the path redirects, `body-limit` for a refused body, and a native mount's `name` for observability.
+Responses the adapter sends itself get a route label of their own: `static` for a file served from the client dir (public assets, prerendered pages, 200 and 304 alike), `duplicate-slashes` and `trailing-slash` for the path redirects, `body-limit` for a refused body, and a native mount's `name` for observability.
 
 ### Reporting the route yourself
 

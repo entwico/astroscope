@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import type { BaseApp } from 'astro/app';
 import send from 'send';
+import { overrideRequestRoute } from '../observability/request-route.js';
 import { COMPRESSIBLE, MIME_TYPES } from './mime.js';
 
 const VARIANTS = [
@@ -160,6 +161,7 @@ export function createStaticHandler(app: BaseApp, client: string) {
 
     stream.on('file', () => {
       forwardError = true;
+      overrideRequestRoute('static');
     });
 
     // fires before the body and before conditional-GET handling, so these

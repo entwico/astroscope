@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { BaseApp } from 'astro/app';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { type RequestRecord, getLogStore } from '../observability/log/store';
 import { createStaticHandler } from './serve-static';
 
 let root: string;
@@ -334,5 +335,57 @@ describe('caching', () => {
     const res = await rawGet(`${url}/hello.txt`);
 
     expect(res.headers['cache-control']).not.toContain('immutable');
+  });
+});
+
+describe('route label', () => {
+  function createRecord(url: string): RequestRecord {
+    return { logger: undefined, url, method: 'GET', route: undefined, routeOverride: false, actionName: undefined, truncated: false };
+  }
+
+  async function startInstrumentedServer(app: BaseApp, record: RequestRecord): Promise<string> {
+    const handler = createStaticHandler(app, client);
+    const server = createServer((req, res) => {
+      getLogStore().requestStorage.run(record, () => {
+        handler(req, res, () => {
+          res.statusCode = 555;
+          res.end('ssr-fallback');
+        });
+      });
+    });
+
+    servers.push(server);
+
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  }
+
+  test('labels a served file as static', async () => {
+    const record = createRecord('/image.png');
+    const base = await startInstrumentedServer(createApp(), record);
+    const res = await rawGet(`${base}/image.png`);
+
+    expect(res.status).toBe(200);
+    expect(record.route).toBe('static');
+  });
+
+  test('labels a 304 as static', async () => {
+    const record = createRecord('/image.png');
+    const base = await startInstrumentedServer(createApp(), record);
+    const first = await rawGet(`${base}/image.png`);
+    const res = await rawGet(`${base}/image.png`, { 'if-none-match': first.headers['etag']! });
+
+    expect(res.status).toBe(304);
+    expect(record.route).toBe('static');
+  });
+
+  test('leaves the label to astro when no file matches', async () => {
+    const record = createRecord('/missing');
+    const base = await startInstrumentedServer(createApp(), record);
+    const res = await rawGet(`${base}/missing`);
+
+    expect(res.status).toBe(555);
+    expect(record.route).toBeUndefined();
   });
 });
