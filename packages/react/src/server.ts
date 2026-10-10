@@ -73,7 +73,7 @@ function renderToStaticMarkup(
     return maybeThen(rendered, (html) => {
       renderDuration.record((performance.now() - started) / 1000, {
         'astro.island.component': componentName(Component),
-        'astro.island.render.path': typeof rendered === 'string' ? 'string' : 'stream',
+        'astro.island.render.mode': typeof rendered === 'string' ? 'string' : 'stream',
       });
 
       return {

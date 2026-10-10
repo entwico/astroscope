@@ -112,13 +112,13 @@ describe('render failures', () => {
 describe('render duration', () => {
   const context = () => ({ result: { request: new Request('http://localhost/'), actionResult: undefined } });
 
-  test('records the island name and the path taken', async () => {
+  test('records the island name and the render mode', async () => {
     const rendered = await renderer.renderToStaticMarkup.call(context() as never, Plain, { label: 'hi' }, {});
 
     expect(rendered.html).toBe('<p>hi</p>');
     expect(record).toHaveBeenCalledWith(expect.any(Number), {
       'astro.island.component': 'Plain',
-      'astro.island.render.path': 'string',
+      'astro.island.render.mode': 'string',
     });
   });
 

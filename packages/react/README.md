@@ -5,7 +5,7 @@ React for Astro islands, tuned for the server. A thin wrapper around [`@astrojs/
 - **Synchronous island rendering** — `renderToString` per island, about 3x cheaper than upstream's stream-and-drain. Astro needs the full html string anyway.
 - **Automatic streaming fallback** — an island that suspends on the server is re-rendered with `renderToReadableStream`, streamed from then on, and logged once with its component url.
 - **SSR effect stripping** — effect callbacks are emptied in the SSR bundle, so client-only dynamic imports (maplibre-gl, hls.js, …) drop out of the server build.
-- **Render telemetry** — `astro.island.render.duration` per island (component name, `string` or `stream` path), `astro.island.check.duration` for astro's per-render detection probe, and `astro.island.render.failures` (`root`: no html, `boundary`: a suspense boundary left to the client, logged with the component).
+- **Render telemetry** — `astro.island.render.duration` per island (component name, render mode `string` or `stream`), `astro.island.check.duration` for astro's per-render detection probe, and `astro.island.render.failures` (`root`: no html, `boundary`: a suspense boundary left to the client, logged with the component).
 
 ## Examples
 
