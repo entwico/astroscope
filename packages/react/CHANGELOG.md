@@ -1,5 +1,16 @@
 # @astroscope/react
 
+## 2.1.0
+
+### Minor Changes
+
+- bf4dc62: rename the `astro.island.render.path` metric attribute to `astro.island.render.mode`
+
+### Patch Changes
+
+- Updated dependencies [6ca871e]
+  - @astroscope/node@4.1.0
+
 ## 2.0.0
 
 ### Major Changes

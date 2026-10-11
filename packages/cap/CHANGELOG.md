@@ -1,5 +1,13 @@
 # @astroscope/cap
 
+## 1.0.1
+
+### Patch Changes
+
+- c5466dd: fix the dev server: the cap client is no longer pre-bundled, and the pako fallback gets a real url
+- Updated dependencies [6ca871e]
+  - @astroscope/node@4.1.0
+
 ## 1.0.0
 
 ### Major Changes

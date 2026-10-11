@@ -1,5 +1,16 @@
 # @astroscope/i18n
 
+## 3.0.0
+
+### Major Changes
+
+- a19e26b: the integration injects the locale middleware — `createI18nMiddleware` is replaced by `i18n.configure({ locale })` and `i18n({ exclude })`
+
+### Patch Changes
+
+- Updated dependencies [6ca871e]
+  - @astroscope/node@4.1.0
+
 ## 2.1.2
 
 ### Patch Changes

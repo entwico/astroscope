@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 4.1.0
+
+### Minor Changes
+
+- 6ca871e: files served from the client dir carry the `static` route label in logs, metrics and spans
+
 ## 4.0.0
 
 ### Major Changes
