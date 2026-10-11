@@ -9,9 +9,11 @@ const RESOLVED_VIRTUAL_CONFIG_ID = `\0${VIRTUAL_CONFIG_ID}`;
 
 // the cap widget loads pako as a classic script and reads `window.pako`, so the client needs the
 // umd build; vite's `import` condition would pick the esm one, so the file is resolved here through
-// the `require` condition and aliased in
+// the `require` condition. a `resolve.alias` would do the same, but vite's pre-alias plugin registers
+// aliased node_modules files with the dev optimizer, which turns the `?url` import into the module
 const PAKO_INFLATE_ID = 'pako/browser/inflate';
 const PAKO_INFLATE_UMD = createRequire(import.meta.url).resolve(PAKO_INFLATE_ID);
+const PAKO_INFLATE_RE = new RegExp(String.raw`^${PAKO_INFLATE_ID}(\?.*)?$`);
 
 /**
  * Astro integration for the Cap captcha: injects the middleware that proxies the challenge and
@@ -24,8 +26,13 @@ export default function capIntegration(options: CapIntegrationOptions = {}): Ast
 
   const configPlugin: Plugin = {
     name: '@astroscope/cap/config',
+    enforce: 'pre',
     resolveId(id) {
-      return id === VIRTUAL_CONFIG_ID ? RESOLVED_VIRTUAL_CONFIG_ID : undefined;
+      if (id === VIRTUAL_CONFIG_ID) return RESOLVED_VIRTUAL_CONFIG_ID;
+
+      const pako = PAKO_INFLATE_RE.exec(id);
+
+      return pako ? `${PAKO_INFLATE_UMD}${pako[1] ?? ''}` : undefined;
     },
     load(id) {
       if (id !== RESOLVED_VIRTUAL_CONFIG_ID) return;
@@ -43,7 +50,10 @@ export default function capIntegration(options: CapIntegrationOptions = {}): Ast
         updateConfig({
           vite: {
             plugins: [configPlugin],
-            resolve: { alias: [{ find: new RegExp(String.raw`^${PAKO_INFLATE_ID}(\?.*)?$`), replacement: `${PAKO_INFLATE_UMD}$1` }] },
+            // the dev optimizer runs without plugins and hands rolldown the client's `pako/browser/inflate?url`
+            // import as a literal file path; vitefu would exclude the package as a framework package, astro
+            // applies only the ssr half of that crawl
+            optimizeDeps: { exclude: ['@astroscope/cap'] },
           },
         });
       },
