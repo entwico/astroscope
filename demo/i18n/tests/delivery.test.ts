@@ -14,7 +14,18 @@ const BASE = `http://localhost:${PROD_PORT}`;
 
 let prodServer: ChildProcess | null = null;
 
-async function waitForServer(port: number, timeout = 30_000): Promise<void> {
+// the child's output is drained from the start (an unread pipe stalls the child once it fills) and
+// only surfaces when the server never comes up — a startup crash is invisible otherwise
+async function waitForServer(server: ChildProcess, port: number, timeout = 30_000): Promise<void> {
+  const output: string[] = [];
+
+  const collect = (chunk: Buffer) => {
+    output.push(chunk.toString());
+  };
+
+  server.stdout?.on('data', collect);
+  server.stderr?.on('data', collect);
+
   const start = Date.now();
 
   while (Date.now() - start < timeout) {
@@ -29,7 +40,9 @@ async function waitForServer(port: number, timeout = 30_000): Promise<void> {
     await new Promise((r) => setTimeout(r, 100));
   }
 
-  throw new Error(`Server on port ${port} did not start within ${timeout}ms`);
+  const exit = server.exitCode === null ? '' : ` (exited with code ${server.exitCode})`;
+
+  throw new Error(`Server on port ${port} did not start within ${timeout}ms${exit}\n${output.join('')}`);
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -70,7 +83,7 @@ beforeAll(async () => {
     stdio: 'pipe',
   });
 
-  await waitForServer(PROD_PORT);
+  await waitForServer(prodServer, PROD_PORT);
 }, 60_000);
 
 afterAll(() => {
