@@ -1,4 +1,5 @@
 import { createObservableGauge } from '@astroscope/node/telemetry';
+import type { APIContext } from 'astro';
 import { computeAllChunkHashes } from '../extraction/hash.js';
 import { getGlobalState } from '../extraction/manifest.js';
 import type { ExtractionManifest } from '../extraction/types.js';
@@ -6,16 +7,28 @@ import { compileTranslations } from '../shared/compiler.js';
 import type { CompiledTranslations, RawTranslations } from '../shared/types.js';
 import type { FallbackBehavior } from './types.js';
 
+/**
+ * Resolves a request's locale — from a cookie, the session on `locals`, the url or
+ * `detectLocale(request)`. `undefined` falls back to the default locale.
+ */
+export type LocaleResolver = (ctx: APIContext) => string | undefined;
+
 export type I18nConfig = {
   locales: string[];
   defaultLocale?: string | undefined;
   fallback?: FallbackBehavior | undefined;
+  /**
+   * Called by the locale middleware for every request it does not exclude. Without
+   * a resolver every request renders in the default locale.
+   */
+  locale?: LocaleResolver | undefined;
 };
 
 type NormalizedConfig = {
   locales: string[];
   defaultLocale: string;
   fallback: FallbackBehavior;
+  locale: LocaleResolver | undefined;
 };
 
 class I18nSingleton {
@@ -108,6 +121,7 @@ class I18nSingleton {
       locales: config.locales,
       defaultLocale: config.defaultLocale ?? config.locales[0]!,
       fallback: config.fallback ?? 'fallback',
+      locale: config.locale,
     };
 
     // resolved lazily so importing the singleton needs no virtual module

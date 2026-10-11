@@ -109,6 +109,15 @@ describe('configure', () => {
     expect(i18n.getConfig()).toEqual({ locales: ['de', 'en'], defaultLocale: 'en', fallback: 'throw' });
   });
 
+  test('keeps the locale resolver', async () => {
+    const i18n = await createI18n();
+    const locale = () => 'de';
+
+    await i18n.configure({ locales: ['de', 'en'], locale });
+
+    expect(i18n.getConfig().locale).toBe(locale);
+  });
+
   test('isConfigured reflects configuration state', async () => {
     const i18n = await createI18n();
 

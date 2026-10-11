@@ -45,8 +45,7 @@ export const STATIC_EXCLUDES: ExcludePattern[] = [
  *
  * @example
  * ```ts
- * createI18nMiddleware({
- *   locale: (ctx) => ctx.locals.session?.locale ?? 'en',
+ * i18n({
  *   exclude: [
  *     ...RECOMMENDED_EXCLUDES,
  *     { exact: "/health" }, // your health endpoint

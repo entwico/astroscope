@@ -1,10 +1,8 @@
 export { default } from './integration/integration.js';
+export type { I18nOptions } from './integration/types.js';
 
 export { i18n } from './server/i18n.js';
-export type { I18nConfig } from './server/i18n.js';
-
-export { createI18nMiddleware } from './server/middleware.js';
-export type { I18nMiddlewareOptions } from './server/middleware.js';
+export type { I18nConfig, LocaleResolver } from './server/i18n.js';
 
 export { detectLocale } from './server/locale.js';
 

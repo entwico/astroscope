@@ -17,8 +17,9 @@ export function getI18nState(): I18nClientState | undefined {
 
     console.error(
       '[@astroscope/i18n] window.__i18n__ is not defined — translations will not work on the client. ' +
-      'Make sure createI18nMiddleware() runs for this page (it injects the state) and, for per-island ' +
-      'hashes, that the site uses the @astroscope/node adapter.',
+      'Make sure the @astroscope/i18n integration is set up and the page is not in its `exclude` list ' +
+      '(the locale middleware injects the state) and, for per-island hashes, that the site uses the ' +
+      '@astroscope/node adapter.',
     );
   }
 

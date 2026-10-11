@@ -62,6 +62,22 @@ i18n({
 - **`'warn'`** — Log a warning but continue
 - **`'off'`** — Disable consistency checking
 
+#### Middleware
+
+The integration injects two middlewares: one serving the `/_i18n/` translation chunks ahead of your own middleware, and the locale middleware after it — it resolves the request's locale and provides the request context for `t()`. Running after your middleware means the locale resolver sees what a session middleware put on `locals`.
+
+Both middlewares are injected in the order of your `integrations` array — keep `i18n()` before integrations whose middleware calls `t()` (e.g. `@astroscope/wormhole`).
+
+By default, `RECOMMENDED_EXCLUDES` (static assets like `/_astro/`) are excluded from locale context setup. To customize:
+
+```ts
+import { RECOMMENDED_EXCLUDES } from '@astroscope/node/excludes';
+
+i18n({
+  exclude: [...RECOMMENDED_EXCLUDES, { exact: '/health' }],
+})
+```
+
 ### 2. Configure i18n in your boot file
 
 > **Note:** `i18n.configure` must be awaited during boot, before any requests are handled.
@@ -80,6 +96,9 @@ export async function onStartup() {
   await i18n.configure({
     locales: ['en', 'de'],
     defaultLocale: 'en',  // optional, defaults to first locale
+    // optional, per request: a cookie, the session on `locals`, the url, `detectLocale(request)`
+    // for Accept-Language — `undefined` falls back to defaultLocale
+    locale: (ctx) => ctx.cookies.get('locale')?.value,
   });
 
   // load translations for all locales
@@ -93,36 +112,7 @@ export async function onStartup() {
 }
 ```
 
-### 3. Add the middleware
-
-```ts
-// src/middleware.ts
-import { createI18nMiddleware, i18n } from '@astroscope/i18n';
-
-export const onRequest = createI18nMiddleware({
-  locale: (ctx) =>
-    ctx.cookies.get('locale')?.value ??
-    i18n.getConfig().defaultLocale,
-});
-```
-
-The middleware serving `/_i18n/` translation chunks is injected automatically by the integration.
-
-By default, `RECOMMENDED_EXCLUDES` (static assets like `/_astro/`) are excluded from locale context setup. To customize:
-
-```ts
-import { createI18nMiddleware, i18n } from '@astroscope/i18n';
-import { RECOMMENDED_EXCLUDES } from '@astroscope/node/excludes';
-
-export const onRequest = createI18nMiddleware({
-  locale: (ctx) =>
-    ctx.cookies.get('locale')?.value ??
-    i18n.getConfig().defaultLocale,
-  exclude: [...RECOMMENDED_EXCLUDES, { exact: '/health' }],
-});
-```
-
-### 4. Use `t()` in your components
+### 3. Use `t()` in your components
 
 ```astro
 ---
@@ -290,7 +280,7 @@ export function App() {
 
 1. **Build time** — all `t()` calls are extracted, mapped to chunks, and fallbacks are stripped from production bundles
 2. **Manifest** — Extracted keys with fallbacks are written to `i18n-manifest.json`
-3. **SSR** — Middleware provides translations to `t()`, merging manifest fallbacks for missing keys
+3. **SSR** — the locale middleware provides translations to `t()`, merging manifest fallbacks for missing keys
 4. **Client** — each island preloads only the translation chunks its code needs, in parallel with the component code
 
 The same `import { t } from '@astroscope/i18n/translate'` works everywhere — bundler picks the correct implementation via conditional exports (`browser` vs `default`).
@@ -378,6 +368,7 @@ For `:currency` and `:unit`, the required option (`currency` or `unit`) can be:
 | `locales` | `string[]` | required | Supported locales |
 | `defaultLocale` | `string` | first locale | Default/fallback locale |
 | `fallback` | `FallbackBehavior` | `'fallback'` | Behavior when translation missing |
+| `locale` | `(ctx: APIContext) => string \| undefined` | `defaultLocale` for every request | Per-request locale resolver, run by the locale middleware |
 
 ### FallbackBehavior
 

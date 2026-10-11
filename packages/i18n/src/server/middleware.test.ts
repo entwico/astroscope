@@ -1,6 +1,7 @@
 import type { APIContext, MiddlewareHandler, MiddlewareNext } from 'astro';
 import { describe, expect, test, vi } from 'vitest';
 import type { ExtractionManifest } from '../extraction/types';
+import type { LocaleResolver } from './i18n';
 import type { I18nContext } from './types';
 
 const mocks = vi.hoisted(() => ({
@@ -22,7 +23,11 @@ vi.mock('@astroscope/node/log', () => ({
   log: { error: mocks.logError },
 }));
 
-async function load(options?: { configured?: boolean; manifest?: Partial<ExtractionManifest> }) {
+async function load(options?: {
+  configured?: boolean;
+  manifest?: Partial<ExtractionManifest>;
+  locale?: LocaleResolver;
+}) {
   mocks.manifest = { keys: [], chunks: {}, scripts: [], ...options?.manifest };
   mocks.overrideRequestRoute.mockClear();
   mocks.logError.mockClear();
@@ -30,14 +35,14 @@ async function load(options?: { configured?: boolean; manifest?: Partial<Extract
   vi.resetModules();
 
   const { i18n } = await import('./i18n');
-  const { createI18nChunkMiddleware, createI18nMiddleware } = await import('./middleware');
+  const { createI18nChunkMiddleware, createI18nLocaleMiddleware } = await import('./middleware');
   const { getContext } = await import('./context');
 
   if (options?.configured ?? true) {
-    await i18n.configure({ locales: ['en', 'de'] });
+    await i18n.configure({ locales: ['en', 'de'], locale: options?.locale });
   }
 
-  return { createI18nChunkMiddleware, createI18nMiddleware, getContext, i18n };
+  return { createI18nChunkMiddleware, createI18nLocaleMiddleware, getContext, i18n };
 }
 
 const createCtx = (path: string): APIContext =>
@@ -192,16 +197,16 @@ describe('createI18nChunkMiddleware', () => {
   });
 });
 
-describe('createI18nMiddleware', () => {
+describe('createI18nLocaleMiddleware', () => {
   test('skips excluded paths without setting up a context', async () => {
-    const { createI18nMiddleware, getContext } = await load();
     const locale = vi.fn(() => 'en');
+    const { createI18nLocaleMiddleware, getContext } = await load({ locale });
     let contextInsideNext: I18nContext | null | undefined;
     const { next, response } = createNext(() => {
       contextInsideNext = getContext();
     });
 
-    const result = await invoke(createI18nMiddleware({ locale }), createCtx('/_astro/chunk.js'), next);
+    const result = await invoke(createI18nLocaleMiddleware(), createCtx('/_astro/chunk.js'), next);
 
     expect(result).toBe(response);
     expect(locale).not.toHaveBeenCalled();
@@ -209,49 +214,34 @@ describe('createI18nMiddleware', () => {
   });
 
   test('supports custom exclude patterns', async () => {
-    const { createI18nMiddleware } = await load();
     const locale = vi.fn(() => 'en');
+    const { createI18nLocaleMiddleware } = await load({ locale });
     const { next } = createNext();
 
-    await createI18nMiddleware({ locale, exclude: [{ exact: '/health' }] })(createCtx('/health'), next);
+    await createI18nLocaleMiddleware({ exclude: [{ exact: '/health' }] })(createCtx('/health'), next);
 
     expect(locale).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledOnce();
   });
 
-  test('supports an exclude function', async () => {
-    const { createI18nMiddleware } = await load();
-    const locale = vi.fn(() => 'en');
-    const { next } = createNext();
-    const exclude = vi.fn((ctx: APIContext) => ctx.url.pathname === '/skip');
-
-    await createI18nMiddleware({ locale, exclude })(createCtx('/skip'), next);
-
-    expect(locale).not.toHaveBeenCalled();
-
-    await createI18nMiddleware({ locale, exclude })(createCtx('/page'), next);
-
-    expect(locale).toHaveBeenCalledOnce();
-  });
-
   test('empty exclude list disables the default excludes', async () => {
-    const { createI18nMiddleware } = await load();
     const locale = vi.fn(() => 'en');
+    const { createI18nLocaleMiddleware } = await load({ locale });
     const { next } = createNext();
 
-    await createI18nMiddleware({ locale, exclude: [] })(createCtx('/_astro/chunk.js'), next);
+    await createI18nLocaleMiddleware({ exclude: [] })(createCtx('/_astro/chunk.js'), next);
 
     expect(locale).toHaveBeenCalledOnce();
   });
 
   test('logs and passes through when not configured', async () => {
-    const { createI18nMiddleware, getContext } = await load({ configured: false });
+    const { createI18nLocaleMiddleware, getContext } = await load({ configured: false });
     let contextInsideNext: I18nContext | null | undefined;
     const { next, response } = createNext(() => {
       contextInsideNext = getContext();
     });
 
-    const result = await invoke(createI18nMiddleware({ locale: () => 'en' }), createCtx('/page'), next);
+    const result = await invoke(createI18nLocaleMiddleware(), createCtx('/page'), next);
 
     expect(mocks.logError).toHaveBeenCalledOnce();
     expect(result).toBe(response);
@@ -259,20 +249,22 @@ describe('createI18nMiddleware', () => {
   });
 
   test('returns the response untouched — delivery rides the islands middleware', async () => {
-    const { createI18nMiddleware, i18n } = await load();
+    const { createI18nLocaleMiddleware, i18n } = await load();
 
     i18n.setTranslations('en', { greeting: 'Hello' });
 
     const response = new Response('<html><head></head></html>', { headers: { 'content-type': 'text/html' } });
     const next = vi.fn(() => Promise.resolve(response)) as unknown as MiddlewareNext;
 
-    const result = await invoke(createI18nMiddleware({ locale: () => 'en' }), createCtx('/page'), next);
+    const result = await invoke(createI18nLocaleMiddleware(), createCtx('/page'), next);
 
     expect(result).toBe(response);
   });
 
   test('runs next within a context built from the resolved locale', async () => {
-    const { createI18nMiddleware, getContext, i18n } = await load();
+    const ctx = createCtx('/page');
+    const locale = vi.fn((c: APIContext) => (c === ctx ? 'de' : 'en'));
+    const { createI18nLocaleMiddleware, getContext, i18n } = await load({ locale });
     let contextInsideNext: I18nContext | null | undefined;
     const { next, response } = createNext(() => {
       contextInsideNext = getContext();
@@ -280,10 +272,7 @@ describe('createI18nMiddleware', () => {
 
     i18n.setTranslations('de', { greeting: 'Hallo' });
 
-    const ctx = createCtx('/page');
-    const locale = vi.fn((c: APIContext) => (c === ctx ? 'de' : 'en'));
-
-    const result = await invoke(createI18nMiddleware({ locale }), ctx, next);
+    const result = await invoke(createI18nLocaleMiddleware(), ctx, next);
 
     expect(result).toBe(response);
     expect(contextInsideNext?.locale).toBe('de');
@@ -292,11 +281,35 @@ describe('createI18nMiddleware', () => {
     expect(contextInsideNext?.translations['greeting']?.()).toBe('Hallo');
   });
 
+  test('falls back to the default locale without a resolver', async () => {
+    const { createI18nLocaleMiddleware, getContext } = await load();
+    let contextInsideNext: I18nContext | null | undefined;
+    const { next } = createNext(() => {
+      contextInsideNext = getContext();
+    });
+
+    await createI18nLocaleMiddleware()(createCtx('/page'), next);
+
+    expect(contextInsideNext?.locale).toBe('en');
+  });
+
+  test('falls back to the default locale when the resolver returns undefined', async () => {
+    const { createI18nLocaleMiddleware, getContext } = await load({ locale: (ctx) => ctx.url.searchParams.get('locale') ?? undefined });
+    let contextInsideNext: I18nContext | null | undefined;
+    const { next } = createNext(() => {
+      contextInsideNext = getContext();
+    });
+
+    await createI18nLocaleMiddleware()(createCtx('/page'), next);
+
+    expect(contextInsideNext?.locale).toBe('en');
+  });
+
   test('context does not leak outside the request', async () => {
-    const { createI18nMiddleware, getContext } = await load();
+    const { createI18nLocaleMiddleware, getContext } = await load();
     const { next } = createNext();
 
-    await createI18nMiddleware({ locale: () => 'en' })(createCtx('/page'), next);
+    await createI18nLocaleMiddleware()(createCtx('/page'), next);
 
     expect(getContext()).toBeNull();
   });

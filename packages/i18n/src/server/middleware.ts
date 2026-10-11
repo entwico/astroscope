@@ -1,35 +1,14 @@
 import { type ExcludePattern, RECOMMENDED_EXCLUDES, shouldExclude } from '@astroscope/node/excludes';
 import { log, overrideRequestRoute } from '@astroscope/node/log';
-import type { APIContext, MiddlewareHandler } from 'astro';
+import type { MiddlewareHandler } from 'astro';
 import { runWithContext } from './context.js';
 import { i18n } from './i18n.js';
 import { registerI18nEmitters, setRequestLocale } from './islands-emitter.js';
 import type { I18nContext } from './types.js';
 
-export type I18nMiddlewareOptions = {
-  locale: (ctx: APIContext) => string;
-  /**
-   * Patterns to exclude from locale context setup.
-   * Defaults to RECOMMENDED_EXCLUDES if not provided.
-   *
-   * @example
-   * ```ts
-   * import { RECOMMENDED_EXCLUDES } from '@astroscope/node/excludes';
-   *
-   * // extend defaults
-   * createI18nMiddleware({
-   *   locale: (ctx) => ctx.locals.session?.locale ?? 'en',
-   *   exclude: [...RECOMMENDED_EXCLUDES, { exact: '/health' }],
-   * })
-   *
-   * // disable excludes entirely
-   * createI18nMiddleware({
-   *   locale: (ctx) => ctx.locals.session?.locale ?? 'en',
-   *   exclude: [],
-   * })
-   * ```
-   */
-  exclude?: ExcludePattern[] | ((context: APIContext) => boolean) | undefined;
+export type I18nLocaleMiddlewareOptions = {
+  /** patterns to skip locale context setup for; defaults to RECOMMENDED_EXCLUDES */
+  exclude?: ExcludePattern[] | undefined;
 };
 
 const I18N_ENDPOINT_PREFIX = '/_i18n/';
@@ -133,28 +112,24 @@ export function createI18nChunkMiddleware(): MiddlewareHandler {
 /**
  * Create the i18n locale middleware.
  *
- * Sets up the request context with locale and translations for `t()`, injects
- * the client i18n state into html responses, and records the locale for the
- * islands emitter. Place this after session middleware if your locale detection
- * depends on session/cookies.
+ * Resolves the request's locale through the resolver from `i18n.configure({ locale })`
+ * (the default locale when there is none or it returns `undefined`), sets up the
+ * request context for `t()`, records the locale for the islands emitter, which
+ * delivers the client state, and runs the rest of the chain inside that context.
  *
- * @example
- * ```typescript
- * import { createI18nMiddleware, detectLocale, i18n } from '@astroscope/i18n';
+ * Injected by the integration as `post` middleware, after the project's own, so the
+ * resolver sees whatever a session middleware put on `locals` — not part of the
+ * public API.
  *
- * export const i18nMiddleware = createI18nMiddleware({
- *   locale: (ctx) =>
- *     ctx.cookies.get('locale')?.value ??
- *     detectLocale(ctx.request) ??
- *     i18n.getConfig().defaultLocale,
- * });
- * ```
+ * @internal
  */
-export function createI18nMiddleware(options: I18nMiddlewareOptions): MiddlewareHandler {
+export function createI18nLocaleMiddleware(options: I18nLocaleMiddlewareOptions = {}): MiddlewareHandler {
   registerI18nEmitters();
 
+  const exclude = options.exclude ?? RECOMMENDED_EXCLUDES;
+
   return (ctx, next) => {
-    if (shouldExclude(ctx, options.exclude ?? RECOMMENDED_EXCLUDES)) {
+    if (shouldExclude(ctx, exclude)) {
       return next();
     }
 
@@ -164,7 +139,8 @@ export function createI18nMiddleware(options: I18nMiddlewareOptions): Middleware
       return next();
     }
 
-    const locale = options.locale(ctx);
+    const config = i18n.getConfig();
+    const locale = config.locale?.(ctx) ?? config.defaultLocale;
 
     // the islands emitter runs while the response streams, outside this ALS scope
     setRequestLocale(ctx, locale);
@@ -173,7 +149,7 @@ export function createI18nMiddleware(options: I18nMiddlewareOptions): Middleware
       locale,
       translations: i18n.getCompiledTranslations(locale),
       rawTranslations: i18n.getTranslations(locale),
-      fallback: i18n.getConfig().fallback,
+      fallback: config.fallback,
     };
 
     return runWithContext(context, () => next());

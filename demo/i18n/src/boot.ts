@@ -1,4 +1,4 @@
-import { type RawTranslations, i18n } from '@astroscope/i18n';
+import { type RawTranslations, detectLocale, i18n } from '@astroscope/i18n';
 
 // note: fallback.* keys are intentionally missing to test fallback behavior
 const mockTranslations: Record<string, RawTranslations> = {
@@ -74,7 +74,11 @@ function fetchTranslations(locale: string): RawTranslations {
 export async function onStartup() {
   await new Promise((resolve) => setTimeout(resolve, 1000)); // simulate async setup work
 
-  await i18n.configure({ locales: ['en', 'de'] });
+  await i18n.configure({
+    locales: ['en', 'de'],
+    locale: ({ request, url, cookies }) =>
+      url.searchParams.get('locale') ?? cookies.get('locale')?.value ?? detectLocale(request),
+  });
 
   console.log('[i18n] loading translations...');
 

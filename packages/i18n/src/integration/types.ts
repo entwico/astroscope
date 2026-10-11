@@ -1,3 +1,5 @@
+import type { ExcludePattern } from '@astroscope/node/excludes';
+
 /**
  * Consistency check level for translation keys.
  * Controls behavior when the same key has different fallbacks/variables across files.
@@ -14,4 +16,9 @@ export interface I18nOptions {
    * @default 'error'
    */
   consistency?: ConsistencyCheckLevel | undefined;
+  /**
+   * Paths the locale middleware skips — no locale is resolved and `t()` has no request context there.
+   * @default RECOMMENDED_EXCLUDES from `@astroscope/node/excludes`
+   */
+  exclude?: ExcludePattern[] | undefined;
 }

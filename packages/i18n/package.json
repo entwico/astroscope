@@ -19,6 +19,10 @@
       "types": "./dist/server/chunk-middleware-entrypoint.d.ts",
       "import": "./dist/server/chunk-middleware-entrypoint.js"
     },
+    "./locale-middleware": {
+      "types": "./dist/server/locale-middleware-entrypoint.d.ts",
+      "import": "./dist/server/locale-middleware-entrypoint.js"
+    },
     "./internal": {
       "types": "./dist/internal.d.ts",
       "import": "./dist/internal.js"

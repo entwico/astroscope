@@ -42,7 +42,7 @@ describe('getI18nState', () => {
     expect(getI18nState()).toBeUndefined();
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy.mock.calls[0]?.[0]).toContain('window.__i18n__ is not defined');
-    expect(errorSpy.mock.calls[0]?.[0]).toContain('createI18nMiddleware');
+    expect(errorSpy.mock.calls[0]?.[0]).toContain('locale middleware');
   });
 
   test('logs the missing-state error only once', async () => {

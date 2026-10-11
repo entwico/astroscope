@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { type ExcludePattern, serializeExcludePatterns } from '@astroscope/node/excludes';
 import type { AstroIntegrationLogger } from 'astro';
 import MagicString from 'magic-string';
 import type { Plugin } from 'vite';
@@ -19,11 +20,16 @@ const RESOLVED_VIRTUAL_MODULE_ID = `\0${VIRTUAL_MODULE_ID}`;
 const isResolvedVirtualModuleId = (id: string) =>
   id === RESOLVED_VIRTUAL_MODULE_ID || id.startsWith(`\0${VIRTUAL_MODULE_ID}?`);
 
+const CONFIG_VIRTUAL_MODULE_ID = 'virtual:@astroscope/i18n/config';
+const RESOLVED_CONFIG_VIRTUAL_MODULE_ID = `\0${CONFIG_VIRTUAL_MODULE_ID}`;
+
 const MANIFEST_FILE_NAME = 'i18n-manifest.json';
 
 export type I18nVitePluginOptions = {
   logger: AstroIntegrationLogger;
   consistency: ConsistencyCheckLevel;
+  /** the locale middleware's exclude patterns, null for the default */
+  exclude: ExcludePattern[] | null;
 };
 
 /**
@@ -63,7 +69,7 @@ function formatExtractionErrors(errors: ExtractionError[], projectRoot: string):
  * 5. Injects translation loader into chunks that use t()
  */
 export function i18nVitePlugin(options: I18nVitePluginOptions): Plugin {
-  const { logger, consistency } = options;
+  const { logger, consistency, exclude } = options;
 
   const store = new KeyStore(logger, consistency);
 
@@ -113,9 +119,18 @@ export function i18nVitePlugin(options: I18nVitePluginOptions): Plugin {
       if (isVirtualModuleId(id)) {
         return `\0${id}`;
       }
+
+      if (id === CONFIG_VIRTUAL_MODULE_ID) {
+        return RESOLVED_CONFIG_VIRTUAL_MODULE_ID;
+      }
     },
 
     load(id) {
+      if (id === RESOLVED_CONFIG_VIRTUAL_MODULE_ID) {
+        // exclude patterns may contain RegExp — serialized as code, not JSON
+        return `export const exclude = ${exclude ? serializeExcludePatterns(exclude) : 'null'};`;
+      }
+
       if (!isResolvedVirtualModuleId(id)) {
         return;
       }
