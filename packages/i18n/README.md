@@ -66,7 +66,7 @@ i18n({
 
 The integration injects two middlewares: one serving the `/_i18n/` translation chunks ahead of your own middleware, and the locale middleware after it — it resolves the request's locale and provides the request context for `t()`. Running after your middleware means the locale resolver sees what a session middleware put on `locals`.
 
-Both middlewares are injected in the order of your `integrations` array — keep `i18n()` before integrations whose middleware calls `t()` (e.g. `@astroscope/wormhole`).
+Both middlewares are injected in the order of your `integrations` array.
 
 By default, `RECOMMENDED_EXCLUDES` (static assets like `/_astro/`) are excluded from locale context setup. To customize:
 
