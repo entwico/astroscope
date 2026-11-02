@@ -1,5 +1,6 @@
 import { hashUser } from '../conversion-user.js';
 import type { ServerDestination } from '../runtime.js';
+import { withoutQuery } from '../source-url.js';
 import type { OpenAiEvent } from './shared.js';
 
 const CONVERSIONS_API_URL = 'https://bzr.openai.com/v1/events';
@@ -36,8 +37,9 @@ export function openAiConversions(options: OpenAiConversionsOptions): ServerDest
           {
             id,
             type: event.name,
+            ...(event.name === 'custom' && { custom_event_name: event.customName }),
             timestamp_ms: Date.now(),
-            source_url: request.sourceUrl,
+            source_url: withoutQuery(request.sourceUrl),
             action_source: 'web',
             user: {
               emails_sha256: toList(hashed.email),

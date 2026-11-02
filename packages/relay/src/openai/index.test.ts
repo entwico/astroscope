@@ -24,6 +24,16 @@ describe('openAiPixel', () => {
     await vi.waitFor(() => expect(oaiq).toHaveBeenCalledWith('measure', 'lead_created', { type: 'customer_action' }, { event_id: 'e-1' }));
   });
 
+  test('a custom event is measured as `custom` with its name in the options', async () => {
+    const oaiq = vi.fn();
+
+    vi.stubGlobal('oaiq', oaiq);
+    openAiPixel().send(openai.custom('quote_requested'), { id: 'e-2', at: 1 });
+
+    await vi.waitFor(() =>
+      expect(oaiq).toHaveBeenCalledWith('measure', 'custom', { type: 'custom' }, { event_id: 'e-2', custom_event_name: 'quote_requested' }));
+  });
+
   test('a failing pixel is reported, never an unhandled rejection', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 

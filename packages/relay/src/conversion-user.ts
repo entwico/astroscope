@@ -4,6 +4,12 @@ export type ConversionUser = {
   phone?: string | undefined;
   firstName?: string | undefined;
   lastName?: string | undefined;
+  city?: string | undefined;
+  postalCode?: string | undefined;
+  /** the two-letter country code */
+  country?: string | undefined;
+  /** the site's own id of the visitor: a customer or subscriber id */
+  externalId?: string | undefined;
 };
 
 /** the identifiers of a visitor as the ad platforms match them: normalized, then sha256 as lowercase hex */
@@ -12,6 +18,10 @@ export type HashedUser = {
   phone?: string | undefined;
   firstName?: string | undefined;
   lastName?: string | undefined;
+  city?: string | undefined;
+  postalCode?: string | undefined;
+  country?: string | undefined;
+  externalId?: string | undefined;
 };
 
 export type HashOptions = {
@@ -24,14 +34,18 @@ export type HashOptions = {
 
 /** normalizes and hashes the identifiers the way the pixels and the conversions apis expect them */
 export async function hashUser(user: ConversionUser, options: HashOptions = {}): Promise<HashedUser> {
-  const [email, phone, firstName, lastName] = await Promise.all([
+  const [email, phone, firstName, lastName, city, postalCode, country, externalId] = await Promise.all([
     hashOptional(normalizeEmail(user.email)),
     hashOptional(normalizePhone(user.phone, options.countryCallingCode)),
     hashOptional(normalizeName(user.firstName)),
     hashOptional(normalizeName(user.lastName)),
+    hashOptional(normalizeName(user.city)),
+    hashOptional(normalizePostalCode(user.postalCode)),
+    hashOptional(normalizeCountry(user.country)),
+    hashOptional(user.externalId?.trim()),
   ]);
 
-  return withoutEmpty({ email, phone, firstName, lastName });
+  return withoutEmpty({ email, phone, firstName, lastName, city, postalCode, country, externalId });
 }
 
 export function normalizeEmail(email: string | undefined): string | undefined {
@@ -60,6 +74,18 @@ export function normalizePhone(phone: string | undefined, countryCallingCode: st
 /** lowercase, without whitespace and punctuation */
 export function normalizeName(name: string | undefined): string | undefined {
   return name?.toLowerCase().replaceAll(/[\s!-/:-@[-`{-~]/g, '') || undefined;
+}
+
+/** lowercase without whitespace */
+export function normalizePostalCode(postalCode: string | undefined): string | undefined {
+  return postalCode?.toLowerCase().replaceAll(/\s/g, '') || undefined;
+}
+
+/** the lowercase two-letter code, anything else is dropped */
+export function normalizeCountry(country: string | undefined): string | undefined {
+  const code = country?.trim().toLowerCase();
+
+  return code && /^[a-z]{2}$/.test(code) ? code : undefined;
 }
 
 export async function sha256(value: string): Promise<string> {

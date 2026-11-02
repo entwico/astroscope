@@ -18,6 +18,8 @@ export default defineConfig({
     'awin/index': 'src/awin/index.ts',
     'openai/index': 'src/openai/index.ts',
     'openai/server': 'src/openai/server.ts',
+    'meta/index': 'src/meta/index.ts',
+    'meta/server': 'src/meta/server.ts',
   },
   format: ['esm'],
   dts: true,

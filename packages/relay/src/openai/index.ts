@@ -3,7 +3,19 @@ import { type HashedUser, hashUser } from '../conversion-user.js';
 import { type EventMeta, isBrowser } from '../shared.js';
 import type { OpenAiEvent } from './shared.js';
 
-export type { OpenAiContent, OpenAiContentInput, OpenAiContents, OpenAiContentsData, OpenAiCustomerActionData, OpenAiEvent } from './shared.js';
+export type {
+  OpenAiContent,
+  OpenAiContentInput,
+  OpenAiContents,
+  OpenAiContentsData,
+  OpenAiCustom,
+  OpenAiCustomData,
+  OpenAiCustomerActionData,
+  OpenAiEvent,
+  OpenAiMoney,
+  OpenAiPlan,
+  OpenAiPlanEnrollmentData,
+} from './shared.js';
 export { openai, toMinorUnits } from './shared.js';
 
 /** advanced matching data of the pixel: normalized identifiers as lowercase sha256 hex */
@@ -17,6 +29,8 @@ type OpenAiUser = {
 type OpenAiOptions = {
   /** deduplicates against the same event sent through the conversions api */
   event_id?: string | undefined;
+  /** the name of a `custom` event; no standard event takes one */
+  custom_event_name?: string | undefined;
 };
 
 type Oaiq = {
@@ -66,7 +80,10 @@ function measure(event: OpenAiEvent, meta: EventMeta, hashed: HashedUser | undef
     identify(oaiq, hashed);
   }
 
-  oaiq('measure', event.name, event.data as OpenAiEvent['data'], { event_id: meta.id });
+  oaiq('measure', event.name, event.data as OpenAiEvent['data'], {
+    event_id: meta.id,
+    ...(event.name === 'custom' && { custom_event_name: event.customName }),
+  });
 }
 
 function identify(oaiq: Oaiq, hashed: HashedUser): void {

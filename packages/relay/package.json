@@ -66,6 +66,14 @@
     "./openai/server": {
       "types": "./dist/openai/server.d.ts",
       "import": "./dist/openai/server.js"
+    },
+    "./meta": {
+      "types": "./dist/meta/index.d.ts",
+      "import": "./dist/meta/index.js"
+    },
+    "./meta/server": {
+      "types": "./dist/meta/server.d.ts",
+      "import": "./dist/meta/server.js"
     }
   },
   "files": [
@@ -89,6 +97,7 @@
     "tracking",
     "ga4",
     "awin",
+    "meta",
     "ccm19",
     "matomo",
     "conversions",

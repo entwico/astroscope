@@ -60,6 +60,29 @@ describe('openAiConversions', () => {
     expect(calls[1]?.body).toMatchObject({ events: [{ id: 'o-1', type: 'order_created', data: { amount: 1000, currency: 'EUR' } }] });
   });
 
+  test('reports the page without its query', async () => {
+    const { calls, fetch } = createFetch();
+    const conversions = openAiConversions({ apiKey: 'k', pixelId: 'p', integrationSource: 'test', fetch });
+
+    await conversions.send(
+      openai.leadCreated(),
+      createMeta({ request: { ...createMeta().request, sourceUrl: 'https://example.com/newsletter/profile?id=1&token=secret' } }),
+    );
+
+    expect(calls[0]?.body).toMatchObject({ events: [{ source_url: 'https://example.com/newsletter/profile' }] });
+  });
+
+  test('a custom event carries its name at the event level', async () => {
+    const { calls, fetch } = createFetch();
+    const conversions = openAiConversions({ apiKey: 'k', pixelId: 'p', integrationSource: 'test', fetch });
+
+    await conversions.send(openai.custom('quote_requested'), createMeta());
+    await conversions.send(openai.leadCreated(), createMeta());
+
+    expect(calls[0]?.body).toMatchObject({ events: [{ type: 'custom', custom_event_name: 'quote_requested', data: { type: 'custom' } }] });
+    expect((calls[1]?.body as { events: unknown[] }).events[0]).not.toHaveProperty('custom_event_name');
+  });
+
   test('a failing response is an error for track() to log', async () => {
     const conversions = openAiConversions({
       apiKey: 'k',

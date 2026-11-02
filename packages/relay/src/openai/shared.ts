@@ -4,37 +4,69 @@ import type { ConversionUser } from '../conversion-user.js';
 
 /** monetary values are integers in the minor unit of the currency: 12999 for 129.99 EUR */
 export type OpenAiContent = {
-  id: string;
-  name: string;
-  content_type: string;
-  quantity: number;
-  amount: number;
-  currency: string;
+  id?: string | undefined;
+  name?: string | undefined;
+  /** e.g. `product`, `plan`, `page` */
+  content_type?: string | undefined;
+  quantity?: number | undefined;
+  /** per unit */
+  amount?: number | undefined;
+  currency?: string | undefined;
 };
 
-export type OpenAiContentsData = {
+/** what every data shape may carry: the money, and the items, where the event has any */
+type OpenAiBaseData = {
+  amount?: number | undefined;
+  /** required with `amount` */
+  currency?: string | undefined;
+  contents?: readonly OpenAiContent[] | undefined;
+};
+
+export type OpenAiContentsData = OpenAiBaseData & {
   type: 'contents';
-  amount: number;
-  currency: string;
-  contents: readonly OpenAiContent[];
 };
 
-export type OpenAiCustomerActionData = {
+export type OpenAiCustomerActionData = Omit<OpenAiBaseData, 'contents'> & {
   type: 'customer_action';
 };
+
+export type OpenAiPlanEnrollmentData = OpenAiBaseData & {
+  type: 'plan_enrollment';
+  plan_id?: string | undefined;
+};
+
+export type OpenAiCustomData = OpenAiBaseData & {
+  type: 'custom';
+  plan_id?: string | undefined;
+};
+
+export type OpenAiContentsEventName = 'contents_viewed' | 'items_added' | 'checkout_started' | 'order_created' | 'page_viewed';
+export type OpenAiCustomerActionEventName = 'lead_created' | 'registration_completed' | 'appointment_scheduled';
+export type OpenAiPlanEnrollmentEventName = 'subscription_created' | 'trial_started';
 
 /**
  * What openai takes, from the pixel and from the conversions api alike: the event and, for a
  * conversion the visitor entered identifiers for, the identifiers — hashed by whichever half sends.
+ * The app events (`app_installed`, `app_opened`) are a mobile app's, not a website's, and have no builder.
  */
 export type OpenAiEvent = (
   | {
-    name: 'contents_viewed' | 'items_added' | 'checkout_started' | 'order_created';
+    name: OpenAiContentsEventName;
     data: OpenAiContentsData;
   }
   | {
-    name: 'lead_created';
+    name: OpenAiCustomerActionEventName;
     data: OpenAiCustomerActionData;
+  }
+  | {
+    name: OpenAiPlanEnrollmentEventName;
+    data: OpenAiPlanEnrollmentData;
+  }
+  | {
+    name: 'custom';
+    /** 1 to 64 lowercase letters, digits, underscores or dashes, no standard event's name */
+    customName: string;
+    data: OpenAiCustomData;
   }
 ) & {
   user?: ConversionUser | undefined;
@@ -46,7 +78,11 @@ declare module '@astroscope/relay' {
   }
 }
 
+/** an item as the site has it: the price in the major unit, 129.99 for 129.99 EUR */
 export type OpenAiContentInput = { id: string; name: string; price: number; quantity: number };
+
+/** the money of an event: the total in the major unit, and its currency */
+export type OpenAiMoney = { value: number; currency: string };
 
 export type OpenAiContents = {
   items: readonly OpenAiContentInput[];
@@ -58,37 +94,93 @@ export type OpenAiContents = {
   user?: ConversionUser | undefined;
 };
 
-/** the openai builders: the events openai has a name for. What an event definition puts under `openai` */
+export type OpenAiPlan = {
+  /** the site's plan identifier */
+  id?: string | undefined;
+  money?: OpenAiMoney | undefined;
+  /** the plan's items, if any; `content_type` `plan` by default */
+  items?: readonly OpenAiContentInput[] | undefined;
+  contentType?: string | undefined;
+  user?: ConversionUser | undefined;
+};
+
+export type OpenAiCustom = OpenAiPlan & {
+  /** the `content_type` of the items; default `product` */
+  contentType?: string | undefined;
+};
+
+/**
+ * The openai builders: every event openai has a name for, and `custom(name)`. What an event
+ * definition puts under `openai`.
+ */
 export const openai = {
   contentsViewed: (contents: OpenAiContents): OpenAiEvent => contentsEvent('contents_viewed', contents),
   itemsAdded: (contents: OpenAiContents): OpenAiEvent => contentsEvent('items_added', contents),
   checkoutStarted: (contents: OpenAiContents): OpenAiEvent => contentsEvent('checkout_started', contents),
   orderCreated: (contents: OpenAiContents): OpenAiEvent => contentsEvent('order_created', contents),
-  leadCreated: (user?: ConversionUser): OpenAiEvent => ({ name: 'lead_created', data: { type: 'customer_action' }, user }),
+  /** the page as a content: its id is what the reports group by, e.g. the path */
+  pageViewed: (page: { id: string; name: string }): OpenAiEvent => ({
+    name: 'page_viewed',
+    data: { type: 'contents', contents: [{ id: page.id, name: page.name, content_type: 'page' }] },
+  }),
+  leadCreated: (user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent => actionEvent('lead_created', user, money),
+  registrationCompleted: (user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent =>
+    actionEvent('registration_completed', user, money),
+  appointmentScheduled: (user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent =>
+    actionEvent('appointment_scheduled', user, money),
+  subscriptionCreated: (plan: OpenAiPlan = {}): OpenAiEvent => planEvent('subscription_created', plan),
+  trialStarted: (plan: OpenAiPlan = {}): OpenAiEvent => planEvent('trial_started', plan),
+  /** a custom event: any name openai has no standard event for */
+  custom: (name: string, { id, money, items, contentType = 'product', user }: OpenAiCustom = {}): OpenAiEvent => ({
+    name: 'custom',
+    customName: name,
+    data: { type: 'custom', plan_id: id, ...toMoneyData(money), ...toContentsData(items, contentType, money?.currency) },
+    user,
+  }),
 };
 
-function contentsEvent(
-  name: 'contents_viewed' | 'items_added' | 'checkout_started' | 'order_created',
-  { items, currency, value, contentType = 'product', user }: OpenAiContents,
-): OpenAiEvent {
+function contentsEvent(name: OpenAiContentsEventName, { items, currency, value, contentType = 'product', user }: OpenAiContents): OpenAiEvent {
   const total = value ?? items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return {
     name,
-    data: {
-      type: 'contents',
-      amount: toMinorUnits(total),
-      currency,
-      contents: items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        content_type: contentType,
-        quantity: item.quantity,
-        amount: toMinorUnits(item.price),
-        currency,
-      })),
-    },
+    data: { type: 'contents', ...toMoneyData({ value: total, currency }), ...toContentsData(items, contentType, currency) },
     user,
+  };
+}
+
+function actionEvent(name: OpenAiCustomerActionEventName, user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent {
+  return { name, data: { type: 'customer_action', ...toMoneyData(money) }, user };
+}
+
+function planEvent(name: OpenAiPlanEnrollmentEventName, { id, money, items, contentType = 'plan', user }: OpenAiPlan): OpenAiEvent {
+  return {
+    name,
+    data: { type: 'plan_enrollment', plan_id: id, ...toMoneyData(money), ...toContentsData(items, contentType, money?.currency) },
+    user,
+  };
+}
+
+function toMoneyData(money: OpenAiMoney | undefined): Pick<OpenAiBaseData, 'amount' | 'currency'> {
+  return money ? { amount: toMinorUnits(money.value), currency: money.currency } : {};
+}
+
+function toContentsData(
+  items: readonly OpenAiContentInput[] | undefined,
+  contentType: string,
+  currency: string | undefined,
+): Pick<OpenAiBaseData, 'contents'> {
+  if (!items) return {};
+
+  return {
+    contents: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      content_type: contentType,
+      quantity: item.quantity,
+      amount: toMinorUnits(item.price),
+      currency,
+    })),
   };
 }
 
