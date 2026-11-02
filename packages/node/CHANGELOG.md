@@ -1,5 +1,16 @@
 # @astroscope/node
 
+## 4.2.0
+
+### Minor Changes
+
+- 8a72776: `isScriptEntry(facadeModuleId)` on `@astroscope/node/islands`: whether a client chunk is a script entry rather than an island
+
+### Patch Changes
+
+- 8a72776: `imageService: 'auto'` keeps processing on for astro 7.4's split `image.service` (`{ build, runtime }`)
+- 8a72776: OpenTelemetry dependencies on the 0.300 sdk line (api 1.10, core 3); a site whose server build inlines the api needs rolldown 1.2.14 or newer in its lockfile
+
 ## 4.1.0
 
 ### Minor Changes

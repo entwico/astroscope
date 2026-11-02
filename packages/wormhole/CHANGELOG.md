@@ -1,5 +1,15 @@
 # @astroscope/wormhole
 
+## 3.0.2
+
+### Patch Changes
+
+- 8a72776: a script an integration injects with `injectScript('page')` gets its wormholes delivered in production
+- Updated dependencies [8a72776]
+- Updated dependencies [8a72776]
+- Updated dependencies [8a72776]
+  - @astroscope/node@4.2.0
+
 ## 3.0.1
 
 ### Patch Changes

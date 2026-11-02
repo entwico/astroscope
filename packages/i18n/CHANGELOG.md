@@ -1,5 +1,16 @@
 # @astroscope/i18n
 
+## 3.0.1
+
+### Patch Changes
+
+- 8a72776: a script an integration injects with `injectScript('page')` gets its translations in production
+- 855dadf: clarify middleware ordering note
+- Updated dependencies [8a72776]
+- Updated dependencies [8a72776]
+- Updated dependencies [8a72776]
+  - @astroscope/node@4.2.0
+
 ## 3.0.0
 
 ### Major Changes

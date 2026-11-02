@@ -1,6 +1,6 @@
 {
   "name": "@astroscope/relay",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Consent-aware event relay for Astro",
   "type": "module",
   "main": "./dist/index.js",
