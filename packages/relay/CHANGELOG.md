@@ -1,5 +1,11 @@
 # @astroscope/relay
 
+## 1.0.1
+
+### Patch Changes
+
+- b4006cb: npm verification
+
 ## 1.0.0
 
 ### Major Changes
