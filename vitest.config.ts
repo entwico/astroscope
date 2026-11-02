@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 // resolves /_i18n/ urls to modules that record their own evaluation, so the
@@ -18,10 +19,24 @@ const i18nImportRecorder = {
   },
 };
 
+// the e2e suites spawn the demos' prod servers, which inherit the workers' env: with the flag
+// set they write raw v8 coverage for scripts/coverage.ts to merge. node reads the variable at
+// startup only, so the already running workers stay on vitest's own instrumentation
+const e2eCoverage = process.env['E2E_COVERAGE']
+  ? { NODE_V8_COVERAGE: path.resolve(import.meta.dirname, '.coverage/v8') }
+  : {};
+
 export default defineConfig({
   plugins: [i18nImportRecorder],
   test: {
     passWithNoTests: true,
+    env: e2eCoverage,
+    coverage: {
+      // every package source file, loaded by a test or not; the test helpers and fixtures are no measure
+      include: ['packages/*/src/**/*.{ts,tsx}'],
+      exclude: ['**/*.test.*', '**/*.bench.ts', '**/*.corpus.ts', '**/*.d.ts', 'packages/node/src/e2e/**'],
+      reporter: ['text-summary', 'lcovonly'],
+    },
     // the react render bench imports upstream's server entry, whose
     // `astro:react:opts` import must go through vite so vi.mock can serve it
     server: { deps: { inline: ['@astrojs/react'] } },

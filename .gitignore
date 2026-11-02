@@ -17,6 +17,7 @@ dist/
 .astro/
 .turbo/
 coverage/
+.coverage/
 .eslintcache
 
 

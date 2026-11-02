@@ -71,6 +71,17 @@ async function fetchText(url: string): Promise<string> {
   return res.text();
 }
 
+// SIGTERM lets the platform drain and exit on its own, which is also when node writes the v8
+// coverage of an E2E_COVERAGE run; a server that does not get there is killed
+async function stop(child: ChildProcess): Promise<void> {
+  const exit = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+
+  child.kill('SIGTERM');
+  await exit;
+  clearTimeout(timer);
+}
+
 async function isListening(url: string): Promise<boolean> {
   const res = await fetch(url);
 
@@ -156,8 +167,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
       return;
     }
 
-    server.kill('SIGKILL');
-    await exited();
+    await stop(server);
   });
 
   test('our build artifacts contain no build machine paths', () => {
@@ -741,8 +751,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
         expect(output).toContain(`[e2e] startup dev=false host=127.0.0.1 port=${envPort} ctx=ok config=from-env-file`);
         expect(logLines(output).find((l) => l['msg'] === 'config loaded')).toMatchObject({ value: 'from-env-file' });
       } finally {
-        envServer.kill('SIGKILL');
-        await new Promise((resolve) => envServer.once('exit', resolve));
+        await stop(envServer);
       }
     }, 30_000);
   });
@@ -836,8 +845,7 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
           expect(res.body.toString()).toContain('<p id="state">initialized</p>');
           expect(logLines(output).find((l) => l['msg'] === 'server ready')).toMatchObject({ https: true });
         } finally {
-          tlsServer.kill('SIGKILL');
-          await new Promise((resolve) => tlsServer.once('exit', resolve));
+          await stop(tlsServer);
           rmSync(certDir, { recursive: true, force: true });
         }
       },

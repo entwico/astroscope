@@ -1,0 +1,20 @@
+{
+  "name": "scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "coverage": "node coverage.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --cache",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@jridgewell/remapping": "^2.3.5",
+    "monocart-coverage-reports": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^6.0.3"
+  }
+}

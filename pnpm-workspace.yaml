@@ -2,6 +2,7 @@ packages:
   - packages/*
   - demo/*
   - benchmarks
+  - scripts
 
 overrides:
   vite: ^8
