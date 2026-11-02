@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { type ExcludePattern, serializeExcludePatterns } from '@astroscope/node/excludes';
+import { isScriptEntry } from '@astroscope/node/islands';
 import type { AstroIntegrationLogger } from 'astro';
 import MagicString from 'magic-string';
 import type { Plugin } from 'vite';
@@ -259,9 +260,9 @@ export function getManifest() { return _getManifest(); }
 
         directImports.set(chunkName, imports);
 
-        // astro `<script>` entries are not islands, so no island carries their
-        // hashes — collect them so the middleware can bootstrap their chunks
-        if ((chunk.isEntry || chunk.isDynamicEntry) && chunk.facadeModuleId?.includes('astro&type=script')) {
+        // astro `<script>` entries and the page script integrations inject are not islands, so no
+        // island carries their hashes — collect them so the middleware can bootstrap their chunks
+        if ((chunk.isEntry || chunk.isDynamicEntry) && isScriptEntry(chunk.facadeModuleId)) {
           scriptEntries.push(chunkName);
         }
       }

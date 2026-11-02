@@ -1,0 +1,16 @@
+---
+import { type TrackInput, inlineTrack } from '@astroscope/relay';
+
+/**
+ * Tracks an event from server-rendered html: an inline push into the queue the bus drains when it
+ * installs, or straight onto the bus when it is already there. Use it for what the page shows
+ * (`view_item`, `view_item_list`), where no island is involved.
+ */
+type Props = {
+  event: TrackInput;
+};
+
+const { event } = Astro.props;
+---
+
+<Fragment set:html={`<script>${inlineTrack(event)}</script>`} />

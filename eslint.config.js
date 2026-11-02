@@ -17,11 +17,18 @@ export default defineConfig({
         'packages/cap/src/server.ts',
         'packages/i18n/src/internal.ts',
         'packages/node/src/lifecycle/boot.ts',
+        'packages/relay/src/index.browser.ts',
         'packages/wormhole/src/index.browser.ts',
       ],
     },
   },
   extra: [
+    // the packages ship a dist that plain node loads too (a consumer's tests, a script): there the
+    // vite constant does not exist, so a runtime `typeof window` guard is the right one
+    {
+      files: within('packages'),
+      rules: { '@astroscope/prefer-ssr-guard': 'off' },
+    },
     // the i18n and wormhole rule sets apply to consumers of those packages, which here are their demos
     {
       files: within('demo/i18n'),

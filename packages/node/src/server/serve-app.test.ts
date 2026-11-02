@@ -1,22 +1,24 @@
 import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { SpanStatusCode, metrics as metricsApi } from '@opentelemetry/api';
-import { metrics, node, tracing } from '@opentelemetry/sdk-node';
+import { AggregationTemporality, InMemoryMetricExporter, MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace';
 import pino, { type DestinationStream } from 'pino';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { createRequestInstrumentation } from '../observability/instrument';
 import { getLogStore, getRequestRecord } from '../observability/log/store';
+import { registerTestTracing } from '../observability/test-tracing';
 import { writeResponse } from './serve-app';
 
-const spans = new tracing.InMemorySpanExporter();
-const reader = new metrics.PeriodicExportingMetricReader({
-  exporter: new metrics.InMemoryMetricExporter(metrics.AggregationTemporality.CUMULATIVE),
+const spans = new InMemorySpanExporter();
+const reader = new PeriodicExportingMetricReader({
+  exporter: new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE),
   exportIntervalMillis: 60_000,
 });
 
 beforeAll(() => {
-  new node.NodeTracerProvider({ spanProcessors: [new tracing.SimpleSpanProcessor(spans)] }).register();
-  metricsApi.setGlobalMeterProvider(new metrics.MeterProvider({ readers: [reader] }));
+  registerTestTracing([new SimpleSpanProcessor({ exporter: spans })]);
+  metricsApi.setGlobalMeterProvider(new MeterProvider({ readers: [reader] }));
 });
 
 const servers: Server[] = [];

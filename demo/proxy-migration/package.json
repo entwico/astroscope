@@ -15,10 +15,10 @@
   "dependencies": {
     "@astroscope/node": "workspace:*",
     "@astroscope/proxy": "workspace:*",
-    "astro": "^7.3.7"
+    "astro": "^7.4.4"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.10",
+    "@astrojs/check": "^0.9.12",
     "@tailwindcss/vite": "^4.3.3",
     "typescript": "^6.0.3"
   }

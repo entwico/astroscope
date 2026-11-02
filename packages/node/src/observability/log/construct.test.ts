@@ -1,15 +1,15 @@
 import { context, trace } from '@opentelemetry/api';
-import { node } from '@opentelemetry/sdk-node';
 import type { LoggerOptions } from 'pino';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { registerTestTracing } from '../test-tracing';
 import { constructRootLogger, dumpEarlyLogs } from './construct';
 import { getLogStore } from './store';
 
 const STORE_KEY = Symbol.for('@astroscope/node/log');
 
 beforeAll(() => {
-  // register() installs the async-hooks context manager so trace correlation sees active spans
-  new node.NodeTracerProvider().register();
+  // the context manager lets trace correlation see active spans
+  registerTestTracing();
 });
 
 const logLines: Record<string, unknown>[] = [];

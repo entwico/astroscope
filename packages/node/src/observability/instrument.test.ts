@@ -1,19 +1,17 @@
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { SpanStatusCode, context, trace } from '@opentelemetry/api';
-import { node, tracing } from '@opentelemetry/sdk-node';
+import { InMemorySpanExporter, type ReadableSpan, SimpleSpanProcessor } from '@opentelemetry/sdk-trace';
 import pino, { type DestinationStream } from 'pino';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { type RequestInstrumentationConfig, createRequestInstrumentation } from './instrument';
 import { getLogStore } from './log/store';
+import { registerTestTracing } from './test-tracing';
 
-const exporter = new tracing.InMemorySpanExporter();
+const exporter = new InMemorySpanExporter();
 
 beforeAll(() => {
-  // register() installs the async-hooks context manager and W3C propagators
-  new node.NodeTracerProvider({
-    spanProcessors: [new tracing.SimpleSpanProcessor(exporter)],
-  }).register();
+  registerTestTracing([new SimpleSpanProcessor({ exporter })]);
 });
 
 const servers: Server[] = [];
@@ -54,13 +52,13 @@ async function drain(url: string, init?: RequestInit): Promise<void> {
   await res.text();
 }
 
-async function waitForSpans(count: number): Promise<tracing.ReadableSpan[]> {
+async function waitForSpans(count: number): Promise<ReadableSpan[]> {
   await vi.waitFor(() => expect(exporter.getFinishedSpans().length).toBeGreaterThanOrEqual(count));
 
   return exporter.getFinishedSpans();
 }
 
-const durationMs = (span: tracing.ReadableSpan): number => span.duration[0] * 1000 + span.duration[1] / 1e6;
+const durationMs = (span: ReadableSpan): number => span.duration[0] * 1000 + span.duration[1] / 1e6;
 
 describe('request tracing', () => {
   test('server span covers the full response, first-byte span ends at the first flush', async () => {

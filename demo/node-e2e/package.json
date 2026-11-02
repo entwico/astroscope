@@ -11,14 +11,14 @@
   "dependencies": {
     "@astroscope/node": "workspace:*",
     "@astroscope/react": "workspace:*",
-    "astro": "^7.3.7",
+    "astro": "^7.4.4",
     "clsx": "^2.1.1",
     "cookie": "^2.0.1",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@astrojs/react": "7.0.1",
+    "@astrojs/react": "7.1.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "typescript": "^6.0.3"

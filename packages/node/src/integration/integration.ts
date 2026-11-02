@@ -194,9 +194,9 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
           command === 'dev' ? [createIslandWarmup({ root, srcDir: fileURLToPath(config.srcDir), logger })] : [];
 
         const imageService = options.imageService ?? 'auto';
-        const imageOff =
-          imageService === 'off' ||
-          (imageService === 'auto' && config.image.service.entrypoint === 'astro/assets/services/sharp');
+        const defaultImageService =
+          !('runtime' in config.image.service) && config.image.service.entrypoint === 'astro/assets/services/sharp';
+        const imageOff = imageService === 'off' || (imageService === 'auto' && defaultImageService);
 
         updateConfig({
           build: { redirects: false },

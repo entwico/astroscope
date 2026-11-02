@@ -1,0 +1,46 @@
+---
+import { trackAttribute } from '@astroscope/relay';
+import { Track } from '@astroscope/relay/astro';
+import '../styles/index.css';
+import Layout from '../../../shared/Layout.astro';
+import ConsentPanel from '../components/ConsentPanel';
+import NewsletterForm from '../components/NewsletterForm';
+import { type DemoItem, selectOfferEvent, viewProductEvent } from '../relay/events';
+
+const item: DemoItem = { id: 'demo', name: 'Demo item', price: 9.5 };
+---
+
+<Layout title="Relay Demo" package="@astroscope/relay">
+  <Track event={viewProductEvent(item)} />
+
+  <p class="text-lg mb-6">
+    One bus for tracking events, each with a payload per destination. Destinations take what the visitor consented to,
+    wait for their sdk, and keep consented events across a navigation; conversions are reported server-side by the same
+    <code class="badge badge-ghost">track()</code> under the same event id.
+  </p>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Consent and destinations</h2>
+      <p class="text-sm text-base-content/70 mb-4">
+        The page tracked <code class="badge badge-ghost">view_item</code> from server-rendered html. Choose, then load the crm sdk and
+        watch the waiting events arrive.
+      </p>
+      <ConsentPanel client:load />
+      <a href="#offer" class="btn btn-sm mt-4" data-track={trackAttribute(selectOfferEvent(item, 'offers'))} data-testid="offer">
+        Select the demo offer
+      </a>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl mb-6">
+    <div class="card-body">
+      <h2 class="card-title">Conversion <code class="badge badge-ghost">track()</code> on the server</h2>
+      <p class="text-sm text-base-content/70 mb-4">
+        The request carries the consent in a header the bus writes, the action tracks the conversion to the consented
+        server destinations and answers with the event id the pixels then fire under. See <a class="link" href="/api/crm">/api/crm</a>.
+      </p>
+      <NewsletterForm client:load />
+    </div>
+  </div>
+</Layout>

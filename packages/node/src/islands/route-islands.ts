@@ -63,6 +63,14 @@ export function routeEntrypoints(root: string, routes: readonly IntegrationResol
   return entrypoints;
 }
 
+/** astro's own module for the scripts integrations inject with `injectScript('page')`, run on every page */
+const INJECTED_PAGE_SCRIPT_ID = 'astro:scripts/page.js';
+
+/** whether a chunk's facade is a script entry rather than an island: an astro `<script>` or the injected page script */
+export function isScriptEntry(facadeModuleId: string | null | undefined): boolean {
+  return facadeModuleId?.includes('astro&type=script') === true || facadeModuleId === INJECTED_PAGE_SCRIPT_ID;
+}
+
 /** module ids can carry vite queries (`?astro&type=...`) — the file path is the identity */
 export function stripQuery(id: string): string {
   const at = id.indexOf('?');

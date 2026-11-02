@@ -11,12 +11,12 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "astro": "^7.3.7",
+    "astro": "^7.4.4",
     "autocannon": "^8.0.0"
   },
   "devDependencies": {
     "@types/autocannon": "^7.12.7",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.6",
     "typescript": "^6.0.3"
   }
 }

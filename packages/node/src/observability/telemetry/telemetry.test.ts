@@ -1,6 +1,16 @@
 import { type Span, SpanStatusCode, context, metrics as metricsApi, trace } from '@opentelemetry/api';
-import { metrics, node, tracing } from '@opentelemetry/sdk-node';
+import {
+  AggregationTemporality,
+  type DataPoint,
+  type Histogram,
+  InMemoryMetricExporter,
+  MeterProvider,
+  type MetricData,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics';
+import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
+import { registerTestTracing } from '../test-tracing';
 import { bindGauges } from './gauges';
 import {
   DURATION_BUCKETS,
@@ -12,26 +22,26 @@ import {
   withSpan,
 } from './index';
 
-const spans = new tracing.InMemorySpanExporter();
+const spans = new InMemorySpanExporter();
 
 beforeAll(() => {
-  new node.NodeTracerProvider({ spanProcessors: [new tracing.SimpleSpanProcessor(spans)] }).register();
+  registerTestTracing([new SimpleSpanProcessor({ exporter: spans })]);
 });
 
-let provider: metrics.MeterProvider | undefined;
-let reader: metrics.PeriodicExportingMetricReader | undefined;
+let provider: MeterProvider | undefined;
+let reader: PeriodicExportingMetricReader | undefined;
 
 function registerMeterProvider(): void {
-  reader = new metrics.PeriodicExportingMetricReader({
-    exporter: new metrics.InMemoryMetricExporter(metrics.AggregationTemporality.CUMULATIVE),
+  reader = new PeriodicExportingMetricReader({
+    exporter: new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE),
     exportIntervalMillis: 60_000,
   });
-  provider = new metrics.MeterProvider({ readers: [reader] });
+  provider = new MeterProvider({ readers: [reader] });
 
   metricsApi.setGlobalMeterProvider(provider);
 }
 
-async function collect(name: string): Promise<{ scope: string; metric: metrics.MetricData } | undefined> {
+async function collect(name: string): Promise<{ scope: string; metric: MetricData } | undefined> {
   const { resourceMetrics } = await reader!.collect();
 
   for (const scope of resourceMetrics.scopeMetrics) {
@@ -66,7 +76,7 @@ describe('instruments', () => {
     histogram.record(0.003, { route: '/a' });
 
     const found = await collect('test.duration');
-    const point = found?.metric.dataPoints[0] as metrics.DataPoint<metrics.Histogram>;
+    const point = found?.metric.dataPoints[0] as DataPoint<Histogram>;
 
     expect(found?.scope).toBe('@astroscope/test');
     expect(found?.metric.descriptor.unit).toBe('s');

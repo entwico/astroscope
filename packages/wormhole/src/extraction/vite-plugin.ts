@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { type ExcludePattern, serializeExcludePatterns } from '@astroscope/node/excludes';
-import { collectRouteIslands, stripQuery } from '@astroscope/node/islands';
+import { collectRouteIslands, isScriptEntry, stripQuery } from '@astroscope/node/islands';
 import type { Plugin } from 'vite';
 import type { WormholeScan } from './scan.js';
 import type { WormholeManifest } from './types.js';
@@ -219,9 +219,9 @@ export { manifest };
         chunkNamesByFileName.set(chunk.fileName, chunkNames);
         chunkEdges.set(chunk.fileName, [...chunk.imports, ...chunk.dynamicImports]);
 
-        // astro `<script>` entries are not islands, so no island emission covers
-        // them — their reachable names ship at stream end instead
-        if ((chunk.isEntry || chunk.isDynamicEntry) && chunk.facadeModuleId?.includes('astro&type=script')) {
+        // astro `<script>` entries and the page script integrations inject are not islands, so
+        // no island emission covers them — their reachable names ship at stream end instead
+        if ((chunk.isEntry || chunk.isDynamicEntry) && isScriptEntry(chunk.facadeModuleId)) {
           scriptEntries.push(chunk.fileName);
         }
       }

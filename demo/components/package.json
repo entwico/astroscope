@@ -13,12 +13,12 @@
     "lint:fix": "eslint src astro.config.ts --fix"
   },
   "dependencies": {
-    "@astroscope/node": "workspace:*",
     "@astroscope/components": "workspace:*",
-    "astro": "^7.3.7"
+    "@astroscope/node": "workspace:*",
+    "astro": "^7.4.4"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.10",
+    "@astrojs/check": "^0.9.12",
     "@tailwindcss/vite": "^4.3.3",
     "typescript": "^6.0.3"
   }

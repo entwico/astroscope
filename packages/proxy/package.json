@@ -49,11 +49,11 @@
     "lint:fix": "eslint src --fix"
   },
   "dependencies": {
-    "undici": "^8.11.2"
+    "undici": "^8.12.3"
   },
   "devDependencies": {
-    "astro": "^7.3.7",
-    "tsdown": "^0.23.0",
+    "astro": "^7.4.4",
+    "tsdown": "^0.23.4",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
