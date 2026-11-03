@@ -35,7 +35,7 @@ export const ga4 = {
 /**
  * The google tag as a destination: hands the `ga4` payload of an event to `gtag('event', …)`. The
  * `gtag` queue stub is installed right away, so the tag's own snippet only has to load; a consented
- * event is delivered once it has and kept across a navigation until then. A site that runs the tag
+ * event waits in memory until it has, and is lost with a navigation before that. A site that runs the tag
  * inside a tag-manager container takes `@astroscope/relay/gtm` instead.
  */
 export function ga4Tag(): Destination<'ga4'> {

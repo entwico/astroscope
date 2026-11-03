@@ -4,7 +4,8 @@ import type { ConsentRecord, DestinationName, EventMeta, RelayDestinations } fro
 
 /** what a server destination gets from the request the conversion arrived with */
 export type RelayRequest = {
-  clientAddress: string;
+  /** the visitor's address, `undefined` when the adapter has none */
+  clientAddress: string | undefined;
   headers: Headers;
   /** a cookie's value, for the click ids the pixels set */
   cookie: (name: string) => string | undefined;

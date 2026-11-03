@@ -32,6 +32,11 @@ beforeAll(() => {
   fs.writeFileSync(path.join(client, '.well-known', 'security.txt'), 'security contact');
   fs.writeFileSync(path.join(client, '.secret'), 'hidden dotfile');
   fs.writeFileSync(path.join(client, 'page.html'), 'file format page');
+  fs.writeFileSync(path.join(client, 'index.html.br'), 'root-index-br-variant');
+  fs.writeFileSync(path.join(client, 'docs', 'index.html.br'), 'docs-index-br-variant');
+  fs.writeFileSync(path.join(client, 'page.html.br'), 'page-br-variant');
+  fs.writeFileSync(path.join(client, 'with space.txt'), 'spaced identity');
+  fs.writeFileSync(path.join(client, 'with space.txt.br'), 'spaced-br-variant');
   fs.writeFileSync(path.join(root, 'outside.txt'), 'outside secret');
 });
 
@@ -94,6 +99,20 @@ function rawGet(url: string, headers: Record<string, string> = {}): Promise<RawR
       });
       res.on('end', () =>
         resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString() }));
+    });
+
+    req.on('error', reject);
+  });
+}
+
+// sends the path exactly as given, unlike a url string that the client would normalize first
+function rawGetPath(base: string, requestPath: string): Promise<RawResponse> {
+  const { hostname, port } = new URL(base);
+
+  return new Promise((resolve, reject) => {
+    const req = http.get({ hostname, port, path: requestPath }, (res) => {
+      res.resume();
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: '' }));
     });
 
     req.on('error', reject);
@@ -212,26 +231,59 @@ describe('encoding negotiation', () => {
     expect(second.status).toBe(304);
     expect(second.headers['vary']).toBe('Accept-Encoding');
   });
+
+  test('never serves an encoding the client refuses with q=0', async () => {
+    const url = await startServer(createApp());
+    const res = await rawGet(`${url}/hello.txt`, { 'accept-encoding': 'br;q=0, gzip' });
+
+    expect(res.headers['content-encoding']).toBe('gzip');
+    expect(res.body).toBe('gz-variant');
+  });
+
+  test('serves the variant of a file whose name is percent-encoded in the url', async () => {
+    const url = await startServer(createApp());
+    const res = await rawGet(`${url}/with%20space.txt`, { 'accept-encoding': 'br' });
+
+    expect(res.headers['content-encoding']).toBe('br');
+    expect(res.body).toBe('spaced-br-variant');
+  });
+
+  test('serves the variant of html resolved from an extension-less url', async () => {
+    const cases = [
+      { app: createApp(), path: '/', body: 'root-index-br-variant' },
+      { app: createApp({ trailingSlash: 'always' }), path: '/docs/', body: 'docs-index-br-variant' },
+      { app: createApp({ buildFormat: 'file' }), path: '/page', body: 'page-br-variant' },
+    ];
+
+    for (const { app, path: target, body } of cases) {
+      const url = await startServer(app);
+      const res = await rawGet(`${url}${target}`, { 'accept-encoding': 'br' });
+
+      expect(res.headers['content-encoding'], target).toBe('br');
+      expect(res.headers['vary'], target).toBe('Accept-Encoding');
+      expect(res.body, target).toBe(body);
+    }
+  });
 });
 
 describe('trailing slash handling', () => {
-  test('never: redirects directory requests with a trailing slash', async () => {
-    const url = await startServer(createApp({ trailingSlash: 'never' }));
-    const res = await rawGet(`${url}/docs/?a=1`);
+  // the setting is enforced by path-redirects.ts ahead of this handler, which only serves
+  const settings = ['never', 'always', 'ignore'] as const;
 
-    expect(res.status).toBe(301);
-    expect(res.headers['location']).toBe('/docs?a=1');
+  test('serves the directory index with and without a trailing slash under every setting', async () => {
+    for (const trailingSlash of settings) {
+      const url = await startServer(createApp({ trailingSlash }));
+
+      for (const target of ['/docs', '/docs/', '/docs/?a=1']) {
+        const res = await rawGet(`${url}${target}`);
+
+        expect(res.status, `${trailingSlash} ${target}`).toBe(200);
+        expect(res.body, `${trailingSlash} ${target}`).toBe('docs index');
+      }
+    }
   });
 
-  test('never: serves the directory index without a trailing slash', async () => {
-    const url = await startServer(createApp({ trailingSlash: 'never' }));
-    const res = await rawGet(`${url}/docs`);
-
-    expect(res.status).toBe(200);
-    expect(res.body).toBe('docs index');
-  });
-
-  test('never: does not redirect the root path', async () => {
+  test('serves the root index', async () => {
     const url = await startServer(createApp({ trailingSlash: 'never' }));
     const res = await rawGet(`${url}/`);
 
@@ -239,42 +291,39 @@ describe('trailing slash handling', () => {
     expect(res.body).toBe('root index');
   });
 
-  test('always: redirects extension-less paths to the slashed form', async () => {
-    const url = await startServer(createApp({ trailingSlash: 'always' }));
-    const res = await rawGet(`${url}/docs?a=1`);
+  test('leaves a path without a file to ssr instead of redirecting it', async () => {
+    for (const trailingSlash of settings) {
+      const url = await startServer(createApp({ trailingSlash }));
 
-    expect(res.status).toBe(301);
-    expect(res.headers['location']).toBe('/docs/?a=1');
+      for (const target of ['/missing', '/missing/', '/_internal']) {
+        const res = await rawGet(`${url}${target}`);
+
+        expect(res.status, `${trailingSlash} ${target}`).toBe(555);
+        expect(res.headers['location'], `${trailingSlash} ${target}`).toBeUndefined();
+      }
+    }
   });
 
-  test('always: does not redirect paths with a file extension', async () => {
-    const url = await startServer(createApp({ trailingSlash: 'always' }));
-    const res = await rawGet(`${url}/hello.txt`);
+  test('never redirects a path that browsers resolve against another host', async () => {
+    const targets = [
+      String.raw`/\evil.example/../_astro/`,
+      '//evil.example/../_astro/',
+      String.raw`/\evil.example/landing`,
+      '//evil.example/landing',
+    ];
 
-    expect(res.status).toBe(200);
-    expect(res.body).toBe('identity content');
+    for (const trailingSlash of settings) {
+      const url = await startServer(createApp({ trailingSlash }));
+
+      for (const target of targets) {
+        const res = await rawGetPath(url, target);
+
+        expect(res.status, `${trailingSlash} ${target}`).toBe(555);
+        expect(res.headers['location'], `${trailingSlash} ${target}`).toBeUndefined();
+      }
+    }
   });
 
-  test('always: does not redirect underscore-prefixed paths', async () => {
-    const url = await startServer(createApp({ trailingSlash: 'always' }));
-    const res = await rawGet(`${url}/_internal`);
-
-    expect(res.status).toBe(555);
-    expect(res.body).toBe('ssr-fallback');
-  });
-
-  test('ignore: serves the directory index with and without a trailing slash', async () => {
-    const url = await startServer(createApp({ trailingSlash: 'ignore' }));
-
-    const withoutSlash = await rawGet(`${url}/docs`);
-    const withSlash = await rawGet(`${url}/docs/`);
-
-    expect(withoutSlash.body).toBe('docs index');
-    expect(withSlash.body).toBe('docs index');
-  });
-});
-
-describe('build format', () => {
   test('file: resolves extension-less pages to their .html file', async () => {
     const url = await startServer(createApp({ buildFormat: 'file' }));
     const res = await rawGet(`${url}/page`);

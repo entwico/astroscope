@@ -1,4 +1,4 @@
-import { type IncomingMessage, type Server, createServer } from 'node:http';
+import { type IncomingMessage, type Server, createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import pino, { type DestinationStream } from 'pino';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -22,6 +22,26 @@ afterEach(async () => {
   logLines.length = 0;
   getLogStore().root = undefined;
 });
+
+/** node's client sends the path as given, unlike fetch, which resolves dot segments first */
+function fetchRawPath(url: string, path: string): Promise<string> {
+  const { hostname, port } = new URL(url);
+
+  return new Promise((resolve, reject) => {
+    const req = request({ hostname, port, path, method: 'GET' }, (res) => {
+      let body = '';
+
+      res.setEncoding('utf8');
+      res.on('data', (chunk: string) => {
+        body += chunk;
+      });
+      res.on('end', () => resolve(body));
+    });
+
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 function enableLogCapture(): void {
   getLogStore().root = pino({ base: null, timestamp: false }, sink);
@@ -97,6 +117,15 @@ describe('dispatchNativeMount routing', () => {
     expect(await fetchText(`${url}/oidc/auth`)).toBe('oidc:/oidc/auth');
     expect(await fetchText(`${url}/oidc?client_id=1`)).toBe('oidc:/oidc?client_id=1');
     expect(await fetchText(`${url}/oidcx`)).toBe('fallthrough');
+  });
+
+  test('prefixes match the path as astro sees it, dot segments resolved', async () => {
+    mountNativeHandler({ prefix: '/oidc' }, (req, res) => void res.end(`oidc:${req.url ?? ''}`));
+
+    const url = await startServer();
+
+    expect(await fetchRawPath(url, '/x/../oidc/cb')).toBe('oidc:/x/../oidc/cb');
+    expect(await fetchRawPath(url, '/oidc/../admin')).toBe('fallthrough');
   });
 
   test('the longest matching prefix wins regardless of registration order', async () => {

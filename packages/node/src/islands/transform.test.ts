@@ -181,6 +181,47 @@ describe('createIslandsTransformer', () => {
   });
 });
 
+describe('createIslandsTransformer with preloading off', () => {
+  function applyWithoutPreload(html: string): string {
+    const rewriter = createIslandsTransformer(manifest, { preload: false }).createDocumentRewriter();
+
+    return rewriter.write(html) + rewriter.end();
+  }
+
+  test('emits only the emitter html, for every directive', () => {
+    registerIslandEmitter(() => ({ links: ['/_astro/x.js'], imports: ['/_astro/y.js'], html: '<script>d()</script>' }));
+
+    const out = applyWithoutPreload(island('load') + island('visible'));
+
+    expect(out.match(/<script>d\(\)<\/script>/g)).toHaveLength(2);
+    expect(out).not.toContain('modulepreload');
+    expect(out).not.toContain('gate runtime');
+    expect(out).not.toContain('__islands__');
+    expect(out).not.toContain('/_astro/x.js');
+    expect(out).not.toContain('/_astro/y.js');
+  });
+
+  test('leaves the document untouched without emitters', () => {
+    const html = island('load') + island('visible');
+
+    expect(applyWithoutPreload(html)).toBe(html);
+  });
+
+  test('emitters still receive the resolved closures', () => {
+    const seen: string[][] = [];
+
+    registerIslandEmitter((info) => {
+      seen.push(info.fullClosure);
+
+      return null;
+    });
+
+    applyWithoutPreload(island('load'));
+
+    expect(seen[0]).toContain('/_astro/Lazy.ddd.js');
+  });
+});
+
 describe('insertIntoHead', () => {
   test('inserts before </head>', () => {
     const html = '<html><head><meta charset="utf-8"><title>t</title></head><body></body></html>';
@@ -199,6 +240,26 @@ describe('insertIntoHead', () => {
   test('falls back to right after <head> when the closing tag is omitted', () => {
     expect(insertIntoHead('<html><head lang="en"><title>t</title><body></body></html>', 'x')).toBe(
       '<html><head lang="en">x<title>t</title><body></body></html>',
+    );
+  });
+
+  test('inserts before the closing head tag, not before head-like text inside a script', () => {
+    const html = '<html><head><script>const end = "</head>";</script></head><body></body></html>';
+
+    expect(insertIntoHead(html, '<script>x</script>')).toBe(
+      '<html><head><script>const end = "</head>";</script><script>x</script></head><body></body></html>',
+    );
+  });
+
+  test('ignores a closing head tag inside a comment', () => {
+    const html = '<html><head><!-- </head> --><title>t</title></head><body></body></html>';
+
+    expect(insertIntoHead(html, 'x')).toBe('<html><head><!-- </head> --><title>t</title>x</head><body></body></html>');
+  });
+
+  test('does not take <header> for the head', () => {
+    expect(insertIntoHead('<html><body><header>h</header></body></html>', 'x')).toBe(
+      'x<html><body><header>h</header></body></html>',
     );
   });
 

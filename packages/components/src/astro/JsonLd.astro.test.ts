@@ -35,6 +35,12 @@ describe('JsonLd', () => {
     expect(JSON.parse(scriptBody(html))['@graph']).toHaveLength(2);
   });
 
+  test('leaves an absent thing out of @graph', async () => {
+    const html = await render({ content: undefined });
+
+    expect(JSON.parse(scriptBody(html))['@graph']).toEqual([]);
+  });
+
   test('escapes `<` in schema values', async () => {
     const html = await render({ content: { '@type': 'X', name: '</script>' } });
 

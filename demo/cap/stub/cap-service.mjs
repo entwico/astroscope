@@ -41,7 +41,7 @@ export function startCapStub({ port = 14363, siteKey = 'demo', secretKey = 'demo
         return;
       }
 
-      const token = `cap-${randomBytes(12).toString('hex')}`;
+      const token = `${siteKey}:${randomBytes(8).toString('hex')}:${randomBytes(12).toString('hex')}`;
 
       tokens.add(token);
       json(res, 200, { success: true, token, expires: Date.now() + TOKEN_LIFETIME_MS });
@@ -56,7 +56,19 @@ export function startCapStub({ port = 14363, siteKey = 'demo', secretKey = 'demo
         return;
       }
 
-      json(res, 200, { success: body.secret === secretKey && tokens.delete(body.response) });
+      if (body.secret !== secretKey) {
+        json(res, 403, { success: false, error: 'Invalid site key or secret' });
+
+        return;
+      }
+
+      if (!tokens.delete(body.response)) {
+        json(res, 404, { success: false, error: 'Token not found' });
+
+        return;
+      }
+
+      json(res, 200, { success: true });
 
       return;
     }

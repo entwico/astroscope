@@ -1,5 +1,6 @@
 import type { Rule } from 'eslint';
 import type { Node, ObjectExpression, Property } from 'estree';
+import { isTranslateCall } from './translate-call.js';
 
 // a meta string is non-extractable when built via `+` concatenation, an interpolated template
 // literal or a tagged template (`String.raw`) — the build cannot read any of them statically
@@ -35,7 +36,7 @@ export const tStaticMeta: Rule.RuleModule = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'require `t()` fallback and description strings to be static string literals',
+      description: 'require `t()` and `rich()` fallback and description strings to be static string literals',
     },
     messages: {
       dynamicMeta:
@@ -57,7 +58,7 @@ export const tStaticMeta: Rule.RuleModule = {
 
     return {
       CallExpression(node) {
-        if (node.callee.type !== 'Identifier' || node.callee.name !== 't') return;
+        if (!isTranslateCall(node.callee)) return;
 
         const meta = node.arguments[1];
 

@@ -118,6 +118,14 @@ describe('prod delivery (sliced)', () => {
     expect(stats).toBeGreaterThan(lastIsland);
   });
 
+  test('a page reading a wormhole on the server only delivers nothing, even if another page\'s script reads it', async () => {
+    const html = await page(PROD_PORT, '/server-only');
+
+    expect(html).toContain('The counter stands at');
+    expect(html).not.toContain('__wormholes__');
+    expect(html).not.toContain('"counter"');
+  });
+
   test('wormholes never read on the client are not delivered', async () => {
     const html = await page(PROD_PORT);
 
@@ -172,14 +180,17 @@ describe('prod loading (per route)', () => {
     const { readFileSync } = await import('node:fs');
     const manifest = JSON.parse(
       readFileSync(new URL('../dist/server/chunks/wormhole-manifest.json', import.meta.url), 'utf8'),
-    ) as { routes: Record<string, string[]>; scripts: string[] };
+    ) as { routes: Record<string, string[]>; scripts: string[]; scriptsByRoute: Record<string, string[]> };
 
     // frontmatter reads plus the page script's
     expect(manifest.routes['/']?.toSorted((a, b) => a.localeCompare(b))).toEqual(['config', 'counter', 'stats']);
     expect(manifest.routes['/plain']).toEqual([]);
     expect(manifest.routes['/api/loads']).toEqual([]);
     expect(manifest.routes['/_actions/[...path]']).toEqual(['counter']);
+    expect(manifest.routes['/server-only']).toEqual(['counter']);
     expect(manifest.scripts.toSorted((a, b) => a.localeCompare(b))).toEqual(['counter', 'stats']);
+    expect(manifest.scriptsByRoute['/']?.toSorted((a, b) => a.localeCompare(b))).toEqual(['counter', 'stats']);
+    expect(manifest.scriptsByRoute['/server-only']).toEqual([]);
   });
 });
 

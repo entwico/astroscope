@@ -21,6 +21,24 @@ export function componentUrlToChunkName(componentUrl: string): string {
   return componentUrl.replace(/^\/_astro\//, '').replace(/\.js$/, '');
 }
 
+/** the chunk endpoint's path under the site's base */
+export const I18N_CHUNK_PATH = '/_i18n/';
+
+/**
+ * The url prefix of the chunk endpoint for a site's astro `base`: the chunks live
+ * under the base like astro's own `/_astro/` assets and `/_image` endpoint, so a
+ * proxy routing only the base path to the site still reaches them.
+ *
+ * @example
+ * chunkPrefixFor('/') // → '/_i18n/'
+ * chunkPrefixFor('/docs/') // → '/docs/_i18n/'
+ */
+export function chunkPrefixFor(base: string): string {
+  const path = base.replaceAll(/^\/+|\/+$/g, '');
+
+  return path === '' ? I18N_CHUNK_PATH : `/${path}${I18N_CHUNK_PATH}`;
+}
+
 /**
  * Build the URL path for fetching a translation chunk
  *
@@ -28,6 +46,6 @@ export function componentUrlToChunkName(componentUrl: string): string {
  * buildI18nChunkUrl('en', '_astro/Cart.C_sxtxbl', 'bzh6rx')
  * // → '/_i18n/en/Cart.C_sxtxbl.bzh6rx.js'
  */
-export function buildI18nChunkUrl(locale: string, chunkId: string, hash: string): string {
-  return `/_i18n/${locale}/${chunkIdToName(chunkId)}.${hash}.js`;
+export function buildI18nChunkUrl(locale: string, chunkId: string, hash: string, prefix = I18N_CHUNK_PATH): string {
+  return `${prefix}${locale}/${chunkIdToName(chunkId)}.${hash}.js`;
 }

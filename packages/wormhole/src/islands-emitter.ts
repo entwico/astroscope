@@ -5,7 +5,7 @@ import {
   registerIslandEmitter,
 } from '@astroscope/node/islands';
 import { log } from '@astroscope/node/log';
-import { createWormholeMergeScript } from './client-state.js';
+import { createWormholeMergeScript, createWormholeMergeScriptFromEntries, jsonForScript } from './client-state.js';
 import type { WormholeManifest } from './extraction/types.js';
 import { getWormholeManifest } from './manifest.js';
 import { namesInClosure } from './reachable.js';
@@ -62,6 +62,10 @@ function reachableFor(island: IslandInfo, manifest: WormholeManifest): Reachable
  */
 export function createWormholeDocumentEmitter(dev: boolean = IS_DEV): DocumentEmitter {
   return (context) => {
+    if (context.isPrerendered) {
+      return null;
+    }
+
     const request = getRequestWormholes(context.request);
 
     if (!request || request.values.size === 0) {
@@ -85,9 +89,13 @@ export function createWormholeDocumentEmitter(dev: boolean = IS_DEV): DocumentEm
       return { head: createWormholeMergeScript(Object.fromEntries(request.values)) };
     }
 
-    const names = manifest.scripts.includes('*')
+    // the scripts of the route's own components; a route the build could not attribute gets every script's
+    const scripts = Object.hasOwn(manifest.scriptsByRoute, context.routePattern)
+      ? manifest.scriptsByRoute[context.routePattern]!
+      : manifest.scripts;
+    const names = scripts.includes('*')
       ? request.values.keys().toArray()
-      : manifest.scripts.filter((name) => request.values.has(name));
+      : scripts.filter((name) => request.values.has(name));
 
     if (names.length === 0) {
       return null;
@@ -105,6 +113,17 @@ export function createWormholeDocumentEmitter(dev: boolean = IS_DEV): DocumentEm
       },
     };
   };
+}
+
+/** `"name":json` for the merge script, null (logged) when the value cannot be serialized */
+function serializeEntry(name: string, value: unknown): string | null {
+  try {
+    return `${JSON.stringify(name)}:${jsonForScript(value)}`;
+  } catch (error) {
+    log.error({ err: error, wormhole: name }, 'wormhole value cannot be serialized');
+
+    return null;
+  }
 }
 
 export function registerWormholeEmitters(): void {
@@ -130,23 +149,29 @@ export function registerWormholeEmitters(): void {
     }
 
     const candidates = reachableFor(island, manifest) ?? request.values.keys();
-    const entries: Record<string, unknown> = {};
-    let count = 0;
+    const entries: string[] = [];
 
     for (const name of candidates) {
       if (!request.values.has(name) || request.emitted.has(name)) {
         continue;
       }
 
+      const entry = serializeEntry(name, request.values.get(name));
+
+      // a value that cannot be serialized is dropped alone; its name stays unemitted,
+      // so the names serialized with it still ship
+      if (entry === null) {
+        continue;
+      }
+
       request.emitted.add(name);
-      entries[name] = request.values.get(name);
-      count++;
+      entries.push(entry);
     }
 
-    if (count === 0) {
+    if (entries.length === 0) {
       return null;
     }
 
-    return { html: createWormholeMergeScript(entries) };
+    return { html: createWormholeMergeScriptFromEntries(entries) };
   });
 }

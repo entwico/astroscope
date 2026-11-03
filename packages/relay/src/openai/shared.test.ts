@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { openai } from './shared.js';
+import { openai, toMinorUnits } from './shared.js';
 
 describe('openai builders', () => {
   test('a contents event carries its items in minor units and the identifiers', () => {
@@ -80,5 +80,22 @@ describe('openai builders', () => {
   test('rounds to the minor unit', () => {
     expect(openai.contentsViewed({ items: [{ id: '1', name: 'x', price: 0.1 + 0.2, quantity: 1 }], value: 0.3, currency: 'CHF' }).data)
       .toMatchObject({ amount: 30, contents: [{ amount: 30 }] });
+  });
+
+  test('the minor unit follows the currency', () => {
+    const item = (price: number) => [{ id: '1', name: 'x', price, quantity: 1 }];
+
+    expect(openai.orderCreated({ items: item(1000), currency: 'JPY' }).data).toMatchObject({ amount: 1000, contents: [{ amount: 1000 }] });
+    expect(openai.orderCreated({ items: item(1.5), currency: 'KWD' }).data).toMatchObject({ amount: 1500, contents: [{ amount: 1500 }] });
+    expect(openai.leadCreated(undefined, { value: 1.5, currency: 'XYZ' }).data).toMatchObject({ amount: 150 });
+    expect(toMinorUnits(1.5)).toBe(150);
+  });
+
+  test('a custom event name outside the rule or taken by a standard event is rejected', () => {
+    expect(() => openai.custom('Quote Requested')).toThrow(TypeError);
+    expect(() => openai.custom('')).toThrow(TypeError);
+    expect(() => openai.custom('a'.repeat(65))).toThrow(TypeError);
+    expect(() => openai.custom('lead_created')).toThrow('standard');
+    expect(openai.custom('quote-requested_2')).toMatchObject({ customName: 'quote-requested_2' });
   });
 });

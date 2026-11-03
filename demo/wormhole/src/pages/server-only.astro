@@ -1,0 +1,12 @@
+---
+import '../styles/index.css';
+import { wormholes } from '@astroscope/wormhole';
+import Layout from '../../../shared/Layout.astro';
+
+// read in frontmatter only: no island and no script of this page needs it in the browser
+const counter = wormholes.counter.get();
+---
+
+<Layout title="Wormhole Demo — server-only read" package="@astroscope/wormhole">
+  <p class="text-lg">The counter stands at <strong>{counter.count}</strong>, read on the server — nothing of it reaches the browser.</p>
+</Layout>

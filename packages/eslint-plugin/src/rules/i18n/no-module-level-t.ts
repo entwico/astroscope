@@ -1,10 +1,11 @@
 import type { Rule } from 'eslint';
+import { isTranslateCall } from './translate-call.js';
 
 export const noModuleLevelT: Rule.RuleModule = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'forbid `t()` calls at module level (outside functions)',
+      description: 'forbid `t()` and `rich()` calls at module level (outside functions)',
     },
     messages: {
       moduleLevelT:
@@ -17,7 +18,7 @@ export const noModuleLevelT: Rule.RuleModule = {
 
     return {
       CallExpression(node) {
-        if (node.callee.type !== 'Identifier' || node.callee.name !== 't') return;
+        if (!isTranslateCall(node.callee)) return;
 
         // walk up the scope chain — if we never hit a function boundary, it's module-level
         let scope = context.sourceCode.getScope(node);

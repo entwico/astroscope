@@ -1,7 +1,7 @@
 export type { ConversionUser } from './conversion-user.js';
 export { inlineTrack } from './inline.js';
 export type { CollectOptions } from './collect.js';
-export { collect } from './collect.js';
+export { collect } from './client/collect.js';
 export type {
   AddPaymentInfoParams,
   AddShippingInfoParams,
@@ -36,7 +36,7 @@ export type {
   RelayDestinations,
   TrackInput,
 } from './shared.js';
-export { RELAY_TRACK_ATTRIBUTE, defineEvent, trackAttribute } from './shared.js';
+export { defineEvent } from './shared.js';
 
 /** the integration is server-only; the browser build of the root entry never loads it */
 export default function relayIntegration(): never {

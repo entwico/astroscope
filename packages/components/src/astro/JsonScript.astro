@@ -10,8 +10,8 @@ const { data, type = 'application/json', id } = Astro.props;
 // escape `<` so a value containing `</script>` (or `<!--`) can't break out of the
 // inline script. astro has no native safe way to render a data `<script>` block —
 // `define:vars` only works on executable scripts, not `type="application/ld+json"`.
-const json = JSON.stringify(data).replaceAll('<', String.raw`\u003c`);
-const attrs = `type="${type}"${id ? ` id="${id}"` : ''}`;
+// `JSON.stringify(undefined)` is no string, so an absent value renders as `null`.
+const json = (JSON.stringify(data) ?? 'null').replaceAll('<', String.raw`\u003c`);
 ---
 
-<Fragment set:html={`<script ${attrs}>${json}</script>`} />
+<script is:inline type={type} id={id} set:html={json} />

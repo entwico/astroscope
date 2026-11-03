@@ -13,6 +13,7 @@ const tester = new RuleTester({
   languageOptions: {
     parser: astroEslintParser,
     sourceType: 'module',
+    parserOptions: { parser: tsParser },
   },
 });
 
@@ -44,6 +45,17 @@ const cart = wormholes.cart.get();
   wormholes.counter.set({ count: 1 });
   wormholes.counter.subscribe(() => {});
 </script>
+`,
+    },
+    // the other exports of a namespace import are not the registry
+    {
+      filename,
+      code: `---
+import * as W from '@astroscope/wormhole';
+
+const cart = W.wormholes.cart.get();
+W.openWormholes.set?.({});
+---
 `,
     },
     // .ts files are out of scope — set() there may be legit client code
@@ -80,6 +92,38 @@ wormholes.counter.subscribe(() => {});
 import { wormholes } from '@astroscope/wormhole';
 
 wormholes['counter'].set({ count: 1 });
+---
+`,
+      errors: [{ messageId: 'serverSet' }],
+    },
+    // computed method, typescript wrappers, namespace import
+    {
+      filename,
+      code: `---
+import { wormholes } from '@astroscope/wormhole';
+
+wormholes.counter['set']({ count: 1 });
+---
+`,
+      errors: [{ messageId: 'serverSet' }],
+    },
+    {
+      filename,
+      code: `---
+import { wormholes } from '@astroscope/wormhole';
+
+wormholes.cart.set!({ items: [] });
+(wormholes.cart as any).subscribe(() => {});
+---
+`,
+      errors: [{ messageId: 'serverSet' }, { messageId: 'serverSubscribe' }],
+    },
+    {
+      filename,
+      code: `---
+import * as W from '@astroscope/wormhole';
+
+W.wormholes.cart.set({ items: [] });
 ---
 `,
       errors: [{ messageId: 'serverSet' }],

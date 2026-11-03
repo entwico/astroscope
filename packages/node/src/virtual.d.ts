@@ -11,6 +11,8 @@ declare module 'virtual:@astroscope/node/islands-manifest' {
   import type { IslandsManifest } from './islands/types.js';
 
   export const manifest: IslandsManifest | null;
+  /** false with `islands: false`: emitters still run per island, nothing is preloaded */
+  export const preload: boolean;
 }
 
 declare module 'virtual:@astroscope/node/log-entry' {

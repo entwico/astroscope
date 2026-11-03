@@ -76,15 +76,48 @@ function renderToStaticMarkup(
         'astro.island.render.mode': typeof rendered === 'string' ? 'string' : 'stream',
       });
 
-      return {
-        // strip react 19 auto-injected resource hints (preloads, etc.) from island
-        // output — these belong in <head>, not inside the island
-        // see https://github.com/facebook/react/issues/27910
-        html: html.replaceAll(/<link\s[^>]*rel="(?:preload|modulepreload|stylesheet|preconnect|dns-prefetch)"[^>]*>/g, ''),
-        attrs,
-      };
+      return { html: stripHoistedResources(html), attrs };
     });
   });
+}
+
+const LEADING_LINK = /<link\s[^>]*>/y;
+const HINT_RELS = new Set(['preload', 'modulepreload', 'preconnect', 'dns-prefetch']);
+
+/**
+ * React 19 hoists resources (preloads, preconnects, stylesheets with a
+ * `precedence`) to the start of the output, ahead of the island's own markup —
+ * they belong in `<head>`, not inside the island, so the leading run is
+ * dropped. Everything after the first non-resource byte is the component's
+ * markup: an in-place stylesheet, slot html, inline script text.
+ * See https://github.com/facebook/react/issues/27910.
+ */
+function stripHoistedResources(html: string): string {
+  let offset = 0;
+
+  while (true) {
+    LEADING_LINK.lastIndex = offset;
+
+    const tag = LEADING_LINK.exec(html)?.[0];
+
+    if (!tag || !isHoistedResource(tag)) {
+      break;
+    }
+
+    offset += tag.length;
+  }
+
+  return offset === 0 ? html : html.slice(offset);
+}
+
+function isHoistedResource(tag: string): boolean {
+  const rel = /\srel="([^"]*)"/.exec(tag)?.[1];
+
+  if (rel === 'stylesheet') {
+    return tag.includes(' data-precedence="');
+  }
+
+  return rel !== undefined && HINT_RELS.has(rel);
 }
 
 const check: NamedSSRLoadedRendererValue['check'] = async function (this: RendererContext, Component, ...rest) {
@@ -123,13 +156,23 @@ function isFormRequest(contentType: string | null) {
 
 type FormState = [actionResult: any, actionKey: string, actionName: string];
 
+// every island of a page reads the same form body, so it is parsed once per request
+const formStates = new WeakMap<SSRResult, Promise<FormState | undefined>>();
+
 function getFormState({ result }: RendererContext): MaybePromise<FormState | undefined> {
   const { request, actionResult } = result;
 
   if (!actionResult) return undefined;
   if (!isFormRequest(request.headers.get('content-type'))) return undefined;
 
-  return readFormState(request, actionResult);
+  let formState = formStates.get(result);
+
+  if (!formState) {
+    formState = readFormState(request, actionResult);
+    formStates.set(result, formState);
+  }
+
+  return formState;
 }
 
 async function readFormState(

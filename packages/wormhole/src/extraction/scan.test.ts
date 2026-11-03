@@ -116,6 +116,16 @@ describe('scanWormholeAccess', () => {
     expect(tsx).toEqual({ names: new Set(['cart']), dynamic: false });
   });
 
+  test('accesses through a dynamic import of the package are not lost', () => {
+    const result = scan(`
+      const { wormholes } = await import('@astroscope/wormhole');
+
+      wormholes.cart.get();
+    `);
+
+    expect(!!result && (result.dynamic || result.names.has('cart'))).toBe(true);
+  });
+
   test('unparseable modules degrade to dynamic', () => {
     const result = scan(`import { wormholes } from '@astroscope/wormhole'; const = ;`);
 

@@ -26,8 +26,8 @@ Astro recommends [nanostores](https://docs.astro.build/en/recipes/sharing-state/
 - **Requires `@astroscope/node`** — per-island delivery uses its islands pipeline in production.
 - **The registry is server-only.** It carries the handlers, and with them your server code. Client code must never import `src/wormholes.ts` — it accesses values through the `wormholes` proxy instead. (The client build fails on such an import, and the eslint plugin's `no-registry-import` rule flags it in island code.)
 - **`set()` is client-only.** Server values are request-scoped and come from the handlers.
-- **Values are deeply readonly.** `get()`, `subscribe()` and `useWormhole()` expose the value as `ReadonlyDeep<T>` — in-place mutation would silently bypass subscribers. The only way to update is `set()` with a new value: `wormholes.counter.set({ ...wormholes.counter.get(), count: 1 })`.
-- **Prerendered pages get no wormhole data** — values are per-request by definition.
+- **Values are deeply readonly.** `get()`, `subscribe()` and `useWormhole()` expose the value as `ReadonlyDeep<T>`; update with `set()` and a new value: `wormholes.counter.set({ ...wormholes.counter.get(), count: 1 })`.
+- **Prerendered pages get no wormhole data.**
 
 ## Examples
 
@@ -128,6 +128,8 @@ export function UserBadge() {
 </script>
 ```
 
+A script has no island to attach to, so its wormholes are appended at the end of the stream, on the routes whose components own the script.
+
 ### 3. Update from the client
 
 Call `set()` to update the wormhole — every `useWormhole()` hook and `subscribe()` callback on the page reacts, across islands:
@@ -190,7 +192,7 @@ Exported helper type mapping a registry shape to its value types. The recursivel
 
 Routes the build could not attribute (dev, astro's own routes) load everything. On the client, `set()` updates the shared data and notifies subscribers, keeping islands and scripts in sync.
 
-Each handler runs under its own `wormhole <name>` span beneath the request span — they run in parallel, and the trace shows which one holds the page's first byte — and records `astro.wormhole.handler.duration` {`astro.wormhole.name`}. A throwing handler is counted on `astro.wormhole.handler.failures` {`astro.wormhole.name`, `error.type`}, logged with its name, and fails the request. All through the adapter's telemetry, so nothing runs without its SDK.
+Each handler runs in a `wormhole <name>` span under the request span and records `astro.wormhole.handler.duration` {`astro.wormhole.name`}; a throwing handler counts on `astro.wormhole.handler.failures` {`astro.wormhole.name`, `error.type`}, is logged and fails the request.
 
 ## License
 

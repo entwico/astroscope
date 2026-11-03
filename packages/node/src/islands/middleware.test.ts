@@ -1,7 +1,7 @@
 import type { APIContext, RouteData } from 'astro';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { setRequestRouteData } from '../server/route-store';
-import { registerDocumentEmitter } from './emitters';
+import { registerDocumentEmitter, registerIslandEmitter } from './emitters';
 import { createIslandsMiddleware } from './middleware';
 import type { IslandsManifest } from './types';
 
@@ -130,6 +130,25 @@ describe('createIslandsMiddleware', () => {
 
   test('is inert without a manifest and without document emitters', async () => {
     const middleware = createIslandsMiddleware(null);
+    const response = htmlResponse(HTML);
+
+    expect(await run(middleware, response)).toBe(response);
+  });
+
+  test('with preloading off, island emitters still deliver per island and nothing is preloaded', async () => {
+    registerIslandEmitter(() => ({ links: ['/_astro/x.js'], html: '<script>d()</script>' }));
+
+    const middleware = createIslandsMiddleware(manifest, { preload: false });
+    const result = await run(middleware, htmlResponse(HTML));
+    const out = await result.text();
+
+    expect(out).toContain('<script>d()</script><astro-island');
+    expect(out).not.toContain('modulepreload');
+    expect(out).not.toContain('/_astro/x.js');
+  });
+
+  test('with preloading off and no island emitters the response passes through', async () => {
+    const middleware = createIslandsMiddleware(manifest, { preload: false });
     const response = htmlResponse(HTML);
 
     expect(await run(middleware, response)).toBe(response);

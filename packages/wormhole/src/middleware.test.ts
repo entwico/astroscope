@@ -299,6 +299,7 @@ describe('route-scoped loading', () => {
       {
         chunks: { 'Cart.Cabc': ['cart'], 'Lazy.Cddd': ['session'] },
         scripts: ['stats'],
+        scriptsByRoute: {},
         routes: { '/page': ['audit', 'stats'], '/plain': [] },
       },
       { '/page': [island('_astro/Cart.Cabc.js', '_astro/Lazy.Cddd.js')], '/plain': [] },
@@ -325,7 +326,7 @@ describe('route-scoped loading', () => {
     const { registry, calls } = countingRegistry(defineWormhole, names);
     const { createWormholeMiddleware } = await load(
       registry,
-      { chunks: {}, scripts: [], routes: { '/page': [] } },
+      { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': [] } },
       { '/page': [] },
     );
 
@@ -340,7 +341,7 @@ describe('route-scoped loading', () => {
   test('a route the node manifest does not know loads everything', async () => {
     const { defineWormhole } = await load({});
     const { registry, calls } = countingRegistry(defineWormhole, names);
-    const { createWormholeMiddleware } = await load(registry, { chunks: {}, scripts: [], routes: { '/page': [] } }, {});
+    const { createWormholeMiddleware } = await load(registry, { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': [] } }, {});
 
     await createWormholeMiddleware()(
       createCtx('/page'),
@@ -355,7 +356,7 @@ describe('route-scoped loading', () => {
     const { registry, calls } = countingRegistry(defineWormhole, names);
     const { createWormholeMiddleware } = await load(
       registry,
-      { chunks: { 'Cart.Cabc': ['*'] }, scripts: [], routes: { '/page': [], '/server': ['*'] } },
+      { chunks: { 'Cart.Cabc': ['*'] }, scripts: [], scriptsByRoute: {}, routes: { '/page': [], '/server': ['*'] } },
       { '/page': [island('_astro/Cart.Cabc.js')], '/server': [] },
     );
     const handler = createWormholeMiddleware();
@@ -380,7 +381,7 @@ describe('route-scoped loading', () => {
     const { registry, calls } = countingRegistry(defineWormhole, ['cart']);
     const { createWormholeMiddleware } = await load(
       registry,
-      { chunks: {}, scripts: [], routes: { '/page': ['cart', 'stale'] } },
+      { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': ['cart', 'stale'] } },
       { '/page': [] },
     );
 

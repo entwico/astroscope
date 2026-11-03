@@ -27,8 +27,8 @@ The adapter assumes a container behind a load balancer / reverse proxy (Kubernet
 
 - **Opens `0.0.0.0:9090` in production** — the health probe server. Meant for the kubelet; do not expose it publicly.
 - **Opens `0.0.0.0:9464` in production** — the Prometheus metrics reader. Same: cluster-internal only.
-- **Trusts any `Host` / `X-Forwarded-Host`** — sets `security.allowedDomains: [{}]` (unless you set it yourself), because the reverse proxy is expected to control these headers. Without one, host header injection is possible.
-- **Trusts `X-Forwarded-For`** — anything that keys on the client address (the cap proxy forwards it to the Cap service for its per-IP rate limits) uses the header as received, because the reverse proxy is expected to set it. Exposed directly, a client can send its own and pick its bucket.
+- **Trusts any `Host` / `X-Forwarded-Host`** — sets `security.allowedDomains: [{}]` unless you set it yourself, because the reverse proxy is expected to control these headers. Without one, host header injection is possible.
+- **Trusts `X-Forwarded-For`** — anything that keys on the client address uses the header as received, because the reverse proxy is expected to set it. Exposed directly, a client can send its own.
 - **Overrides Astro security and config defaults** — `security.checkOrigin: false` (the embedded CSRF middleware replaces it; `csrf: false` restores Astro's check), `build.redirects: false` (redirects handled at runtime), `trailingSlash: 'never'` (only when yours is at the default `'ignore'`), `astro:assets` disabled when `image.service` is at its default ([Image processing](#image-processing)).
 - **Limits request bodies to 1 MiB** — every request astro handles, pages and endpoints included, not only actions as astro does. An upload route needs `bodySizeLimit` raised (native mounts are not covered).
 - **Standalone only.** No middleware mode — the adapter always owns the server.
@@ -76,6 +76,18 @@ const dev = getBootContext()?.dev ?? false;
 ```
 
 It is stamped before the platform entry files and the boot lifecycle run, in both prod and dev (re-stamped per dev restart generation).
+
+### Lifecycle events
+
+A library that needs to run at boot or shutdown without a line in the site's `src/boot.ts` listens on `@astroscope/node/events`: `on(event, handler)` and `off(event, handler)` for `beforeOnStartup`, `afterOnStartup`, `beforeOnShutdown` and `afterOnShutdown`. Handlers get the `BootContext`, run in registration order and are awaited one by one; `afterOnShutdown` runs even when `onShutdown` threw.
+
+```typescript
+import { on } from '@astroscope/node/events';
+
+on('beforeOnShutdown', async () => {
+  await flushPendingWork();
+});
+```
 
 ## Platform entry files
 
@@ -147,13 +159,13 @@ const dbLog = log.child({ component: 'db' });
 
 Entries logged before the logger is constructed (env loading, config, instrumentation) are buffered (cap 100) and replayed once construction completes — the original timestamp is kept as a `bufferedTime` field. If startup dies before the logger exists, the buffer is dumped to the console together with the error.
 
-Request logging happens at the native handler on `finish`/`close`: real status code, response size, `ttfb`, aborted-vs-completed, and the route pattern (fed back by an internal astro middleware). An incoming `x-request-id` header is passed through (and echoed on the response); otherwise a short id is generated.
+Request logging happens at the native handler on `finish`/`close`: real status code, response size, `ttfb`, aborted-vs-completed, and the route pattern. An incoming `x-request-id` header is passed through (and echoed on the response); otherwise a short id is generated.
 
 Responses the adapter sends itself get a route label of their own: `static` for a file served from the client dir (public assets, prerendered pages, 200 and 304 alike), `duplicate-slashes` and `trailing-slash` for the path redirects, `body-limit` for a refused body, and a native mount's `name` for observability.
 
 ### Reporting the route yourself
 
-The route comes from the route astro matched, which is wrong for a middleware that serves a request astro has no page for — one that rewrites via `next(url)`, or answers itself. Astro matches `/404` there, so the request is logged as `/404` despite its `200`, and every such request collapses into one `/404` bucket in the request duration metric. `overrideRequestRoute` lets the middleware report what it actually served:
+The route comes from the route astro matched, which is wrong for a middleware that serves a request astro has no page for — one that rewrites via `next(url)`, or answers itself. Astro matches `/404` there, so the request is logged and measured as `/404`. `overrideRequestRoute` lets the middleware report what it actually served:
 
 ```typescript
 import { overrideRequestRoute } from '@astroscope/node/log';
@@ -179,8 +191,9 @@ The adapter itself emits exactly one info line on startup — `server ready { ho
 `node({ telemetry })` ships the standard bundle: NodeSDK, fetch instrumentation via undici (diagnostics-channel based — no `--import` needed), Node runtime + host metrics, and a Prometheus reader on `0.0.0.0:9464`. **Prod: on by default. Dev: off by default** (opt in with `telemetry: { dev: true }`).
 
 - server spans start at the native handler with W3C context extraction; the route pattern and span name are enriched by the internal middleware
-- request metrics: `http.server.request.duration`, `http.server.active_requests`, `astro.action.duration` (semconv bucket boundaries, 5 ms – 10 s); fetch metrics come from the undici instrumentation
-- `astro.render.failures` {`http.route`} counts renders that failed after the status went out. Such a response is truncated on the wire (astro's behavior — the status cannot change anymore), so the counter is the alert signal; the request log line reads `request truncated` at error level next to the failure itself, and the server span carries `astro.response.truncated`
+- `url.query` carries the query string with the values of `redactedQueryParams` replaced by `REDACTED`, by default the signed-url credentials of OpenTelemetry's semantic conventions (exported as `OTEL_REDACTED_QUERY_PARAMS`); an application secret in a query string (an oauth `code`, a reset `token`) needs adding. The same applies to the `query` of extended request logs
+- request metrics: `http.server.request.duration`, `http.server.active_requests`, `astro.action.duration` (`astro.action.name` is the registry name, any other `/_actions/` path counts as `unknown`); fetch metrics come from the undici instrumentation
+- `astro.render.failures` {`http.route`} counts renders that failed after the status went out; the response is truncated on the wire, the request log line reads `request truncated` at error level and the server span carries `astro.response.truncated`
 - the boot lifecycle gets `startup` (with `boot`/`warmup`/`listen` children) and `shutdown` (with `drain`/`onShutdown`) spans
 - trace exporters are driven by the standard `OTEL_*` env vars; without a configured OTLP endpoint, trace exporting defaults to `none` (no failing localhost exports)
 - `OTEL_SDK_DISABLED=true` turns the SDK off entirely
@@ -220,10 +233,10 @@ export function onStartup() {
 }
 ```
 
-- the handler owns the response completely: matched requests are dispatched before static serving and never reach astro middleware or rendering — machine endpoints (`/token`, `/introspection`) need no csrf exclusions because they never meet the csrf middleware
+- the handler owns the response completely: matched requests are dispatched before static serving and never reach astro middleware or rendering, so machine endpoints need no csrf exclusions
 - the handler gets the real request and response: streaming bodies, `socket.remoteAddress`, set-cookie arrays
 - requests stay inside request logging and tracing; `name` becomes the route label for logs, metrics and span names
-- identical in dev — the same registry is dispatched at the connect level, so there is no fake-host-header or dev/prod drift
+- identical in dev
 - matching: `prefix` (segment-aware, longest wins) or a `match(req)` predicate consulted after prefixes, in registration order
 - returns an unregister function; mounts are cleared automatically after `onShutdown` (and between dev restart generations)
 - handler errors are logged and answered with a 500 (unless the handler already sent headers)
@@ -299,7 +312,7 @@ if (denied) return denied;
 
 After the check `user` is required, before it optional.
 
-A denial answers per the request, on every surface: a browser navigation (`text/html` in `Accept`) gets the denying guard's `page` response, the login redirect above or a 404 rewrite, or the status with the message when the guard has none; any other caller gets `{ error: { code, message } }` with the status. So a page fetched from a script gets a json 401 rather than a redirect it cannot follow, and an endpoint opened in a browser gets the login page. A denial raised by a parent in an `extend()` chain keeps the parent's `page` handler.
+A denial answers per the request, on every surface: a browser navigation (`text/html` in `Accept`) gets the denying guard's `page` response, the login redirect above or a 404 rewrite, or the status with the message when the guard has none; any other caller gets `{ error: { code, message } }` with the status. A denial raised by a parent in an `extend()` chain keeps the parent's `page` handler.
 
 Whole areas are guarded from the middleware, with the same guards and the same denial responses:
 
@@ -319,7 +332,9 @@ export const onRequest = sequence(
 );
 ```
 
-Patterns are the exclude-pattern vocabulary (`prefix`, `exact`, `suffix`, `includes`, `pattern`). It is defence in depth, not a replacement for the page-level call: a middleware cannot narrow `locals`, so pages inside the area still call `guard(Astro, [...])` for the typed proofs. That costs nothing extra — a guard that passed runs once per request, and the page's call gets the remembered proofs.
+Patterns are the exclude-pattern vocabulary (`prefix`, `exact`, `suffix`, `includes`, `pattern`). It is defence in depth, not a replacement for the page-level call: a middleware cannot narrow `locals`, so pages inside the area still call `guard(Astro, [...])` for the typed proofs; a guard that passed runs once per request.
+
+A server island renders through astro's own endpoint, outside a prefix rule for the page's path: a component that must not render for everyone calls `guard(Astro, [...])` in its own frontmatter.
 
 ### Available guards
 
@@ -327,7 +342,7 @@ The package ships the guards that depend on the request alone; the ones that dep
 
 #### `rateLimit({ max, window, key?, name? })`
 
-A fixed window per key, in memory and per process: the `max`-th request within `window` ms still passes, the next one is denied with `TOO_MANY_REQUESTS` (429) until the window ends. The key is the client address by default; `key(ctx)` picks another subject (a user id, a target email) or returns `undefined` to exempt a request. Per process means per pod, so the total across replicas is bounded by that factor. Buckets of expired windows are dropped once many keys are tracked; live ones are never evicted.
+A fixed window per key, in memory and per process: the `max`-th request within `window` ms still passes, the next one is denied with `TOO_MANY_REQUESTS` (429) until the window ends. The key is the client address by default; `key(ctx)` picks another subject (a user id, a target email) or returns `undefined` to exempt a request. Per process means per replica.
 
 Put it first in a list, so a flood is refused before a guard that costs something runs:
 
@@ -340,7 +355,7 @@ guards: [rateLimit({ max: 5, window: 60_000 }), captcha()],
 
 ## Exclude patterns
 
-`@astroscope/node/excludes` ships the shared exclude-pattern vocabulary for middlewares. Matching itself comes from [`@entwico/dash/match`](https://github.com/entwico/dash); `ExcludePattern` is the serializable subset of dash's `StringPattern` (`exact` / `prefix` / `suffix` / `includes` / `pattern` — no matcher functions, since adapter options cross a virtual-module boundary).
+`@astroscope/node/excludes` ships the shared exclude-pattern vocabulary for middlewares. Matching itself comes from [`@entwico/dash/match`](https://github.com/entwico/dash); `ExcludePattern` is the serializable subset of dash's `StringPattern` (`exact` / `prefix` / `suffix` / `includes` / `pattern`).
 
 ```typescript
 import { RECOMMENDED_EXCLUDES, shouldExclude, withExcluded } from '@astroscope/node/excludes';
@@ -355,17 +370,17 @@ if (shouldExclude(ctx, [...RECOMMENDED_EXCLUDES, { exact: '/health' }])) return 
 export const onRequest = withExcluded(someExternalMiddleware(), RECOMMENDED_EXCLUDES);
 ```
 
-For hot paths, compile the set once with `createMatcher` from `@entwico/dash/match` instead of scanning per request (the adapter's own request instrumentation does exactly that).
+For hot paths, compile the set once with `createMatcher` from `@entwico/dash/match` instead of scanning per request.
 
 ## Island preloading
 
 Without it, an island's JS loads as a chain: the browser fetches the component module, parses it, discovers its imports, fetches those, and so on. In production the adapter knows each island's chunks from the build and emits preload tags next to the island, so the browser fetches everything in parallel. Deferred islands (`client:visible`, `client:idle`, `client:media`) are preloaded just ahead of their hydration.
 
-Always on in production; `islands: false` disables it.
+Always on in production; `islands: false` disables the preloading only.
 
 ## Pre-compressed static serving
 
-At build time, every compressible file in `dist/client` gets max-quality `.br` (brotli 11) and `.gz` (gzip 9) variants written next to it — variants that don't shrink the file are skipped. At request time the static handler negotiates `Accept-Encoding` and serves the best variant with the original's content-type, `content-encoding`, `vary: accept-encoding` and per-variant etags (304s included). Behind a caching proxy with per-encoding cache keys, the origin serves each asset once per encoding.
+At build time, every compressible file in `dist/client` gets max-quality `.br` (brotli 11) and `.gz` (gzip 9) variants written next to it — variants that don't shrink the file are skipped. At request time the static handler negotiates `Accept-Encoding` and serves the best variant with the original's content-type, `content-encoding`, `vary: accept-encoding` and per-variant etags (304s included).
 
 ## Embedded build tweaks
 
@@ -377,7 +392,7 @@ SSR effect stripping for React islands lives in [`@astroscope/react`](../react).
 
 ## Image processing
 
-In SSR, astro's default sharp service makes `/_image` an on-demand decode+encode endpoint whose transform space is attacker-controlled: every distinct query string (`w`, `h`, `q`, `fit`, `position`, `background`) costs a full sharp run and is a distinct cache key, so no fronting cache can absorb it. Most SSR apps serve pre-generated variants from a CMS/CDN anyway, so the adapter keeps processing off unless you ask for it — governed by one option:
+Astro's default sharp service makes `/_image` an on-demand endpoint anyone can drive, so the adapter keeps image processing off unless you ask for it:
 
 ```typescript
 node({
@@ -385,11 +400,11 @@ node({
 });
 ```
 
-- `'auto'` (default) — on when the astro config sets `image.service` itself, off otherwise
+- `'auto'` (default) — on when the astro config sets an `image.service` other than astro's default sharp, off otherwise. An explicit `sharpImageService()` needs `'on'`
 - `'on'` — astro's default sharp service, no further config needed
 - `'off'` — off even over an explicit `image.service`
 
-Off is loud, not silent: the adapter installs a service whose every method throws with an explanation, so any `astro:assets` use — `<Image>`, `<Picture>`, `getImage()`, markdown or content-collection images — fails at render/build time instead of quietly serving unoptimized bytes. The `/_image` endpoint is replaced with a 404 responder — to clients the endpoint simply doesn't exist. Apps without images never load any of it.
+Off is loud: any `astro:assets` use (`<Image>`, `<Picture>`, `getImage()`, markdown images) throws with an explanation, and `/_image` answers 404.
 
 ## Options
 
@@ -418,7 +433,7 @@ node({
   // false disables it (the log proxy keeps working).
   logging: {
     exclude: [{ prefix: '/internal/' }], // replaces RECOMMENDED_EXCLUDES
-    extended: false, // query/headers/client address (may capture sensitive data)
+    extended: false, // query (redacted per redactedQueryParams)/headers/client address (may capture sensitive data)
     dev: false, // also log requests in dev (astro narrates them already)
   },
 
@@ -436,8 +451,13 @@ node({
   // in the astro config (see the Image processing section)
   imageService: 'auto',
 
+  // query parameters redacted in server spans and extended request logs; replaces
+  // OTEL_REDACTED_QUERY_PARAMS (the signed-url credentials of the OpenTelemetry conventions)
+  redactedQueryParams: [...OTEL_REDACTED_QUERY_PARAMS, 'code', 'token'],
+
   bodySizeLimit: 1024 * 1024, // request body limit in bytes: 413 when announced larger, cut off when chunked
-  shutdownTimeout: 10_000, // ms to wait for in-flight requests on shutdown
+  shutdownTimeout: 10_000, // ms to wait for in-flight requests on shutdown; also bounds onShutdown and the telemetry flush, each
+  keepAliveTimeout: 120_000, // ms an idle keep-alive connection stays open; must exceed the reverse proxy's idle timeout
 });
 ```
 
@@ -473,8 +493,8 @@ On SIGTERM/SIGINT:
 
 1. readiness probe starts failing, `draining` is logged
 2. the server stops accepting connections and waits up to `shutdownTimeout` for in-flight requests
-3. `onShutdown` runs
-4. `shutdown complete { drainMs }` is logged, the health server stops, telemetry flushes, the process exits with code 0
+3. the `beforeOnShutdown` listeners run, then `onShutdown`, then the `afterOnShutdown` listeners — bounded by `shutdownTimeout`; a hanging phase is logged and left behind
+4. `shutdown complete { drainMs }` is logged, the health server stops, telemetry flushes (bounded the same way), the process exits with code 0
 
 ## License
 

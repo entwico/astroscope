@@ -113,7 +113,7 @@ const metadata: WebpageMetadata = {
 </head>
 ```
 
-`<PageMetadata>` emits title, description, `robots`, an absolutized `<link rel="canonical">` (only when `index`), the full `og:*` set **including `og:url`**, a `twitter:card`, and `<link rel="alternate" hreflang>` for every `alternates` entry. Relative `canonical` / `ogImage` values are absolutized against `Astro.url.origin` (override with `origin` when SSR runs behind a proxy).
+`<PageMetadata>` emits title, description, `robots`, an absolutized `<link rel="canonical">` (only when `index`), the full `og:*` set **including `og:url`**, a `twitter:card`, and `<link rel="alternate" hreflang>` for every `alternates` entry. Relative `canonical` / `ogImage` values are absolutized against the request origin, which is whatever `Host` the request named: in production pass `origin` from your config, or set astro's `security.allowedDomains`.
 
 Everything `<PageMetadata>` renders belongs in `<head>`. JSON-LD is intentionally **not** included — it's valid in `<head>` or at the end of `<body>`, so place `<JsonLd>` separately wherever you prefer.
 
@@ -145,7 +145,7 @@ import { JsonScript } from '@astroscope/components/astro';
 <JsonScript type="application/json" id="bootstrap" data={{ featureFlags: { beta: true } }} />
 ```
 
-The data is `JSON.stringify`'d and every `<` is escaped to `\u003c`, so a value containing `</script>` cannot break out of the tag. The browser still parses it back to the exact original.
+The data is `JSON.stringify`'d with `<` escaped, so a value containing `</script>` cannot break out of the tag.
 
 `type` defaults to `application/json`. Use it for any non-executable JSON data block the browser reads but never runs — a client-side script reads it via `JSON.parse(el.textContent)`:
 
@@ -176,7 +176,7 @@ import { WithNoBfCache } from '@astroscope/components/astro';
 </WithNoBfCache>
 ```
 
-It sets a `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` response header **and** registers `pageshow`/`pagehide` handlers.
+It sets a `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` response header **and** registers a `pageshow` handler that reloads a page restored from the cache.
 
 ### `<SmoothHashScroll>`
 
@@ -188,7 +188,7 @@ import { SmoothHashScroll } from '@astroscope/components/astro';
 <SmoothHashScroll />
 ```
 
-Delegates a single click listener that smooth-scrolls same-page `#anchor` links and updates the URL hash for deep-linking.
+Delegates a single click listener on `document` (place it in `<head>` or `<body>`) that smooth-scrolls same-document `#anchor` links and updates the URL hash for deep-linking. Links that open elsewhere (`target`, `download`, another path or query), modified clicks and links to a missing id are left to the browser.
 
 ## License
 

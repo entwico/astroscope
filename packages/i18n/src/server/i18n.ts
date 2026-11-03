@@ -5,6 +5,7 @@ import { getGlobalState } from '../extraction/manifest.js';
 import type { ExtractionManifest } from '../extraction/types.js';
 import { compileTranslations } from '../shared/compiler.js';
 import type { CompiledTranslations, RawTranslations } from '../shared/types.js';
+import { formatErrorReporter } from './format-errors.js';
 import type { FallbackBehavior } from './types.js';
 
 /**
@@ -43,7 +44,7 @@ class I18nSingleton {
   // locale -> compiled MessageFormat 2 functions
   private compiledCache = new Map<string, CompiledTranslations>();
 
-  // locale -> chunk name -> content hash (for cache busting)
+  // locale -> chunk name -> hash of the served chunk body (for cache busting)
   private hashCache = new Map<string, Record<string, string>>();
 
   // "locale:chunkName" -> encoded chunk response body
@@ -69,6 +70,7 @@ class I18nSingleton {
     this.manifestVersion = version;
     this.mergedCache.clear();
     this.compiledCache.clear();
+    this.hashCache.clear();
     this.chunkCache.clear();
   }
 
@@ -158,13 +160,6 @@ class I18nSingleton {
         this.chunkCache.delete(key);
       }
     }
-
-    // recompute hashes if chunk manifest exists (production only)
-    const { chunks } = this.getManifest();
-
-    if (Object.keys(chunks).length > 0) {
-      this.hashCache.set(locale, computeAllChunkHashes(raw, chunks));
-    }
   }
 
   getTranslations(locale: string): RawTranslations {
@@ -204,7 +199,9 @@ class I18nSingleton {
       return cached;
     }
 
-    const compiled = compileTranslations(locale, this.getTranslations(locale));
+    const translations = this.getTranslations(locale);
+    const compiled = compileTranslations(locale, translations, (key, error) =>
+      formatErrorReporter(locale, key, translations[key] ?? '')(error));
 
     this.compiledCache.set(locale, compiled);
 
@@ -224,8 +221,27 @@ class I18nSingleton {
     return this.manifestGetter();
   }
 
+  /**
+   * Chunk hashes of a locale: computed from the translations a chunk body is served
+   * with — the set ones merged with the manifest fallbacks — so the url changes
+   * whenever the body does, a deploy that only edits a fallback included. Empty
+   * without a chunk manifest (dev).
+   */
   getHashes(locale: string): Record<string, string> {
-    return this.hashCache.get(locale) ?? {};
+    this.invalidateIfManifestChanged();
+
+    const cached = this.hashCache.get(locale);
+
+    if (cached) {
+      return cached;
+    }
+
+    const { chunks } = this.getManifest();
+    const hashes = Object.keys(chunks).length > 0 ? computeAllChunkHashes(this.getTranslations(locale), chunks) : {};
+
+    this.hashCache.set(locale, hashes);
+
+    return hashes;
   }
 
   /**
@@ -234,7 +250,8 @@ class I18nSingleton {
    * Returns undefined if chunk not found in manifest.
    */
   getChunkBody(locale: string, chunkName: string): Uint8Array | undefined {
-    const keys = this.getManifest().chunks[chunkName];
+    const { chunks } = this.getManifest();
+    const keys = Object.hasOwn(chunks, chunkName) ? chunks[chunkName] : undefined;
 
     if (!keys) {
       return undefined;

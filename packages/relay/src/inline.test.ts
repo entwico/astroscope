@@ -1,16 +1,27 @@
-import { describe, expect, test } from 'vitest';
-import { inlineTrack } from './inline.js';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { RELAY_QUEUE_SCRIPT, inlineTrack } from './inline.js';
 import './test-destinations.js';
 
+/** runs the head script and an inline call the way a page does, `self` being the window */
+function runInline(script: string): void {
+  // eslint-disable-next-line no-new-func -- the inline scripts run as written
+  new Function(RELAY_QUEUE_SCRIPT + script)();
+}
+
+afterEach(() => {
+  // the inline script assigned the global itself, so the stub clears it before the restore
+  vi.stubGlobal('__relay__', undefined);
+  vi.unstubAllGlobals();
+});
+
 describe('inlineTrack', () => {
-  test('pushes the event into the queue, creating it when needed', () => {
-    const script = inlineTrack({ key: 'viewProduct', event: { a: 'view 1' } });
-    const self: { __relay__?: { q: unknown[] } } = {};
+  test('tracks into the queue the head script creates', () => {
+    vi.stubGlobal('self', globalThis);
 
-    // eslint-disable-next-line no-new-func -- the inline script runs as written
-    new Function('self', script)(self);
+    runInline(inlineTrack({ key: 'viewProduct', event: { a: 'view 1' } }));
+    runInline(inlineTrack({ a: 'view 2' }));
 
-    expect(self.__relay__?.q).toEqual([{ key: 'viewProduct', event: { a: 'view 1' } }]);
+    expect(globalThis.__relay__?.q).toEqual([{ key: 'viewProduct', event: { a: 'view 1' } }, { a: 'view 2' }]);
   });
 
   test('never closes the script tag it is written into', () => {

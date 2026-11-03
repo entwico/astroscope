@@ -28,10 +28,11 @@ declare module '@astroscope/relay' {
  * user_email })`). What an event definition puts under `gtm`.
  */
 export const gtm = {
-  event: (name: string, params: RelayParams = {}): GtmPush => ({ event: name, ...params }),
+  // the name last, so no parameter renames the push
+  event: (name: string, params: RelayParams = {}): GtmPush => ({ ...params, event: name }),
   ...wellKnownEvents(
     (name, params, extra): GtmPush =>
-      isCommerceEvent(name) ? { event: name, ...extra, ecommerce: params } : { event: name, ...extra, ...params },
+      isCommerceEvent(name) ? { ...extra, ecommerce: params, event: name } : { ...extra, ...params, event: name },
   ),
 };
 

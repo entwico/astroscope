@@ -28,18 +28,41 @@ export type AwinSaleParams = {
   parts?: Readonly<Record<string, number>> | undefined;
 };
 
-/** The awin builders: the sale an event definition puts under `awin`. */
+/** a commission group code as awin defines them; `:` and `|` would reshape the parts string */
+const GROUP_CODE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * The awin builders: the sale an event definition puts under `awin`. Throws for a commission group
+ * code outside awin's format or an amount that is not a finite number, since both would corrupt
+ * the sale instead of failing it.
+ */
 export const awin = {
   sale: ({ amount, orderRef, currency, voucher, parts }: AwinSaleParams): AwinSale => ({
-    amount: amount.toFixed(2),
+    amount: formatAmount(amount, 'amount'),
     orderRef,
     parts: Object.entries(parts ?? { DEFAULT: amount })
-      .map(([group, value]) => `${group}:${value.toFixed(2)}`)
+      .map(([group, value]) => `${validGroup(group)}:${formatAmount(value, `parts.${group}`)}`)
       .join('|'),
     currency,
     voucher: voucher ?? '',
   }),
 };
+
+function validGroup(group: string): string {
+  if (!GROUP_CODE.test(group)) {
+    throw new TypeError(`relay: awin commission group ${JSON.stringify(group)} is not a group code (letters, digits, _ and -)`);
+  }
+
+  return group;
+}
+
+function formatAmount(value: number, what: string): string {
+  if (!Number.isFinite(value)) {
+    throw new TypeError(`relay: awin ${what} must be a finite number, got ${String(value)}`);
+  }
+
+  return value.toFixed(2);
+}
 
 type DeclaredSale = AwinSale & {
   channel: 'aw';

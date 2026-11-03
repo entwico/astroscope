@@ -87,6 +87,6 @@ plugin.configs.wormhole = wormholeConfigs;
 
 export { i18nPlugin } from './i18n.js';
 export { wormholePlugin } from './wormhole.js';
-export { DEFAULT_IGNORE_ATTRIBUTES } from './rules/i18n/no-raw-strings-in-jsx.js';
+export { DEFAULT_IGNORE_ATTRIBUTES, DEFAULT_IGNORE_PATTERNS } from './rules/i18n/no-raw-strings-in-jsx.js';
 
 export default plugin;

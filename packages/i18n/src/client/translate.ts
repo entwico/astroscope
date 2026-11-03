@@ -33,7 +33,7 @@ export const t: TranslateFunction = ((
   const state = getI18nState();
   const locale = state?.locale ?? '';
 
-  const raw = state?.translations[key];
+  const raw = state && Object.hasOwn(state.translations, key) ? state.translations[key] : undefined;
 
   if (!raw) {
     // translation missing: use fallback (dev) or key (prod)
@@ -90,7 +90,8 @@ export function rich<T = unknown>(
 
   const state = getI18nState();
 
-  const raw = state?.translations[key] || normalizedMeta.fallback || key;
+  const translated = state && Object.hasOwn(state.translations, key) ? state.translations[key] : undefined;
+  const raw = translated || normalizedMeta.fallback || key;
 
   const parts = formatMessageToParts(state?.locale ?? '', raw, values);
 

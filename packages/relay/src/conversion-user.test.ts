@@ -20,6 +20,22 @@ describe('normalizePhone', () => {
     expect(normalizePhone('', '49')).toBeUndefined();
     expect(normalizePhone(undefined, '49')).toBeUndefined();
   });
+
+  test('a trunk zero in parentheses after the country code is dropped', () => {
+    expect(normalizePhone('+49 (0) 151 2345678', '49')).toBe('491512345678');
+    expect(normalizePhone('0049(0)151 2345678', '49')).toBe('491512345678');
+    expect(normalizePhone('+49 (151) 2345678', '49')).toBe('491512345678');
+  });
+
+  test('a slash separates digit groups', () => {
+    expect(normalizePhone('0151/2345678', '49')).toBe('491512345678');
+    expect(normalizePhone('0151 / 234.56.78', '49')).toBe('491512345678');
+  });
+
+  test('a national number without a country calling code is dropped', () => {
+    expect(normalizePhone('0151 2345678', undefined)).toBeUndefined();
+    expect(normalizePhone('+49 151 2345678', undefined)).toBe('491512345678');
+  });
 });
 
 describe('normalizeName', () => {
@@ -34,6 +50,16 @@ describe('normalizePostalCode', () => {
     expect(normalizePostalCode(' 80331 ')).toBe('80331');
     expect(normalizePostalCode('SW1A 1AA')).toBe('sw1a1aa');
     expect(normalizePostalCode('')).toBeUndefined();
+  });
+
+  test('without dashes', () => {
+    expect(normalizePostalCode('12345-6789')).toBe('123456789');
+  });
+
+  test('the first five digits of a us zip code', () => {
+    expect(normalizePostalCode('12345-6789', 'US')).toBe('12345');
+    expect(normalizePostalCode('12345', 'us')).toBe('12345');
+    expect(normalizePostalCode('12345-6789', 'DE')).toBe('123456789');
   });
 });
 

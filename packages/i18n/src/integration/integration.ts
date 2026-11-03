@@ -21,13 +21,13 @@ export default function i18nIntegration(options: I18nOptions = {}): AstroIntegra
   return {
     name: '@astroscope/i18n',
     hooks: {
-      'astro:config:setup': ({ addMiddleware, updateConfig, logger }) => {
+      'astro:config:setup': ({ addMiddleware, config, updateConfig, logger }) => {
         addMiddleware({ order: 'pre', entrypoint: '@astroscope/i18n/chunk-middleware' });
         addMiddleware({ order: 'post', entrypoint: '@astroscope/i18n/locale-middleware' });
 
         updateConfig({
           vite: {
-            plugins: [i18nVitePlugin({ logger, consistency, exclude })],
+            plugins: [i18nVitePlugin({ logger, consistency, exclude, base: config.base })],
           },
         });
       },

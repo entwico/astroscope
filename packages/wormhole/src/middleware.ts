@@ -122,8 +122,11 @@ export function createWormholeMiddleware(options: WormholeMiddlewareOptions = {}
         }
 
         // the islands emitter and the stream-end script run while the response streams,
-        // outside this ALS scope — the request object carries the values to them
-        setRequestWormholes(ctx.request, { values: open, emitted: new Set() });
+        // outside this ALS scope — the request object carries the values to them; a
+        // prerendered page gets none: its html is built once and served to everyone
+        if (!ctx.isPrerendered) {
+          setRequestWormholes(ctx.request, { values: open, emitted: new Set() });
+        }
 
         return als.run(scope, () => next());
       },

@@ -1,11 +1,7 @@
 import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 import ts from 'typescript';
 
-export interface PluginDocs {
-  description: string;
-  recommended?: boolean;
-  requiresTypeChecking?: boolean;
-}
+import { type PluginDocs, isIslandElement, resolvePropsType, tagName } from '../utils/island.js';
 
 const createRule = ESLintUtils.RuleCreator<PluginDocs>(
   (name) => `https://github.com/entwico/astroscope/tree/main/packages/eslint-plugin#${name}`,
@@ -99,12 +95,39 @@ function getDeclaredPropType(checker: ts.TypeChecker, type: ts.Type, name: strin
   return null;
 }
 
-function getArrayElementType(type: ts.Type, checker: ts.TypeChecker): ts.Type | null {
-  if (!checker.isArrayType(type)) return null;
+const NULLISH_FLAGS = ts.TypeFlags.Undefined | ts.TypeFlags.Null;
 
-  const args = checker.getTypeArguments(type as ts.TypeReference);
+// the constituents that carry a value: an optional prop resolves to `T | undefined`
+function valueConstituents(type: ts.Type): ts.Type[] {
+  return constituents(type).filter((member) => (member.flags & NULLISH_FLAGS) === 0);
+}
 
-  return args[0] ?? null;
+function isArrayLike(type: ts.Type, checker: ts.TypeChecker): boolean {
+  return checker.isArrayType(type) || checker.isTupleType(type);
+}
+
+// the declared element type of an array prop: exactly one array constituent besides nullish ones
+function getDeclaredElementType(type: ts.Type, checker: ts.TypeChecker): ts.Type | null {
+  const values = valueConstituents(type);
+  const only = values[0];
+
+  if (!only || values.length !== 1 || !checker.isArrayType(only)) return null;
+
+  return checker.getTypeArguments(only as ts.TypeReference)[0] ?? null;
+}
+
+// the element types a value can hold: every array or tuple constituent contributes its own, a
+// tuple one per position; `null` when a constituent is not an array at all
+function getActualElementTypes(type: ts.Type, checker: ts.TypeChecker): ts.Type[] | null {
+  const elements: ts.Type[] = [];
+
+  for (const member of valueConstituents(type)) {
+    if (!isArrayLike(member, checker)) return null;
+
+    elements.push(...checker.getTypeArguments(member as ts.TypeReference));
+  }
+
+  return elements;
 }
 
 function isLiteralType(type: ts.Type): boolean {
@@ -203,37 +226,6 @@ function narrowByDiscriminant(expected: ts.Type, actual: ts.Type, checker: ts.Ty
   return matches.length === 1 ? matches[0]! : expected;
 }
 
-function resolveComponentType(checker: ts.TypeChecker, tsTagNode: ts.Node): ts.Type | null {
-  const direct = checker.getTypeAtLocation(tsTagNode);
-
-  if (direct.getCallSignatures().length > 0) return direct;
-
-  const rawSymbol = checker.getSymbolAtLocation(tsTagNode);
-
-  if (!rawSymbol) return null;
-
-  const symbol = rawSymbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(rawSymbol) : rawSymbol;
-  const viaSymbol = checker.getTypeOfSymbolAtLocation(symbol, tsTagNode);
-
-  return viaSymbol.getCallSignatures().length > 0 ? viaSymbol : null;
-}
-
-function resolvePropsType(checker: ts.TypeChecker, tsTagNode: ts.Node): ts.Type | null {
-  const componentType = resolveComponentType(checker, tsTagNode);
-
-  if (!componentType) return null;
-
-  const firstSignature = componentType.getCallSignatures()[0];
-
-  if (!firstSignature) return null;
-
-  const paramSymbol = firstSignature.getParameters()[0];
-
-  if (!paramSymbol) return null;
-
-  return checker.getTypeOfSymbolAtLocation(paramSymbol, tsTagNode);
-}
-
 function formatPath(segments: string[]): string {
   let out = '';
 
@@ -297,12 +289,12 @@ function walkExcess(
 
   try {
     // arrays: descend into element types, under one '[]' path segment
-    const expectedElement = getArrayElementType(expected, checker);
+    const expectedElement = getDeclaredElementType(expected, checker);
 
     if (expectedElement) {
-      const actualElement = getArrayElementType(actual, checker);
+      const actualElements = getActualElementTypes(actual, checker) ?? [];
 
-      if (actualElement) {
+      for (const actualElement of actualElements) {
         walkExcess(expectedElement, actualElement, [...path, '[]'], seen, out, checker, site);
       }
 
@@ -410,19 +402,11 @@ export const noExcessJsxProps = createRule({
 
     return {
       JSXOpeningElement(node: TSESTree.JSXOpeningElement) {
-        const tag = node.name;
-
-        if (tag.type !== 'JSXIdentifier') return;
-        // lowercase → intrinsic HTML element, not our surface
-        if (/^[a-z]/.test(tag.name)) return;
-
         // only hydrated components serialize props to the browser
-        const hydrated = node.attributes.some(
-          (a) => a.type === 'JSXAttribute' && a.name.type === 'JSXNamespacedName' && a.name.namespace.name === 'client',
-        );
+        if (!isIslandElement(node)) return;
 
-        if (!hydrated) return;
-
+        const tag = node.name;
+        const comp = tagName(tag);
         const tsTagNode = services.esTreeNodeToTSNodeMap.get(tag);
         const propsType = resolvePropsType(checker, tsTagNode);
 
@@ -434,7 +418,7 @@ export const noExcessJsxProps = createRule({
             const argType = checker.getTypeAtLocation(tsArg);
             const excess = collectExcessPaths(propsType, argType, [], checker, tsTagNode);
 
-            report(attr, excess, tag.name);
+            report(attr, excess, comp);
             continue;
           }
 
@@ -452,7 +436,7 @@ export const noExcessJsxProps = createRule({
           const actualSub = checker.getTypeAtLocation(tsExpr);
           const excess = collectExcessPaths(declaredSub, actualSub, [attrName], checker, tsTagNode);
 
-          report(attr, excess, tag.name);
+          report(attr, excess, comp);
         }
       },
     };

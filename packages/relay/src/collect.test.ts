@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { collect } from './collect.js';
+import { createCollect } from './collect.js';
 
 describe('collect', () => {
+  const collect = createCollect();
+
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -100,6 +102,31 @@ describe('collect', () => {
     expect(flush.mock.calls).toEqual([
       ['list', [1]],
       ['list', [2]],
+    ]);
+  });
+
+  test('keeps a buffer per scope object', () => {
+    const flush = vi.fn();
+    let scope: object | undefined;
+    const scoped = createCollect({ current: () => scope, run: (_scope, fn) => fn() });
+    const see = scoped<string, string>({ flush, within: 100 });
+    const first = {};
+    const second = {};
+
+    scope = first;
+    see('list', 'first');
+    scope = second;
+    see('list', 'second');
+    scope = undefined;
+    see('list', 'unscoped');
+    scope = first;
+    see('list', 'first again');
+    vi.runAllTimers();
+
+    expect(flush.mock.calls).toEqual([
+      ['list', ['second']],
+      ['list', ['unscoped']],
+      ['list', ['first', 'first again']],
     ]);
   });
 });

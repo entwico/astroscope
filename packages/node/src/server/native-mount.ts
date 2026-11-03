@@ -111,10 +111,20 @@ export function clearNativeMounts(): void {
   getStore().mounts.length = 0;
 }
 
+// the path as astro sees it: dot segments resolved, so a mount and a route never
+// disagree about where a request lands
+function requestPathname(url: string): string {
+  try {
+    return new URL(url, 'http://localhost').pathname;
+  } catch {
+    const queryIndex = url.indexOf('?');
+
+    return queryIndex === -1 ? url : url.slice(0, queryIndex);
+  }
+}
+
 function findMount(req: IncomingMessage): Mount | undefined {
-  const url = req.url ?? '';
-  const queryIndex = url.indexOf('?');
-  const pathname = queryIndex === -1 ? url : url.slice(0, queryIndex);
+  const pathname = requestPathname(req.url ?? '');
 
   let best: Mount | undefined;
 

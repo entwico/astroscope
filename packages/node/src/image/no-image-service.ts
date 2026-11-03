@@ -3,8 +3,8 @@ import type { LocalImageService } from 'astro';
 const MESSAGE =
   '[@astroscope/node] image processing is disabled: astro\'s on-demand `/_image` endpoint is a decode+encode ' +
   'amplification surface, so the adapter turns it off unless a service is configured. Serve pre-generated ' +
-  'variants with a plain <img>, or opt in via the adapter option `imageService: \'on\'` (astro\'s sharp service) ' +
-  'or an explicit `image.service` in the astro config.';
+  'variants with a plain <img>, or opt in via the adapter option `imageService: \'on\'` (astro\'s sharp service). ' +
+  'A service other than sharp set as `image.service` in the astro config is picked up on its own.';
 
 function disabled(): never {
   throw new Error(MESSAGE);

@@ -6,14 +6,18 @@ vi.mock('virtual:@astroscope/i18n/manifest', () => ({
   getManifest: () => ({ keys: [], chunks: {}, imports: {} }),
 }));
 
-const { missingAdd, logDebug } = vi.hoisted(() => ({ missingAdd: vi.fn(), logDebug: vi.fn() }));
+const { missingAdd, logDebug, logError } = vi.hoisted(() => ({
+  missingAdd: vi.fn(),
+  logDebug: vi.fn(),
+  logError: vi.fn(),
+}));
 
 vi.mock('@astroscope/node/telemetry', () => ({
   createCounter: () => ({ add: missingAdd }),
   createObservableGauge: () => {},
 }));
 
-vi.mock('@astroscope/node/log', () => ({ log: { debug: logDebug } }));
+vi.mock('@astroscope/node/log', () => ({ log: { debug: logDebug, error: logError } }));
 
 async function createTranslate() {
   vi.resetModules();
@@ -143,6 +147,44 @@ describe('t inside request context', () => {
     });
 
     expect(fallback).toHaveBeenCalledWith('missing.key', { fallback: 'Hello' });
+  });
+
+  test('treats an empty translation as missing', async () => {
+    const { runWithContext, t } = await createTranslate();
+
+    runWithContext(createI18nContext('de', { greeting: '' }), () => {
+      expect(t('greeting', 'Hello')).toBe('Hello');
+      expect(missingAdd).toHaveBeenCalledWith(1, { 'astro.i18n.locale': 'de' });
+    });
+  });
+
+  test('a message that fails to format renders the best effort and logs once per locale, key and message', async () => {
+    const { i18n } = await import('./i18n');
+    const { runWithContext, rich, t } = await createTranslate();
+
+    const raw = { hello: 'Hallo {$name}', bye: 'Tschüss {$name}' };
+
+    i18n.setTranslations('de', raw);
+
+    runWithContext({ ...createI18nContext('de', raw), translations: i18n.getCompiledTranslations('de') }, () => {
+      expect(t('hello', 'Hello')).toBe('Hallo {$name}');
+      expect(t('hello', 'Hello')).toBe('Hallo {$name}');
+      expect(rich('bye', 'Bye')).toEqual(['Tschüss ']);
+      expect(rich('bye', 'Bye')).toEqual(['Tschüss ']);
+    });
+
+    expect(logError).toHaveBeenCalledTimes(2);
+    expect(logError.mock.calls.map(([fields]) => fields.key)).toEqual(['hello', 'bye']);
+    expect(logError.mock.calls[0]?.[1]).toBe('translation failed to format');
+  });
+
+  test('falls back for keys named like Object.prototype members', async () => {
+    const { runWithContext, t } = await createTranslate();
+
+    runWithContext(createI18nContext('en', {}), () => {
+      expect(t('constructor', 'Builder')).toBe('Builder');
+      expect(t('toString', 'Text')).toBe('Text');
+    });
   });
 });
 

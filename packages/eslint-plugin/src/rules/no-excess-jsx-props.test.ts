@@ -650,5 +650,38 @@ tester.run('no-excess-jsx-props', noExcessJsxProps, {
       `,
       errors: [err('C', ['x1.x2.x3.x4.x5.x6.x7.x8.secret'])],
     },
+    // an optional array prop still walks its elements
+    {
+      filename,
+      code: `
+        interface Row { title: string; }
+        function C(p: { rows?: Row[] }) { return null as any; }
+        declare const rows: { title: string; secret: string }[];
+        export const v = <C client:load rows={rows} />;
+      `,
+      errors: [err('C', ['rows[].secret'])],
+    },
+    // a readonly tuple (an `as const` array) walks as an array
+    {
+      filename,
+      code: `
+        interface Row { title: string; }
+        function C(p: { rows: readonly Row[] }) { return null as any; }
+        const rows = [{ title: 'a', secret: 'b' }] as const;
+        export const v = <C client:load rows={rows} />;
+      `,
+      errors: [err('C', ['rows[].secret'])],
+    },
+    // a member expression tag is an island like any other
+    {
+      filename,
+      code: `
+        function C(p: { name: string }) { return null as any; }
+        const UI = { C };
+        declare const user: { name: string; passwordHash: string };
+        export const v = <UI.C client:load {...user} />;
+      `,
+      errors: [err('UI.C', ['passwordHash'])],
+    },
   ],
 });

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createIslandsTransformer } from './transform.js';
+import { type IslandsTransformerOptions, createIslandsTransformer } from './transform.js';
 import type { IslandsManifest } from './types.js';
 
 function* walkHtmlFiles(dir: string): Generator<string> {
@@ -22,8 +22,12 @@ function* walkHtmlFiles(dir: string): Generator<string> {
  * once, at build time, before the client dir is compressed. Runs without a request
  * context, so registered emitters that need one contribute nothing here.
  */
-export function transformPrerenderedHtml(clientDir: string, manifest: IslandsManifest): number {
-  const transformer = createIslandsTransformer(manifest);
+export function transformPrerenderedHtml(
+  clientDir: string,
+  manifest: IslandsManifest,
+  options?: IslandsTransformerOptions | undefined,
+): number {
+  const transformer = createIslandsTransformer(manifest, options);
   let transformed = 0;
 
   for (const file of walkHtmlFiles(clientDir)) {

@@ -148,6 +148,35 @@ describe('stripSsrEffectsPlugin — replacement behavior', () => {
     expect(out.code).toContain('useEffect((()=>{}), [a, b, c])');
   });
 
+  test('leaves calls through a local binding that shadows the hook import untouched', () => {
+    const transform = getTransform();
+    const code = [
+      `import { useEffect } from 'react';`,
+      `export function run(useEffect) {`,
+      `  return useEffect(() => compute());`,
+      `}`,
+    ].join('\n');
+
+    const out = transform(code, '/src/run.ts', { ssr: true });
+
+    expect(out?.code ?? code).toContain('useEffect(() => compute())');
+  });
+
+  test('keeps a first argument that is evaluated during render, not a callback literal', () => {
+    const transform = getTransform();
+    const code = [
+      `import { useEffect } from 'react';`,
+      `export function C() {`,
+      `  useEffect(subscribe(store), []);`,
+      `  return null;`,
+      `}`,
+    ].join('\n');
+
+    const out = transform(code, '/src/Island.tsx', { ssr: true });
+
+    expect(out?.code ?? code).toContain('subscribe(store)');
+  });
+
   test('returns null when syntactically broken (parser throws)', () => {
     const transform = getTransform();
     const code = `import { useEffect } from 'react'; useEffect(() => { `;

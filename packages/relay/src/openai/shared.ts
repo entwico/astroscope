@@ -130,10 +130,10 @@ export const openai = {
     actionEvent('appointment_scheduled', user, money),
   subscriptionCreated: (plan: OpenAiPlan = {}): OpenAiEvent => planEvent('subscription_created', plan),
   trialStarted: (plan: OpenAiPlan = {}): OpenAiEvent => planEvent('trial_started', plan),
-  /** a custom event: any name openai has no standard event for */
+  /** a custom event: any name openai has no standard event for; throws for a name outside openai's rule */
   custom: (name: string, { id, money, items, contentType = 'product', user }: OpenAiCustom = {}): OpenAiEvent => ({
     name: 'custom',
-    customName: name,
+    customName: validCustomName(name),
     data: { type: 'custom', plan_id: id, ...toMoneyData(money), ...toContentsData(items, contentType, money?.currency) },
     user,
   }),
@@ -161,8 +161,38 @@ function planEvent(name: OpenAiPlanEnrollmentEventName, { id, money, items, cont
   };
 }
 
+const STANDARD_EVENT_NAMES: ReadonlySet<string> = new Set([
+  'contents_viewed',
+  'items_added',
+  'checkout_started',
+  'order_created',
+  'page_viewed',
+  'lead_created',
+  'registration_completed',
+  'appointment_scheduled',
+  'subscription_created',
+  'trial_started',
+  'app_installed',
+  'app_opened',
+  'custom',
+]);
+
+const CUSTOM_EVENT_NAME = /^[a-z0-9_-]{1,64}$/;
+
+function validCustomName(name: string): string {
+  if (!CUSTOM_EVENT_NAME.test(name)) {
+    throw new TypeError(`relay: openai custom event name ${JSON.stringify(name)} must be 1 to 64 lowercase letters, digits, _ or -`);
+  }
+
+  if (STANDARD_EVENT_NAMES.has(name)) {
+    throw new TypeError(`relay: openai custom event name ${JSON.stringify(name)} is a standard event's`);
+  }
+
+  return name;
+}
+
 function toMoneyData(money: OpenAiMoney | undefined): Pick<OpenAiBaseData, 'amount' | 'currency'> {
-  return money ? { amount: toMinorUnits(money.value), currency: money.currency } : {};
+  return money ? { amount: toMinorUnits(money.value, money.currency), currency: money.currency } : {};
 }
 
 function toContentsData(
@@ -178,12 +208,37 @@ function toContentsData(
       name: item.name,
       content_type: contentType,
       quantity: item.quantity,
-      amount: toMinorUnits(item.price),
+      amount: toMinorUnits(item.price, currency),
       currency,
     })),
   };
 }
 
-export function toMinorUnits(value: number): number {
-  return Math.round(value * 100);
+const fractionDigits = new Map<string | undefined, number>();
+
+/** the minor unit of the currency: 1000 for 10.00 EUR, 10 for 10 JPY, 1500 for 1.500 KWD; two decimals where unknown */
+export function toMinorUnits(value: number, currency?: string | undefined): number {
+  return Math.round(value * 10 ** fractionDigitsOf(currency));
+}
+
+function fractionDigitsOf(currency: string | undefined): number {
+  const known = fractionDigits.get(currency);
+
+  if (known !== undefined) {
+    return known;
+  }
+
+  let digits = 2;
+
+  if (currency) {
+    try {
+      digits = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+    } catch {
+      // not a currency code intl knows: two decimals, as most have
+    }
+  }
+
+  fractionDigits.set(currency, digits);
+
+  return digits;
 }

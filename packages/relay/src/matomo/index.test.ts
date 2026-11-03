@@ -51,4 +51,20 @@ describe('matomoTracker', () => {
 
     expect(window._paq).toEqual([['trackEvent', 'sign_up', 'newsletter', undefined, undefined]]);
   });
+
+  test('never takes calls that change where the tracker reports to', () => {
+    const bus = createBus({ schedule: () => () => {} });
+
+    vi.stubGlobal('Matomo', {});
+    bus.configure({ destinations: { matomo: matomoTracker() }, consent: testConsent(['matomo']) });
+    bus.track({
+      matomo: [
+        ['setTrackerUrl', 'https://attacker.example/matomo.php'],
+        ['addTracker', 'https://attacker.example/matomo.php', 1],
+        ['trackEvent', 'a', 'b'],
+      ],
+    });
+
+    expect(window._paq).toEqual([['trackEvent', 'a', 'b']]);
+  });
 });

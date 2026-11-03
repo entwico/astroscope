@@ -2,7 +2,7 @@ import type { APIContext } from 'astro';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Guard } from './guard';
 import { guard } from './pages';
-import { PRUNE_ABOVE, rateLimit } from './rate-limit';
+import { rateLimit } from './rate-limit';
 
 vi.mock('astro:actions', () => {
   class ActionError extends Error {
@@ -103,27 +103,65 @@ describe('rateLimit', () => {
     expect(await attempt(createContext(), first)).toBe(429);
   });
 
-  test('drops the buckets of expired windows once many keys are tracked, keeping live ones', async () => {
+  test('drops the buckets of expired windows when a new one starts, keeping live ones', async () => {
     const limited = rateLimit({ max: 1, window: 1000 });
+    const many = 10_000;
 
-    for (let i = 0; i < PRUNE_ABOVE - 1; i++) {
+    for (let i = 0; i < many; i++) {
       await guard(createContext(`10.0.${Math.floor(i / 256)}.${i % 256}`), [limited]);
     }
 
     vi.setSystemTime(1_000_500);
     await guard(createContext('live'), [limited]);
 
-    // the early keys expired, the live one has half its window left: a new key triggers the prune
+    // the early keys expired, the live one has half its window left
     vi.setSystemTime(1_001_001);
 
     const deletions = vi.spyOn(Map.prototype, 'delete');
 
     await guard(createContext('trigger'), [limited]);
 
-    expect(deletions).toHaveBeenCalledTimes(PRUNE_ABOVE - 1);
+    expect(deletions).toHaveBeenCalledTimes(many);
     deletions.mockRestore();
 
     expect(await attempt(createContext('live'), limited)).toBe(429);
     expect(await attempt(createContext('10.0.0.0'), limited)).toBeUndefined();
+  });
+
+  test('a new key costs the same while every tracked window is live', async () => {
+    const limited = rateLimit({ max: 1, window: 60_000 });
+
+    // buckets visited while inserting fresh keys
+    const visitsForFreshKeys = async (prefix: string): Promise<number> => {
+      let visits = 0;
+      const iterate = Map.prototype[Symbol.iterator];
+      const spy = vi.spyOn(Map.prototype, Symbol.iterator).mockImplementation(function (this: Map<unknown, unknown>) {
+        const iterator = iterate.call(this);
+
+        return {
+          next() {
+            visits += 1;
+
+            return iterator.next();
+          },
+        } as MapIterator<[unknown, unknown]>;
+      });
+
+      for (let i = 0; i < 100; i++) {
+        await guard(createContext(`${prefix}${i}`), [limited]);
+      }
+
+      spy.mockRestore();
+
+      return visits;
+    };
+
+    const baseline = await visitsForFreshKeys('early');
+
+    for (let i = 0; i < 10_000; i++) {
+      await guard(createContext(`k${i}`), [limited]);
+    }
+
+    expect(await visitsForFreshKeys('late')).toBe(baseline);
   });
 });

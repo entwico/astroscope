@@ -5,7 +5,7 @@ import {
   registerIslandEmitter,
 } from '@astroscope/node/islands';
 import type { APIContext } from 'astro';
-import { buildI18nChunkUrl } from '../shared/url.js';
+import { I18N_CHUNK_PATH, buildI18nChunkUrl } from '../shared/url.js';
 import { createFullStateScript, createScriptHashesScript, jsonForScript } from './client-state.js';
 import { i18n } from './i18n.js';
 
@@ -45,6 +45,7 @@ const emittedByRequest = new WeakMap<object, Set<string>>();
 const IS_DEV = !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
 
 let registered = false;
+let chunkPrefix = I18N_CHUNK_PATH;
 
 export function setRequestLocale(context: APIContext, locale: string): void {
   requestLocales.set(context.locals, locale);
@@ -104,8 +105,8 @@ function sliceFor(island: IslandInfo, locale: string, hashes: Record<string, str
 
   slice = {
     chunks,
-    links: translated(island.staticClosure).map(([chunk, hash]) => buildI18nChunkUrl(locale, chunk, hash)),
-    imports: chunks.map(([chunk, hash]) => buildI18nChunkUrl(locale, chunk, hash)),
+    links: translated(island.staticClosure).map(([chunk, hash]) => buildI18nChunkUrl(locale, chunk, hash, chunkPrefix)),
+    imports: chunks.map(([chunk, hash]) => buildI18nChunkUrl(locale, chunk, hash, chunkPrefix)),
   };
   byIsland.set(island, slice);
 
@@ -150,12 +151,18 @@ export function createI18nDocumentEmitter(dev: boolean = IS_DEV): DocumentEmitte
   };
 }
 
-export function registerI18nEmitters(): void {
+export type RegisterI18nEmittersOptions = {
+  /** the chunk endpoint's url prefix; defaults to `/_i18n/` */
+  chunkPrefix?: string | undefined;
+};
+
+export function registerI18nEmitters(options: RegisterI18nEmittersOptions = {}): void {
   if (registered) {
     return;
   }
 
   registered = true;
+  chunkPrefix = options.chunkPrefix ?? I18N_CHUNK_PATH;
 
   registerDocumentEmitter(createI18nDocumentEmitter());
 

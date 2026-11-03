@@ -122,7 +122,8 @@ function createGuard(
 
     async run(ctx, raw) {
       const memo = memoFor(ctx.request);
-      const passed = memo.get(guard);
+      const key = memoKey(input, raw);
+      const passed = key === undefined ? undefined : memo.get(guard)?.get(key);
 
       if (passed) {
         Object.assign(ctx.locals, passed);
@@ -137,7 +138,9 @@ function createGuard(
 
       const proofs = { ...inherited, ...proof };
 
-      memo.set(guard, proofs);
+      if (key !== undefined) {
+        remember(memo, guard, key, proofs);
+      }
 
       return proofs;
     },
@@ -179,11 +182,14 @@ export async function runGuards(guards: readonly Guard[], ctx: GuardContext, inp
 
 const DENIED_BY = new WeakMap<ActionError, Guard>();
 
-// a guard that passed runs once per request: a middleware guarding the area and the page's own
-// `guard()` call share the result, as do extensions sharing a parent
-const PASSED = new WeakMap<Request, Map<Guard<Proof>, Proof>>();
+// a guard that passed runs once per request and input: a middleware guarding the area and the
+// page's own `guard()` call share the result, as do extensions sharing a parent — but a guard
+// reading input (`projectId`) passed only for that input, another input runs it again
+type Memo = Map<Guard<Proof>, Map<string, Proof>>;
 
-function memoFor(request: Request): Map<Guard<Proof>, Proof> {
+const PASSED = new WeakMap<Request, Memo>();
+
+function memoFor(request: Request): Memo {
   let memo = PASSED.get(request);
 
   if (!memo) {
@@ -192,6 +198,37 @@ function memoFor(request: Request): Map<Guard<Proof>, Proof> {
   }
 
   return memo;
+}
+
+// the input fields the guard (and its parents) read, serialized; `undefined` when they cannot be,
+// so that run is not remembered
+function memoKey(shape: z.ZodRawShape | undefined, raw: unknown): string | undefined {
+  if (!shape) return '';
+
+  const fields = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  try {
+    return JSON.stringify(Object.keys(shape).toSorted(compareNames).map((name) => [name, fields[name]]));
+  } catch {
+    return undefined;
+  }
+}
+
+function compareNames(a: string, b: string): number {
+  if (a === b) return 0;
+
+  return a < b ? -1 : 1;
+}
+
+function remember(memo: Memo, guard: Guard<Proof>, key: string, proofs: Proof): void {
+  let byInput = memo.get(guard);
+
+  if (!byInput) {
+    byInput = new Map();
+    memo.set(guard, byInput);
+  }
+
+  byInput.set(key, proofs);
 }
 
 export function deniedBy(error: ActionError): Guard | undefined {

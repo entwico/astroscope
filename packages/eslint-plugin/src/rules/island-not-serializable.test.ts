@@ -65,6 +65,26 @@ tester.run('island-not-serializable', islandNotSerializable, {
         export const v = <C client:load item={{ id: 'a', name: 'x', custom: false }} />;
       `,
     },
+    // a generic that expands on every level ends the walk instead of the stack
+    {
+      filename,
+      code: `
+        type Deep<T> = { v: T; next: Deep<[T]> };
+        interface Props { deep: Deep<string>; }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load deep={null as any} />;
+      `,
+    },
+    // the same generic under different arguments on sibling props is walked for each
+    {
+      filename,
+      code: `
+        type Box<T> = { value: T };
+        interface Props { a: Box<string>; b: Box<number> }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load a={{ value: 'x' }} b={{ value: 1 }} />;
+      `,
+    },
   ],
   invalid: [
     // function prop
@@ -97,6 +117,28 @@ tester.run('island-not-serializable', islandNotSerializable, {
       `,
       errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'user'`, v: 'is' } }],
     },
+    // an expanding generic still reports what sits on its first level
+    {
+      filename,
+      code: `
+        type Deep<T> = { v: T; next: Deep<[T]> };
+        interface Props { deep: Deep<Date>; }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load deep={null as any} />;
+      `,
+      errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'deep.v'`, v: 'is' } }],
+    },
+    // sibling instantiations of one generic are checked separately
+    {
+      filename,
+      code: `
+        type Box<T> = { value: T };
+        interface Props { a: Box<string>; b: Box<Date> }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load a={{ value: 'x' }} b={{ value: new Date() }} />;
+      `,
+      errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'b.value'`, v: 'is' } }],
+    },
     // a non-serializable member nested one level deeper is reported at its enclosing object
     {
       filename,
@@ -118,6 +160,16 @@ tester.run('island-not-serializable', islandNotSerializable, {
         export const v = <C client:load item={{ id: 'a', when: new Date() }} />;
       `,
       errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'item.when'`, v: 'is' } }],
+    },
+    // a member expression tag is an island like any other
+    {
+      filename,
+      code: `
+        function C(p: { onSelect: () => void }) { return null as any; }
+        const UI = { C };
+        export const v = <UI.C client:load onSelect={() => {}} />;
+      `,
+      errors: [{ messageId: 'notSerializable', data: { comp: 'UI.C', names: `'onSelect'`, v: 'is' } }],
     },
   ],
 });

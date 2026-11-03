@@ -30,4 +30,21 @@ describe('createWormholeMergeScript', () => {
     expect((scope.__wormholes__.cart as { v?: unknown }).v).toEqual({ items: [1] });
     expect(seen).toEqual([{ items: [1] }]);
   });
+
+  test('names that shadow Object.prototype members are stored as own entries', () => {
+    const script = createWormholeMergeScript({ constructor: { a: 1 } });
+    const js = script.replace(/^<script>/, '').replace(/<\/script>$/, '');
+    const scope: { __wormholes__?: Record<string, unknown> } = {};
+    const builtin = Object as unknown as Record<string, unknown>;
+
+    try {
+      // eslint-disable-next-line no-new-func -- evaluates the generated inline script
+      new Function('self', js)(scope);
+
+      expect(Object.hasOwn(scope.__wormholes__!, 'constructor')).toBe(true);
+      expect(Object.hasOwn(builtin, 'v')).toBe(false);
+    } finally {
+      delete builtin['v'];
+    }
+  });
 });

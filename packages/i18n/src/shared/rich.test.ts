@@ -55,6 +55,13 @@ describe('partsToNodes', () => {
     expect(partsToNodes([text('a'), standalone('icon'), text('b')], {})).toEqual(['a', 'b']);
   });
 
+  test('treats tag names inherited from Object.prototype as unknown', () => {
+    for (const name of ['valueOf', '__proto__', 'toString', 'constructor']) {
+      expect(partsToNodes([text('a '), open(name), text('b'), close(name)], {})).toEqual(['a ', 'b']);
+      expect(partsToNodes([text('a'), standalone(name), text('b')], {})).toEqual(['a', 'b']);
+    }
+  });
+
   test('ignores mismatched close tags', () => {
     expect(partsToNodes([text('a'), close('link'), text('b')], {})).toEqual(['a', 'b']);
   });

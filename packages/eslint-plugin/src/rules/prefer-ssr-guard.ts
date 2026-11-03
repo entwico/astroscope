@@ -1,4 +1,4 @@
-import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
+import { ASTUtils, ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 
 export interface PluginDocs {
   description: string;
@@ -29,12 +29,17 @@ function isUndefinedString(node: TSESTree.Node): boolean {
   return node.type === 'Literal' && node.value === 'undefined';
 }
 
-function getTypeofGlobalName(node: TSESTree.Node, globals: ReadonlySet<string>): string | null {
+function getTypeofGlobal(node: TSESTree.Node, globals: ReadonlySet<string>): TSESTree.Identifier | null {
   if (node.type !== 'UnaryExpression' || node.operator !== 'typeof') return null;
   if (node.argument.type !== 'Identifier') return null;
   if (!globals.has(node.argument.name)) return null;
 
-  return node.argument.name;
+  return node.argument;
+}
+
+// `import.meta` is a syntax error in a commonjs module, so the fix cannot go there
+function isCommonJs(filename: string, sourceType: string | undefined): boolean {
+  return sourceType === 'commonjs' || /\.c[jt]s$/.test(filename);
 }
 
 export const preferSsrGuard = createRule<[{ globals?: string[] }?], 'preferSsrGuard'>({
@@ -43,7 +48,7 @@ export const preferSsrGuard = createRule<[{ globals?: string[] }?], 'preferSsrGu
     type: 'suggestion',
     docs: {
       description:
-        'prefer `import.meta.env.SSR` over `typeof window !== "undefined"` (and similar) for SSR/client guards. The Vite-injected constant tree-shakes the dead branch out of the SSR bundle, dropping client-only deps from the server build.',
+        'prefer `import.meta.env.SSR` over `typeof window !== "undefined"` (and similar) for SSR/client guards. The Vite-injected constant tree-shakes the dead branch out of the SSR bundle, dropping client-only deps from the server build. Assumes vite-processed code: the fix is withheld in commonjs files.',
     },
     messages: {
       preferSsrGuard:
@@ -67,20 +72,28 @@ export const preferSsrGuard = createRule<[{ globals?: string[] }?], 'preferSsrGu
   defaultOptions: [{}],
   create(context, [options]) {
     const globals = new Set(options?.globals ?? DEFAULT_GLOBALS);
+    const fixable = !isCommonJs(context.filename, context.languageOptions.sourceType);
+
+    // a parameter or local named like the global is a plain value, not the browser check
+    const isShadowed = (identifier: TSESTree.Identifier): boolean => {
+      const variable = ASTUtils.findVariable(context.sourceCode.getScope(identifier), identifier);
+
+      return variable !== null && variable.defs.length > 0;
+    };
 
     return {
       BinaryExpression(node: TSESTree.BinaryExpression) {
         if (!EQUALITY_OPERATORS.has(node.operator)) return;
 
-        let global: string | null = null;
+        let identifier: TSESTree.Identifier | null = null;
 
         if (isUndefinedString(node.right)) {
-          global = getTypeofGlobalName(node.left, globals);
+          identifier = getTypeofGlobal(node.left, globals);
         } else if (isUndefinedString(node.left)) {
-          global = getTypeofGlobalName(node.right, globals);
+          identifier = getTypeofGlobal(node.right, globals);
         }
 
-        if (!global) return;
+        if (!identifier || isShadowed(identifier)) return;
 
         const matchesSsr = MATCHES_SSR[node.operator as EqualityOperator];
         const replacement = matchesSsr ? 'import.meta.env.SSR' : '!import.meta.env.SSR';
@@ -88,8 +101,8 @@ export const preferSsrGuard = createRule<[{ globals?: string[] }?], 'preferSsrGu
         context.report({
           node,
           messageId: 'preferSsrGuard',
-          data: { global, replacement },
-          fix: (fixer) => fixer.replaceText(node, replacement),
+          data: { global: identifier.name, replacement },
+          fix: fixable ? (fixer) => fixer.replaceText(node, replacement) : null,
         });
       },
     };

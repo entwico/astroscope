@@ -59,7 +59,7 @@ export const ALL = createProxyHandler({
 
 ### `upstream` (required)
 
-The base URL of the upstream server.
+The base URL of the upstream server: an origin with an optional base path, which is put in front of every proxied path (`https://api.example.com/v1` sends `/users` to `/v1/users`). Credentials, a query or a fragment in the url are rejected.
 
 ```ts
 createProxyHandler({
@@ -104,6 +104,8 @@ onRequest: (context, targetUrl) => {
 };
 ```
 
+`targetUrl` is the only way to re-target: the url of a returned `Request` is ignored, only its method, headers and body are used.
+
 ### `onResponse` (optional)
 
 Called after receiving a response from upstream. Can modify the response.
@@ -142,7 +144,7 @@ createProxyHandler({
 });
 ```
 
-If not provided, returns a default 502 response.
+If not provided, a failed upstream request (unreachable, timed out, reset) answers 502 and a hook that threw answers 500. A client that went away answers 499 without calling the hook.
 
 ### `client` (optional)
 
@@ -156,13 +158,28 @@ createProxyHandler({
     allowH2: true,             // enable HTTP/2 (default: true)
     maxConcurrentStreams: 128, // HTTP/2 max streams (default: 128)
     keepAliveTimeout: 60000,   // keep-alive timeout in ms (default: 60000)
+    connectTimeout: 10000,     // ms to establish the connection (default: 10000)
+    headersTimeout: 60000,     // ms the upstream has to answer with headers (default: 60000, 0 = none)
+    bodyTimeout: 60000,        // ms between two body chunks (default: 60000, 0 = none)
   },
 });
 ```
 
+A timed-out upstream answers 502 (or whatever `onError` returns); mid-body, the response stream errors.
+
+## Forwarded headers
+
+The upstream receives `x-forwarded-for` (`context.clientAddress` appended to an existing chain), `x-forwarded-host` and `x-forwarded-proto` (kept when a proxy in front set them); `host` is the upstream's. Anything else, a preserved `host` for instance, is an `onRequest` header change.
+
+## Upstream references in answers
+
+A `location` or `content-location` under the upstream url is rewritten to the site's origin, and a `set-cookie` with a `Domain` naming the upstream host loses that attribute. A different mapping is an `onResponse` header change.
+
 ## Features
 
 - HTTP/2 support with connection pooling (via undici)
+- `x-forwarded-for` / `-host` / `-proto` towards the upstream
+- Upstream redirects and cookie domains mapped to the site
 - Proper stream handling for large responses
 - Request cancellation support
 - Handles 204/304 responses correctly

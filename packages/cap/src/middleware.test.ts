@@ -62,6 +62,40 @@ describe('proxy', () => {
     expect(headers.has('authorization')).toBe(false);
   });
 
+  test('bounds the upstream request with an abort signal and follows no redirect', async () => {
+    const fetchMock = mockFetch(Response.json({}));
+    const ctx = createApiContext('https://example.com/_cap/challenge', { method: 'POST', body: '{}' });
+
+    await middleware(ctx, next);
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(init.redirect).toBe('error');
+  });
+
+  test('answers 504 when the service does not answer in time', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new DOMException('timed out', 'TimeoutError'))),
+    );
+
+    const ctx = createApiContext('https://example.com/_cap/challenge', { method: 'POST', body: '{}' });
+
+    expect(((await middleware(ctx, next)) as Response).status).toBe(504);
+  });
+
+  test('answers 499 when the browser went away', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new DOMException('aborted', 'AbortError'))),
+    );
+
+    const ctx = createApiContext('https://example.com/_cap/challenge', { method: 'POST', body: '{}' });
+
+    expect(((await middleware(ctx, next)) as Response).status).toBe(499);
+  });
+
   test('passes the redeem answer through untouched', async () => {
     mockFetch(Response.json({ success: true, token: 'tok', expires: 1 }, { status: 200 }));
 

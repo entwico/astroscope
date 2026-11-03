@@ -20,7 +20,7 @@ vi.mock('virtual:@astroscope/i18n/manifest', () => ({
 
 vi.mock('@astroscope/node/log', () => ({
   overrideRequestRoute: mocks.overrideRequestRoute,
-  log: { error: mocks.logError },
+  log: { error: mocks.logError, debug: () => {} },
 }));
 
 async function load(options?: {
@@ -97,6 +97,24 @@ describe('createI18nChunkMiddleware', () => {
 
     expect(result.status).toBe(200);
     expect(mocks.overrideRequestRoute).toHaveBeenCalledWith('/_i18n/[locale]/[chunk]');
+  });
+
+  test('serves the chunks under the configured prefix only', async () => {
+    const { createI18nChunkMiddleware, i18n } = await load({ manifest: chunkManifest });
+    const middleware = createI18nChunkMiddleware({ prefix: '/docs/_i18n/' });
+
+    i18n.setTranslations('en', { 'cart.title': 'Cart' });
+
+    const served = await invoke(middleware, createCtx('/docs/_i18n/en/Cart.Cabc.hash.js'), createNext().next);
+
+    expect(served.status).toBe(200);
+    expect(await served.text()).toContain('cart.title');
+
+    const { next, response } = createNext();
+    const outside = await invoke(middleware, createCtx('/_i18n/en/Cart.Cabc.hash.js'), next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(outside).toBe(response);
   });
 
   test('reports the endpoint route for chunk 404s', async () => {
@@ -185,15 +203,46 @@ describe('createI18nChunkMiddleware', () => {
 
     i18n.setTranslations('en', { 'cart.title': 'Cart' });
 
-    const result = await invoke(createI18nChunkMiddleware(), createCtx('/_i18n/en/Cart.Cabc.deadbeef.js'), next);
+    const hash = i18n.getHashes('en')['Cart.Cabc'];
+    const result = await invoke(createI18nChunkMiddleware(), createCtx(`/_i18n/en/Cart.Cabc.${hash}.js`), next);
     const body = await result.text();
 
     expect(result.status).toBe(200);
     expect(result.headers.get('Content-Type')).toBe('text/javascript; charset=utf-8');
+    expect(result.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(result.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
     expect(result.headers.get('Content-Length')).toBe(String(new TextEncoder().encode(body).byteLength));
     expect(body).toContain('"cart.title":"Cart"');
     expect(next).not.toHaveBeenCalled();
+  });
+
+  test('does not cache a chunk as immutable under a hash other than the current one', async () => {
+    const { createI18nChunkMiddleware, i18n } = await load({ manifest: chunkManifest });
+
+    i18n.setTranslations('en', { 'cart.title': 'Cart' });
+
+    const current = i18n.getHashes('en')['Cart.Cabc'];
+
+    expect(current).toBeDefined();
+    expect(current).not.toBe('deadbeef');
+
+    const result = await invoke(createI18nChunkMiddleware(), createCtx('/_i18n/en/Cart.Cabc.deadbeef.js'), createNext().next);
+
+    expect(result.status).toBe(200);
+    expect(result.headers.get('Cache-Control')).toBe('no-cache');
+    expect(await result.text()).toContain('"cart.title":"Cart"');
+  });
+
+  test('answers 404 for chunk names inherited from Object.prototype', async () => {
+    const { createI18nChunkMiddleware, i18n } = await load({ manifest: chunkManifest });
+
+    i18n.setTranslations('en', { 'cart.title': 'Cart' });
+
+    for (const name of ['__proto__', 'constructor', 'toString']) {
+      const result = await invoke(createI18nChunkMiddleware(), createCtx(`/_i18n/en/${name}.hash.js`), createNext().next);
+
+      expect(result.status).toBe(404);
+    }
   });
 });
 
@@ -301,6 +350,20 @@ describe('createI18nLocaleMiddleware', () => {
     });
 
     await createI18nLocaleMiddleware()(createCtx('/page'), next);
+
+    expect(contextInsideNext?.locale).toBe('en');
+  });
+
+  test('only ever runs a request in a configured locale', async () => {
+    const { createI18nLocaleMiddleware, getContext } = await load({
+      locale: (ctx) => ctx.url.searchParams.get('locale') ?? undefined,
+    });
+    let contextInsideNext: I18nContext | null | undefined;
+    const { next } = createNext(() => {
+      contextInsideNext = getContext();
+    });
+
+    await createI18nLocaleMiddleware()(createCtx('/page?locale=xx-%22%3E'), next);
 
     expect(contextInsideNext?.locale).toBe('en');
   });

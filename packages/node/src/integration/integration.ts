@@ -12,6 +12,7 @@ import { createIslandsManifestPlugin } from '../islands/manifest-plugin.js';
 import { routeEntrypoints } from '../islands/route-islands.js';
 import type { IslandsManifest } from '../islands/types.js';
 import { createRequestInstrumentation } from '../observability/instrument.js';
+import { OTEL_REDACTED_QUERY_PARAMS } from '../observability/redact-query.js';
 import { preparePlatform } from '../platform/prepare.js';
 import { enforceBodyLimit } from '../server/body-limit.js';
 import { dispatchNativeMount } from '../server/native-mount.js';
@@ -83,6 +84,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
   const loggingOptions = options.logging ?? {};
   const telemetryOptions = options.telemetry ?? {};
 
+  const redactedQueryParams = options.redactedQueryParams ?? [...OTEL_REDACTED_QUERY_PARAMS];
   const loggingExclude = loggingOptions ? (loggingOptions.exclude ?? DEFAULT_REQUEST_EXCLUDES) : [];
   const telemetryExclude = telemetryOptions ? (telemetryOptions.exclude ?? DEFAULT_REQUEST_EXCLUDES) : [];
 
@@ -100,6 +102,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
         ? createRequestInstrumentation({
             logging: devLogging ? { exclude: loggingExclude, extended: loggingOptions.extended ?? false } : false,
             telemetry: devTelemetry ? { exclude: telemetryExclude } : false,
+            redactedQueryParams,
           })
         : undefined;
 
@@ -226,7 +229,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
               ...islandWarmup,
               createIslandsManifestPlugin({
                 logger,
-                enabled: islandsEnabled,
+                preload: islandsEnabled,
                 pages: () => routeEntrypoints(root, resolvedRoutes),
               }),
               ssrSourcemapPlugin(),
@@ -261,6 +264,8 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
                       server: astroConfig.build.server.href,
                       bodySizeLimit: options.bodySizeLimit ?? DEFAULT_BODY_SIZE_LIMIT,
                       shutdownTimeout: options.shutdownTimeout ?? 10_000,
+                      keepAliveTimeout: options.keepAliveTimeout ?? 120_000,
+                      redactedQueryParams,
                       health: healthOptions
                         ? {
                             ...(healthOptions.host !== undefined && { host: healthOptions.host }),
@@ -343,19 +348,19 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
       'astro:build:done': async ({ logger }) => {
         if (!astroConfig) return;
 
-        if (islandsEnabled) {
-          // prerendered pages never pass through the middleware — rewrite them on
-          // disk before compression, from the manifest the client build just wrote
-          const manifestPath = path.join(fileURLToPath(astroConfig.build.server), 'chunks', 'islands-manifest.json');
+        // prerendered pages never pass through the middleware — rewrite them on
+        // disk before compression, from the manifest the client build just wrote
+        const manifestPath = path.join(fileURLToPath(astroConfig.build.server), 'chunks', 'islands-manifest.json');
 
-          if (fs.existsSync(manifestPath)) {
-            const { transformPrerenderedHtml } = await import('../islands/prerendered.js');
-            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as IslandsManifest;
-            const transformed = transformPrerenderedHtml(fileURLToPath(astroConfig.build.client), manifest);
+        if (fs.existsSync(manifestPath)) {
+          const { transformPrerenderedHtml } = await import('../islands/prerendered.js');
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as IslandsManifest;
+          const transformed = transformPrerenderedHtml(fileURLToPath(astroConfig.build.client), manifest, {
+            preload: islandsEnabled,
+          });
 
-            if (transformed > 0) {
-              logger.info(`island preloading applied to ${transformed} prerendered page(s)`);
-            }
+          if (transformed > 0) {
+            logger.info(`islands rewrite applied to ${transformed} prerendered page(s)`);
           }
         }
 

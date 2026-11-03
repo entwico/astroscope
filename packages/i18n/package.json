@@ -75,7 +75,6 @@
     "@babel/core": "^8.0.10",
     "@babel/preset-typescript": "^8.0.7",
     "@jridgewell/trace-mapping": "^0.3.31",
-    "magic-string": "^1.4.5",
     "messageformat": "^4.1.0"
   },
   "devDependencies": {
@@ -83,6 +82,7 @@
     "@babel/types": "^8.0.10",
     "@types/babel__core": "^7.20.5",
     "astro": "^7.4.4",
+    "magic-string": "^1.4.5",
     "tsdown": "^0.23.4",
     "typescript": "^6.0.3",
     "vite": "^8.3.5",

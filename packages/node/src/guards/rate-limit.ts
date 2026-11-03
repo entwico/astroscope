@@ -16,10 +16,6 @@ export type RateLimitOptions = {
 
 type Bucket = { count: number; resetAt: number };
 
-// buckets of expired windows are dropped when the map has grown past this, so a key never
-// seen again costs nothing after its window
-export const PRUNE_ABOVE = 10_000;
-
 /**
  * A fixed window per key, in memory and per process: the `max`-th request within `window` ms
  * still passes, the next one is denied with `TOO_MANY_REQUESTS` (429) until the window ends.
@@ -28,6 +24,8 @@ export const PRUNE_ABOVE = 10_000;
  * (a captcha verification, a database lookup) runs.
  */
 export function rateLimit(options: RateLimitOptions): Guard {
+  // every window has the same length, so the map's insertion order is the order the windows
+  // end in: the expired buckets are a prefix, dropped whenever a new window starts
   const buckets = new Map<string, Bucket>();
   const key = options.key ?? clientAddress;
 
@@ -41,19 +39,23 @@ export function rateLimit(options: RateLimitOptions): Guard {
       const now = Date.now();
       const bucket = buckets.get(id);
 
-      if (!bucket || bucket.resetAt <= now) {
-        if (buckets.size >= PRUNE_ABOVE) prune(buckets, now);
+      if (bucket && bucket.resetAt > now) {
+        if (bucket.count >= options.max) {
+          deny('TOO_MANY_REQUESTS', 'too many requests');
+        }
 
-        buckets.set(id, { count: 1, resetAt: now + options.window });
+        bucket.count += 1;
 
         return;
       }
 
-      if (bucket.count >= options.max) {
-        deny('TOO_MANY_REQUESTS', 'too many requests');
-      }
+      evictExpired(buckets, now);
 
-      bucket.count += 1;
+      // set() keeps the position of an existing key, so an expired bucket the eviction left
+      // behind (a clock that went backwards) must move to the end explicitly
+      if (bucket) buckets.delete(id);
+
+      buckets.set(id, { count: 1, resetAt: now + options.window });
     },
   });
 }
@@ -66,8 +68,10 @@ function clientAddress(ctx: GuardContext): string | undefined {
   }
 }
 
-function prune(buckets: Map<string, Bucket>, now: number): void {
+function evictExpired(buckets: Map<string, Bucket>, now: number): void {
   for (const [id, bucket] of buckets) {
-    if (bucket.resetAt <= now) buckets.delete(id);
+    if (bucket.resetAt > now) return;
+
+    buckets.delete(id);
   }
 }

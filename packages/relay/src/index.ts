@@ -2,7 +2,7 @@ export { default } from './integration.js';
 export type { ConversionUser } from './conversion-user.js';
 export { inlineTrack } from './inline.js';
 export type { CollectOptions } from './collect.js';
-export { collect } from './collect.js';
+export { collect } from './server/collect.js';
 export type {
   AddPaymentInfoParams,
   AddShippingInfoParams,
@@ -37,4 +37,4 @@ export type {
   RelayDestinations,
   TrackInput,
 } from './shared.js';
-export { RELAY_TRACK_ATTRIBUTE, defineEvent, trackAttribute } from './shared.js';
+export { defineEvent } from './shared.js';

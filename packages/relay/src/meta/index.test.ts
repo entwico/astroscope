@@ -27,7 +27,7 @@ describe('metaPixel', () => {
     expect(fbq).toHaveBeenCalledTimes(1);
   });
 
-  test('hands the hashed identifiers to the pixel before a conversion, once per set', async () => {
+  test('hands the first hashed identifiers of the page to the pixel before a conversion, once', async () => {
     const fbq = vi.fn();
 
     vi.stubGlobal('fbq', fbq);
@@ -46,17 +46,17 @@ describe('metaPixel', () => {
     });
     expect(fbq).toHaveBeenNthCalledWith(2, 'trackSingle', '123', 'Lead', { content_name: 'contact' }, { eventID: 'e-1' });
 
-    pixel.send(meta.subscribe({}, { email: 'jane@example.com' }), { id: 'e-2', at: 2 });
+    // another set would be refused by the pixel with a warning: not sent
+    pixel.send(meta.subscribe({}, { email: 'john@example.com' }), { id: 'e-2', at: 2 });
 
-    await vi.waitFor(() => expect(fbq).toHaveBeenCalledTimes(4));
+    await vi.waitFor(() => expect(fbq).toHaveBeenCalledTimes(3));
 
     pixel.send(meta.event('QuizResult', { status: 'hp' }), { id: 'e-3', at: 3 });
 
-    await vi.waitFor(() => expect(fbq).toHaveBeenCalledTimes(5));
+    await vi.waitFor(() => expect(fbq).toHaveBeenCalledTimes(4));
 
-    expect(fbq).toHaveBeenNthCalledWith(3, 'init', '123', { em: await sha256('jane@example.com') });
-    expect(fbq).toHaveBeenNthCalledWith(4, 'trackSingle', '123', 'Subscribe', {}, { eventID: 'e-2' });
-    expect(fbq).toHaveBeenNthCalledWith(5, 'trackSingleCustom', '123', 'QuizResult', { status: 'hp' }, { eventID: 'e-3' });
+    expect(fbq).toHaveBeenNthCalledWith(3, 'trackSingle', '123', 'Subscribe', {}, { eventID: 'e-2' });
+    expect(fbq).toHaveBeenNthCalledWith(4, 'trackSingleCustom', '123', 'QuizResult', { status: 'hp' }, { eventID: 'e-3' });
   });
 
   test('a failing pixel is reported, never an unhandled rejection', async () => {

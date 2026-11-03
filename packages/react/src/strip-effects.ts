@@ -71,6 +71,13 @@ export function stripSsrEffectsPlugin(): Plugin {
         }
       });
 
+      // a parameter or local declared under a hook's name shadows the import
+      // somewhere in the file; without scope tracking that name is left alone
+      for (const name of collectDeclaredNames(ast)) {
+        directHooks.delete(name);
+        namespaceHooks.delete(name);
+      }
+
       if (directHooks.size === 0 && namespaceHooks.size === 0) return null;
 
       const replacements: { start: number; end: number }[] = [];
@@ -92,6 +99,10 @@ export function stripSsrEffectsPlugin(): Plugin {
 
         const arg = node.arguments[0];
 
+        // only a callback literal is inert during render; any other expression
+        // (`subscribe(store)`, a hook call) runs on the server too and stays
+        if (arg.type !== 'ArrowFunctionExpression' && arg.type !== 'FunctionExpression') return;
+
         replacements.push({ start: arg.start, end: arg.end });
       });
 
@@ -106,6 +117,72 @@ export function stripSsrEffectsPlugin(): Plugin {
       return { code: s.toString(), map: s.generateMap({ hires: true }).toString() };
     },
   };
+}
+
+/** every name the file declares outside its react imports: locals, params, functions, classes, catch params */
+function collectDeclaredNames(ast: any): Set<string> {
+  const names = new Set<string>();
+
+  walk(ast, (node) => {
+    switch (node.type) {
+      case 'VariableDeclarator': {
+        collectPatternNames(node.id, names);
+        break;
+      }
+      case 'FunctionDeclaration':
+      case 'FunctionExpression':
+      case 'ArrowFunctionExpression': {
+        const params: any[] = node.params ?? [];
+
+        if (node.id) names.add(node.id.name);
+        for (const param of params) collectPatternNames(param, names);
+        break;
+      }
+      case 'ClassDeclaration':
+      case 'ClassExpression': {
+        if (node.id) names.add(node.id.name);
+        break;
+      }
+      case 'CatchClause': {
+        if (node.param) collectPatternNames(node.param, names);
+        break;
+      }
+      case 'ImportDeclaration': {
+        const specifiers: any[] = node.specifiers ?? [];
+
+        if (typeof node.source?.value !== 'string' || REACT_SOURCE.test(node.source.value)) break;
+        for (const spec of specifiers) names.add(spec.local.name);
+        break;
+      }
+    }
+  });
+
+  return names;
+}
+
+function collectPatternNames(pattern: any, names: Set<string>): void {
+  switch (pattern?.type) {
+    case 'Identifier': {
+      names.add(pattern.name);
+      break;
+    }
+    case 'ObjectPattern': {
+      for (const property of pattern.properties) collectPatternNames(property.value ?? property.argument, names);
+      break;
+    }
+    case 'ArrayPattern': {
+      for (const element of pattern.elements) collectPatternNames(element, names);
+      break;
+    }
+    case 'RestElement': {
+      collectPatternNames(pattern.argument, names);
+      break;
+    }
+    case 'AssignmentPattern': {
+      collectPatternNames(pattern.left, names);
+      break;
+    }
+  }
 }
 
 function walk(node: any, visit: (n: any) => void): void {

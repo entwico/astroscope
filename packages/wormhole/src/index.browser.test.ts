@@ -27,6 +27,17 @@ describe('wormhole proxy (browser)', () => {
     expect(() => (wormholes as any).cart.get()).toThrow('wormhole "cart" has no data');
   });
 
+  test('names shadowing Object.prototype members are own entries, never builtins', async () => {
+    const { wormholes } = await load();
+
+    expect(() => (wormholes as any).constructor.get()).toThrow('wormhole "constructor" has no data');
+
+    runMergeScript(createWormholeMergeScript({ constructor: 'own' }));
+
+    expect((wormholes as any).constructor.get()).toBe('own');
+    expect(Object.hasOwn(Object, 'v')).toBe(false);
+  });
+
   test('reads values written by an emitted merge script, in either order', async () => {
     // script first, proxy later
     const first = await load();

@@ -1,11 +1,14 @@
 import type { Rule } from 'eslint';
 import type { Node } from 'estree';
+import { type Linked, callOf, memberName, memberOff } from '../../utils/ast.js';
 
 /**
  * Astro files are server code (frontmatter and template expressions run during
  * render) — wormhole values there are request-scoped and read-only. `set()`
  * throws at runtime and `subscribe()` is an inert no-op; both are client-only.
- * Covers both the `wormholes` proxy and a registry imported under that name.
+ * Covers both the `wormholes` proxy and a registry imported under that name,
+ * reached directly or through a namespace import (`W.wormholes`); computed
+ * members with a static key and typescript wrappers read like the plain form.
  */
 export const serverReadonly: Rule.RuleModule = {
   meta: {
@@ -24,44 +27,56 @@ export const serverReadonly: Rule.RuleModule = {
   create(context) {
     if (!context.filename.endsWith('.astro')) return {};
 
-    const specifiers: Node[] = [];
+    const registries: Node[] = [];
+    const namespaces: Node[] = [];
+
+    // wormholes.<name>.set(...) — registry → member → member → call
+    const reportClientCalls = (registry: Linked): void => {
+      const wormhole = memberOff(registry);
+      const access = wormhole && memberOff(wormhole);
+      const method = access && memberName(access);
+      const call = access && callOf(access);
+
+      if (!call) return;
+
+      if (method === 'set') {
+        context.report({ node: call, messageId: 'serverSet' });
+      } else if (method === 'subscribe') {
+        context.report({ node: call, messageId: 'serverSubscribe' });
+      }
+    };
 
     return {
       ImportDeclaration(node) {
         for (const specifier of node.specifiers) {
-          if (
+          if (specifier.type === 'ImportNamespaceSpecifier') {
+            namespaces.push(specifier);
+          } else if (
             specifier.type === 'ImportSpecifier' &&
             specifier.imported.type === 'Identifier' &&
             specifier.imported.name === 'wormholes'
           ) {
-            specifiers.push(specifier);
+            registries.push(specifier);
           }
         }
       },
 
       'Program:exit'() {
-        for (const specifier of specifiers) {
+        for (const specifier of registries) {
           for (const variable of context.sourceCode.getDeclaredVariables(specifier)) {
             for (const reference of variable.references) {
-              const identifier = reference.identifier as Node & { parent?: Node };
-              const wormhole = identifier.parent;
+              reportClientCalls(reference.identifier as Linked);
+            }
+          }
+        }
 
-              // wormholes.<name>.set(...) — identifier → member → member → call
-              if (wormhole?.type !== 'MemberExpression' || wormhole.object !== identifier) continue;
+        for (const specifier of namespaces) {
+          for (const variable of context.sourceCode.getDeclaredVariables(specifier)) {
+            for (const reference of variable.references) {
+              const registry = memberOff(reference.identifier as Linked);
 
-              const access = (wormhole as Node & { parent?: Node }).parent;
-
-              if (access?.type !== 'MemberExpression' || access.object !== wormhole || access.computed) continue;
-              if (access.property.type !== 'Identifier') continue;
-
-              const call = (access as Node & { parent?: Node }).parent;
-
-              if (call?.type !== 'CallExpression' || call.callee !== access) continue;
-
-              if (access.property.name === 'set') {
-                context.report({ node: call, messageId: 'serverSet' });
-              } else if (access.property.name === 'subscribe') {
-                context.report({ node: call, messageId: 'serverSubscribe' });
+              if (registry && memberName(registry) === 'wormholes') {
+                reportClientCalls(registry);
               }
             }
           }

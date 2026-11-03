@@ -180,20 +180,34 @@ export function createAppHandler(app: BaseApp, options: RuntimeOptions, client: 
       return;
     }
 
-    const routeData = app.match(request, true);
-    const matched = routeData && !(routeData.type === 'page' && routeData.prerender) ? routeData : undefined;
+    try {
+      const routeData = app.match(request, true);
+      const matched = routeData && !(routeData.type === 'page' && routeData.prerender) ? routeData : undefined;
 
-    // the one object astro keeps for the whole request, whatever rewrites replace `context.request` with
-    const locals = {};
+      // the one object astro keeps for the whole request, whatever rewrites replace `context.request` with
+      const locals = {};
 
-    if (matched) {
-      setRequestRouteData(request, locals, matched);
+      if (matched) {
+        setRequestRouteData(request, locals, matched);
+      }
+
+      const response = matched
+        ? await app.render(request, { addCookieHeader: true, locals, routeData: matched, prerenderedErrorPageFetch })
+        : await app.render(request, { addCookieHeader: true, locals, prerenderedErrorPageFetch });
+
+      await writeResponse(response, res);
+    } catch (error) {
+      // astro answers render errors with its 500 page; this is the rest — a
+      // rejected render, headers node refuses — which must not leave the client
+      // waiting on a response that never comes
+      log.error(error instanceof Error ? { err: error, url: req.url } : { reason: error, url: req.url }, 'could not render');
+
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.end('Internal Server Error');
+      } else if (!res.writableEnded) {
+        res.destroy(error instanceof Error ? error : undefined);
+      }
     }
-
-    const response = matched
-      ? await app.render(request, { addCookieHeader: true, locals, routeData: matched, prerenderedErrorPageFetch })
-      : await app.render(request, { addCookieHeader: true, locals, prerenderedErrorPageFetch });
-
-    await writeResponse(response, res);
   };
 }

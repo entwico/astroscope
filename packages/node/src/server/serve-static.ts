@@ -11,59 +11,114 @@ const VARIANTS = [
   { encoding: 'gzip', suffix: '.gz' },
 ] as const;
 
+/** the weight of every coding listed in an `accept-encoding` header; an unparsable q counts as 0 */
+function parseAcceptEncoding(header: string): Map<string, number> {
+  const weights = new Map<string, number>();
+
+  for (const entry of header.split(',')) {
+    const [coding = '', ...params] = entry.split(';').map((part) => part.trim().toLowerCase());
+
+    if (!coding) continue;
+
+    const q = params.find((param) => param.startsWith('q='));
+    const weight = q === undefined ? 1 : Number(q.slice(2));
+
+    weights.set(coding, Number.isFinite(weight) ? weight : 0);
+  }
+
+  return weights;
+}
+
 function negotiateVariant(
   req: IncomingMessage,
   client: string,
-  pathname: string,
+  file: string,
 ): { pathname: string; encoding: string } | undefined {
   const accept = req.headers['accept-encoding'];
 
   if (typeof accept !== 'string') return undefined;
 
-  for (const { encoding, suffix } of VARIANTS) {
-    if (!accept.includes(encoding)) continue;
+  const weights = parseAcceptEncoding(accept);
+  const candidates = VARIANTS.map((variant, order) => ({
+    ...variant,
+    order,
+    weight: weights.get(variant.encoding) ?? weights.get('*') ?? 0,
+  }))
+    .filter((candidate) => candidate.weight > 0)
+    .toSorted((a, b) => b.weight - a.weight || a.order - b.order);
 
-    if (fs.existsSync(path.join(client, `${pathname}${suffix}`))) {
-      return { pathname: `${pathname}${suffix}`, encoding };
+  for (const { encoding, suffix } of candidates) {
+    if (statWithin(client, `${file}${suffix}`)?.isFile()) {
+      return { pathname: `${file}${suffix}`, encoding };
     }
   }
 
   return undefined;
 }
 
-function hasFileExtension(pathname: string): boolean {
-  const last = pathname.split('/').pop();
-
-  return !!last && last.includes('.');
-}
-
 function prependForwardSlash(pathname: string): string {
   return pathname.startsWith('/') ? pathname : `/${pathname}`;
 }
 
-function isDirectory(client: string, urlPath: string): boolean {
-  const filePath = path.join(client, urlPath);
+/** the decoded, normalized path send() resolves against the client dir; undefined when malformed */
+function decodePath(pathname: string): string | undefined {
+  try {
+    return path.posix.normalize(decodeURIComponent(pathname));
+  } catch {
+    return undefined;
+  }
+}
+
+/** stats of a path under the client dir; undefined when missing or outside of it */
+function statWithin(client: string, pathname: string): fs.Stats | undefined {
+  const filePath = path.join(client, pathname);
   const resolved = path.resolve(filePath);
   const resolvedClient = path.resolve(client);
 
   // path traversal guard
   if (resolved !== resolvedClient && !resolved.startsWith(resolvedClient + path.sep)) {
-    return false;
+    return undefined;
   }
 
   try {
-    return fs.lstatSync(filePath).isDirectory();
+    return fs.statSync(filePath);
   } catch {
-    return false;
+    return undefined;
   }
+}
+
+/** the file send() would pick for a decoded path: the index of a slashed directory, the file itself, or its `.html` */
+function resolveFile(client: string, pathname: string, extensions: string[]): string | undefined {
+  if (pathname.endsWith('/')) {
+    const index = `${pathname}index.html`;
+
+    return statWithin(client, index)?.isFile() ? index : undefined;
+  }
+
+  if (statWithin(client, pathname)?.isFile()) {
+    return pathname;
+  }
+
+  if (path.posix.extname(pathname)) {
+    return undefined;
+  }
+
+  return extensions.map((extension) => `${pathname}.${extension}`).find((file) => statWithin(client, file)?.isFile());
 }
 
 /**
  * Serve files from the client build directory, falling through to `ssr` when
- * no file matches. Handles trailing-slash redirects per the manifest config
- * and marks hashed assets as immutable.
+ * no file matches, and mark hashed assets as immutable. Directories are served
+ * through their index; the trailing-slash setting is enforced by
+ * path-redirects.ts ahead of this handler, which never redirects. The file is
+ * resolved up front so a pre-compressed variant can be negotiated for whatever
+ * send() would serve, an index or an extension-less page included.
  */
 export function createStaticHandler(app: BaseApp, client: string) {
+  // with build.format 'file' or 'preserve', pages are output as `page.html`
+  // instead of `page/index.html`, so an extension-less url tries `.html`
+  const extensions = app.manifest.buildFormat === 'file' || app.manifest.buildFormat === 'preserve' ? ['html'] : [];
+
   return (req: IncomingMessage, res: ServerResponse, ssr: () => void): void => {
     if (!req.url) {
       ssr();
@@ -77,67 +132,28 @@ export function createStaticHandler(app: BaseApp, client: string) {
       fullUrl = fullUrl.slice(0, fullUrl.indexOf('#'));
     }
 
-    const [urlPath = '', urlQuery] = fullUrl.split('?', 2);
-    let fsPath = app.removeBase(urlPath);
+    const [urlPath = ''] = fullUrl.split('?', 2);
+    let pathname = prependForwardSlash(app.removeBase(urlPath));
+    let decoded = decodePath(pathname);
 
-    try {
-      fsPath = decodeURI(fsPath);
-    } catch {
-      // fall through with the raw path; send() rejects malformed paths itself
+    if (decoded !== undefined && !decoded.endsWith('/') && statWithin(client, decoded)?.isDirectory()) {
+      pathname += '/index.html';
+      decoded += '/index.html';
     }
-
-    const dir = isDirectory(client, fsPath);
-    const hasSlash = urlPath.endsWith('/');
-    let pathname = urlPath;
-
-    switch (app.manifest.trailingSlash) {
-      case 'never': {
-        if (dir && urlPath !== '/' && hasSlash) {
-          res.statusCode = 301;
-          res.setHeader('Location', urlPath.slice(0, -1) + (urlQuery ? `?${urlQuery}` : ''));
-          res.end();
-
-          return;
-        }
-
-        if (dir && !hasSlash) {
-          pathname = `${urlPath}/index.html`;
-        }
-
-        break;
-      }
-      case 'ignore': {
-        if (dir && !hasSlash) {
-          pathname = `${urlPath}/index.html`;
-        }
-
-        break;
-      }
-      case 'always': {
-        if (!hasSlash && !hasFileExtension(urlPath) && !urlPath.startsWith('/_')) {
-          res.statusCode = 301;
-          res.setHeader('Location', `${urlPath}/${urlQuery ? `?${urlQuery}` : ''}`);
-          res.end();
-
-          return;
-        }
-
-        break;
-      }
-    }
-
-    pathname = prependForwardSlash(app.removeBase(pathname));
 
     const normalizedPathname = path.posix.normalize(pathname);
-    const compressible = COMPRESSIBLE.has(path.posix.extname(normalizedPathname));
-    const variant = compressible ? negotiateVariant(req, client, normalizedPathname) : undefined;
+    // a malformed encoding falls through with the raw path; send() rejects it itself
+    const target = decoded ?? normalizedPathname;
+    const file = decoded === undefined ? undefined : resolveFile(client, decoded, extensions);
+    const compressible = file !== undefined && COMPRESSIBLE.has(path.posix.extname(file));
+    const variant = compressible ? negotiateVariant(req, client, file) : undefined;
+    const contentType = compressible ? (MIME_TYPES.get(path.posix.extname(file)) ?? 'application/octet-stream') : undefined;
 
-    const stream = send(req, variant?.pathname ?? normalizedPathname, {
+    // the variant is a resolved file, re-encoded for send()'s own decoding
+    const stream = send(req, variant ? encodeURI(variant.pathname) : normalizedPathname, {
       root: client,
-      dotfiles: normalizedPathname.startsWith('/.well-known/') ? 'allow' : 'deny',
-      // with build.format 'file' or 'preserve', pages are output as `page.html`
-      // instead of `page/index.html` — let send() try appending `.html`
-      extensions: app.manifest.buildFormat === 'file' || app.manifest.buildFormat === 'preserve' ? ['html'] : [],
+      dotfiles: target.startsWith('/.well-known/') ? 'allow' : 'deny',
+      extensions,
     });
 
     let forwardError = false;
@@ -171,15 +187,12 @@ export function createStaticHandler(app: BaseApp, client: string) {
         headersRes.setHeader('Vary', 'Accept-Encoding');
       }
 
-      if (variant) {
+      if (variant && contentType) {
         headersRes.setHeader('Content-Encoding', variant.encoding);
-        headersRes.setHeader(
-          'Content-Type',
-          MIME_TYPES.get(path.posix.extname(normalizedPathname)) ?? 'application/octet-stream',
-        );
+        headersRes.setHeader('Content-Type', contentType);
       }
 
-      if (normalizedPathname.startsWith(`/${app.manifest.assetsDir}/`)) {
+      if (target.startsWith(`/${app.manifest.assetsDir}/`)) {
         headersRes.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       }
     });

@@ -51,7 +51,7 @@ export function reportTracked(input: TrackInput, meta: EventMeta, outcomes: read
   });
 }
 
-/** a delivery after the event's own group: consent given later, an sdk that appeared, a replay on the next page */
+/** a delivery after the event's own group: consent given later, an sdk that appeared */
 export function reportLate(name: string, payload: unknown, meta: EventMeta): void {
   safely(() => {
     console.groupCollapsed(`%crelay ${meta.key ?? 'event'} #${meta.id} → ${name}, later`, titleStyle);

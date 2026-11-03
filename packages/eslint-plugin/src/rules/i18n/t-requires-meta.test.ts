@@ -16,10 +16,16 @@ tester.run('t-requires-meta', tRequiresMeta, {
     `t('key', { fallback: 'Hello' });`,
     // with values
     `t('key', 'fallback', { count: 5 });`,
+    // rich() with components
+    `rich('key', 'Read {#link}more{/link}', { link: (c) => c });`,
   ],
   invalid: [
     {
       code: `t('key');`,
+      errors: [{ messageId: 'missingMeta' }],
+    },
+    {
+      code: `rich('key');`,
       errors: [{ messageId: 'missingMeta' }],
     },
   ],

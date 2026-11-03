@@ -35,6 +35,12 @@ describe('defineWormhole', () => {
     expect(() => assignWormholeNames({ cart: { get: () => 1 } })).toThrow('registry entry "cart" is not a wormhole');
   });
 
+  test('rejects __proto__ as a name', () => {
+    const wh = defineWormhole<number>({ handler: () => 1 });
+
+    expect(() => assignWormholeNames({ ['__proto__']: wh })).toThrow('"__proto__" cannot be a wormhole name');
+  });
+
   test('get() outside an open scope throws with the wormhole name', () => {
     const wh = defineWormhole<number>({ handler: () => {} });
 

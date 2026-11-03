@@ -18,11 +18,18 @@ tester.run('t-static-meta', tStaticMeta, {
     `t('cart.total', { fallback: 'Total: {amount}', description: 'cart total', variables: { amount: { fallback: '$0', description: 'the amount' } } });`,
     // no meta — handled by other rules
     `t('cart.total');`,
+    // rich() with a static fallback
+    `rich('tos', 'Read our {#link}Terms{/link}', { link: (c) => c });`,
   ],
   invalid: [
     {
       // concatenated shorthand fallback
       code: `t('greeting', 'Hello ' + name);`,
+      errors: [{ messageId: 'dynamicMeta' }],
+    },
+    {
+      // rich() is extracted like t()
+      code: `rich('greeting', 'Hello ' + name, { b: (c) => c });`,
       errors: [{ messageId: 'dynamicMeta' }],
     },
     {

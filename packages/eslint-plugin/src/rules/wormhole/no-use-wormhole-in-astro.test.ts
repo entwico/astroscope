@@ -45,5 +45,26 @@ import { useWormhole } from '@astroscope/wormhole/react';
 `,
       errors: [{ messageId: 'useWormholeInAstro' }],
     },
+    // namespace import of the react entry
+    {
+      filename,
+      code: `---
+import * as wormholeReact from '@astroscope/wormhole/react';
+
+const cart = wormholeReact.useWormhole(w);
+---
+`,
+      errors: [{ messageId: 'useWormholeInAstro' }],
+    },
+    {
+      filename,
+      code: `---
+import * as wormholeReact from '@astroscope/wormhole/react';
+
+const cart = wormholeReact['useWormhole'](w);
+---
+`,
+      errors: [{ messageId: 'useWormholeInAstro' }],
+    },
   ],
 });

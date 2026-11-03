@@ -33,9 +33,32 @@ export type MatomoOrder = {
 };
 
 /**
- * The matomo builders: an event, a site search, an ecommerce order, or the raw `calls()`. What an
- * event definition puts under `matomo`. Product and cart views stay events: the ecommerce views
- * need the page view call, which the tracker snippet already made.
+ * The tracker methods the destination pushes: the calls that report something. Everything else
+ * (`setTrackerUrl`, `addTracker`, `setSiteId`, `setUserId`, …) configures the tracker and is
+ * dropped — an inline call is text in the page, and the page must not get to choose where the
+ * tracking goes.
+ */
+export const MATOMO_TRACKING_METHODS: ReadonlySet<string> = new Set([
+  'trackEvent',
+  'trackSiteSearch',
+  'trackGoal',
+  'trackLink',
+  'trackContentImpression',
+  'trackContentInteraction',
+  'addEcommerceItem',
+  'trackEcommerceOrder',
+  'trackEcommerceCartUpdate',
+  'setEcommerceView',
+  'setCustomDimension',
+  'setCustomVariable',
+  'deleteCustomVariable',
+]);
+
+/**
+ * The matomo builders: an event, a site search, an ecommerce order, or the raw `calls()` — any
+ * of the methods in `MATOMO_TRACKING_METHODS`, the destination drops the others. What an event
+ * definition puts under `matomo`. Product and cart views stay events: the ecommerce views need
+ * the page view call, which the tracker snippet already made.
  */
 export const matomo = {
   calls: (...calls: MatomoCall[]): MatomoCalls => calls,
@@ -69,6 +92,14 @@ export function matomoTracker(): Destination<'matomo'> {
       const paq = globalThis.window._paq ?? [];
 
       for (const call of calls) {
+        const method = call[0];
+
+        if (typeof method !== 'string' || !MATOMO_TRACKING_METHODS.has(method)) {
+          console.error(`relay: matomo call ${String(method)} is not a tracking method, dropped`);
+
+          continue;
+        }
+
         paq.push([...call]);
       }
     },

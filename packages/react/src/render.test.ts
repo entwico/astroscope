@@ -99,6 +99,42 @@ describe('renderIsland', () => {
     expect(renderToReadableStream).not.toHaveBeenCalled();
   });
 
+  test('a client-render marker inside injected html does not move the component to streaming', () => {
+    const Rich = ({ html }: { html: string }) =>
+      React.createElement('div', { dangerouslySetInnerHTML: { __html: html } });
+
+    const html = renderIsland(Rich, React.createElement(Rich, { html: '<p>a</p><!--$!--><p>b</p>' }), options);
+
+    expect(html).toBe('<div><p>a</p><!--$!--><p>b</p></div>');
+    expect(renderToReadableStream).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  test('a boundary error without suspension keeps the component on the synchronous path', async () => {
+    let fail = true;
+    const Flaky = () => {
+      if (fail) throw new Error('transient');
+
+      return React.createElement('p', null, 'ok');
+    };
+    const Bounded = () => React.createElement(Suspense, { fallback: 'fallback' }, React.createElement(Flaky));
+
+    const failed = await renderIsland(Bounded, React.createElement(Bounded), options);
+
+    expect(failed).toContain('fallback');
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(logError.mock.calls[0]?.[1]).toBe('react island boundary failed during server render, left to the client');
+
+    fail = false;
+    vi.clearAllMocks();
+
+    const html = await renderIsland(Bounded, React.createElement(Bounded), options);
+
+    expect(html).toContain('ok');
+    expect(renderToString).toHaveBeenCalledTimes(1);
+    expect(renderToReadableStream).not.toHaveBeenCalled();
+  });
+
   test('uses the streaming api when actions form state is present', async () => {
     const html = await renderIsland(Plain, React.createElement(Plain, { label: 'form' }), {
       ...options,

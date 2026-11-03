@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { buildI18nChunkUrl, chunkIdToName, componentUrlToChunkName } from './url.js';
+import { buildI18nChunkUrl, chunkIdToName, chunkPrefixFor, componentUrlToChunkName } from './url.js';
 
 describe('chunkIdToName', () => {
   test('strips _astro/ prefix', () => {
@@ -28,5 +28,24 @@ describe('buildI18nChunkUrl', () => {
 
   test('builds correct URL without prefix', () => {
     expect(buildI18nChunkUrl('de', 'Cart.C_sxtxbl', 'abc123')).toBe('/_i18n/de/Cart.C_sxtxbl.abc123.js');
+  });
+
+  test('builds the url under a chunk prefix', () => {
+    expect(buildI18nChunkUrl('de', '_astro/Cart.C_sxtxbl', 'abc123', '/docs/_i18n/')).toBe(
+      '/docs/_i18n/de/Cart.C_sxtxbl.abc123.js',
+    );
+  });
+});
+
+describe('chunkPrefixFor', () => {
+  test.each([
+    ['/', '/_i18n/'],
+    ['', '/_i18n/'],
+    ['/docs', '/docs/_i18n/'],
+    ['/docs/', '/docs/_i18n/'],
+    ['docs', '/docs/_i18n/'],
+    ['/docs/v2/', '/docs/v2/_i18n/'],
+  ])('puts the chunk endpoint under base %j', (base, prefix) => {
+    expect(chunkPrefixFor(base)).toBe(prefix);
   });
 });

@@ -7,7 +7,6 @@ import {
   parseConsent,
   serializeConsent,
   toTracked,
-  trackAttribute,
   unusableEventId,
 } from './shared.js';
 import './test-destinations.js';
@@ -29,11 +28,8 @@ describe('defineEvent', () => {
     expect(toTracked({ a: 'search x' })).toEqual({ key: undefined, event: { a: 'search x' } });
   });
 
-  test('the attribute round-trips through json and untrusted values are rejected', () => {
-    const parsed: unknown = JSON.parse(trackAttribute(search('x')));
-
-    expect(isTrackInput(parsed)).toBe(true);
-    expect(parsed).toEqual(search('x'));
+  test('untrusted values are rejected', () => {
+    expect(isTrackInput(search('x'))).toBe(true);
     expect(isTrackInput({ a: 'plain' })).toBe(true);
     expect(isTrackInput({})).toBe(true);
     expect(isTrackInput({ key: 'x' })).toBe(false);

@@ -13,8 +13,12 @@ const MANIFEST_FILE_NAME = 'islands-manifest.json';
 
 export type IslandsManifestPluginOptions = {
   logger: { warn: (message: string) => void };
-  /** `islands: false` disables the preloading — no manifest is written and the virtual module resolves to null */
-  enabled: boolean;
+  /**
+   * `islands: false` — the preloading is off, the manifest is still written and
+   * loaded: registered island emitters need the chunk closures to slice their
+   * data per island, and route attribution feeds per-route loading
+   */
+  preload: boolean;
   /** page components (absolute paths) → the route patterns they serve, from `astro:routes:resolved` */
   pages: () => Map<string, string[]>;
 };
@@ -30,7 +34,7 @@ export type IslandsManifestPluginOptions = {
  *
  * The client build runs after the server build, so the SSR bundle can only carry
  * code that reads the file lazily; in dev there is no manifest and the middleware
- * stays inert.
+ * only runs the document emitters.
  */
 export function createIslandsManifestPlugin(options: IslandsManifestPluginOptions): Plugin {
   let isBuild = false;
@@ -51,8 +55,8 @@ export function createIslandsManifestPlugin(options: IslandsManifestPluginOption
     load(id) {
       if (id !== RESOLVED_ISLANDS_VIRTUAL_MODULE_ID) return;
 
-      if (!isBuild || !options.enabled) {
-        return 'export const manifest = null;';
+      if (!isBuild) {
+        return `export const manifest = null;\nexport const preload = ${options.preload};`;
       }
 
       // the manifest only exists after the client build — read it at runtime. astro
@@ -81,12 +85,13 @@ for (const candidate of [
 }
 
 export { manifest };
+export const preload = ${options.preload};
 `;
     },
 
     async generateBundle() {
       // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the rollup plugin context
-      if (!options.enabled || this.environment.name === 'client') return;
+      if (this.environment.name === 'client') return;
 
       // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the rollup plugin context
       const { routes } = await collectRouteIslands(this, options.pages());
@@ -98,7 +103,7 @@ export { manifest };
 
     writeBundle(outputOptions, bundle) {
       // eslint-disable-next-line unicorn/no-this-outside-of-class -- `this` is the rollup plugin context
-      if (!options.enabled || this.environment.name !== 'client' || !outputOptions.dir) return;
+      if (this.environment.name !== 'client' || !outputOptions.dir) return;
 
       const chunks: IslandsManifest['chunks'] = {};
       const entryByComponent = new Map<string, string>();

@@ -16,9 +16,9 @@ const RESOLVED_CONFIG_VIRTUAL_MODULE_ID = `\0${CONFIG_VIRTUAL_MODULE_ID}`;
 
 const MANIFEST_FILE_NAME = 'wormhole-manifest.json';
 
-const SCAN_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
-// compiled astro components are plain modules in the server build
-const SERVER_SCAN_EXTENSIONS = [...SCAN_EXTENSIONS, '.astro'];
+const SCAN_EXTENSIONS = ['.ts', '.mts', '.cts', '.tsx', '.js', '.mjs', '.cjs', '.jsx'];
+// compiled astro components and mdx pages are plain modules in the server build
+const SERVER_SCAN_EXTENSIONS = [...SCAN_EXTENSIONS, '.astro', '.mdx'];
 
 /** chunk file name → manifest key, e.g. `_astro/Counter.abc.js` → `Counter.abc` */
 function chunkFileNameToName(fileName: string): string {
@@ -227,6 +227,7 @@ export { manifest };
       }
 
       const scriptNames = new Set<string>();
+      const scriptNamesByRoute = new Map<string, Set<string>>(routeNames.keys().map((pattern) => [pattern, new Set()]));
 
       for (const entry of scriptEntries) {
         const names = new Set<string>();
@@ -250,8 +251,12 @@ export { manifest };
 
         for (const pattern of owners) {
           const route = routeNames.get(pattern);
+          const delivered = scriptNamesByRoute.get(pattern);
 
-          names.forEach((name) => route?.add(name));
+          names.forEach((name) => {
+            route?.add(name);
+            delivered?.add(name);
+          });
         }
       }
 
@@ -261,7 +266,13 @@ export { manifest };
         routes[pattern] = [...names];
       }
 
-      const manifest: WormholeManifest = { chunks, scripts: [...scriptNames], routes };
+      const scriptsByRoute: WormholeManifest['scriptsByRoute'] = {};
+
+      for (const [pattern, names] of scriptNamesByRoute) {
+        scriptsByRoute[pattern] = [...names];
+      }
+
+      const manifest: WormholeManifest = { chunks, scripts: [...scriptNames], scriptsByRoute, routes };
       const chunksDir = path.resolve(outputOptions.dir, '..', 'server', 'chunks');
 
       if (fs.existsSync(chunksDir)) {

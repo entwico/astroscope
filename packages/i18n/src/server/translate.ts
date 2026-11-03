@@ -5,6 +5,7 @@ import { normalizeMeta } from '../shared/meta.js';
 import { type RichComponents, partsToNodes } from '../shared/rich.js';
 import type { CompiledTranslation, TranslateFunction, TranslationMeta } from '../shared/types.js';
 import { getContext } from './context.js';
+import { formatErrorReporter } from './format-errors.js';
 import { i18n } from './i18n.js';
 import type { FallbackBehavior } from './types.js';
 
@@ -86,14 +87,18 @@ export const t: TranslateFunction = ((
     return compiled(values);
   }
 
-  const compiled = ctx.translations[key];
+  const compiled = Object.hasOwn(ctx.translations, key) ? ctx.translations[key] : undefined;
 
   if (!compiled) {
     reportMissing(key, ctx.locale);
 
     const fallbackValue = applyFallback(key, normalizedMeta, ctx.fallback);
 
-    const compiledFallback = compileMessage(ctx.locale, fallbackValue);
+    const compiledFallback = compileMessage(
+      ctx.locale,
+      fallbackValue,
+      formatErrorReporter(ctx.locale, key, fallbackValue),
+    );
 
     ctx.translations[key] = compiledFallback;
 
@@ -133,7 +138,7 @@ export function rich<T = unknown>(
   const ctx = getContext();
   const locale = ctx?.locale ?? i18n.getConfig().defaultLocale;
 
-  const translated = ctx?.rawTranslations[key];
+  const translated = ctx && Object.hasOwn(ctx.rawTranslations, key) ? ctx.rawTranslations[key] : undefined;
 
   if (ctx && !translated) {
     reportMissing(key, ctx.locale);
@@ -141,7 +146,7 @@ export function rich<T = unknown>(
 
   const raw = translated || normalizedMeta.fallback || key;
 
-  const parts = formatMessageToParts(locale, raw, values);
+  const parts = formatMessageToParts(locale, raw, values, formatErrorReporter(locale, key, raw));
 
   return partsToNodes(parts, components ?? {});
 }

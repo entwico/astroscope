@@ -148,53 +148,81 @@ function extractVariables(
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+const TRANSLATE_MODULE = '@astroscope/i18n/translate';
+
+type TranslateCall = BabelTypes.CallExpression | BabelTypes.OptionalCallExpression;
+
+/**
+ * Whether a call's callee is `t` or `rich` imported from the translate module
+ * under its own name. Aliases are out of scope (`no-t-reassign` lints them); a
+ * local binding that merely shares the name is not a translation call.
+ */
+function isTranslateCall(path: NodePath<TranslateCall>): boolean {
+  const callee = path.get('callee');
+
+  if (!callee.isIdentifier({ name: 't' }) && !callee.isIdentifier({ name: 'rich' })) return false;
+
+  const binding = path.scope.getBinding(callee.node.name);
+  const specifier = binding?.path;
+
+  if (!specifier?.isImportSpecifier() || !specifier.parentPath.isImportDeclaration()) return false;
+
+  const imported = specifier.node.imported;
+  const importedName = imported.type === 'Identifier' ? imported.name : imported.value;
+
+  return importedName === callee.node.name && specifier.parentPath.node.source.value === TRANSLATE_MODULE;
+}
+
 /**
  * Babel plugin for i18n extraction and transformation
  *
- * - Extracts t() calls with key and metadata
+ * - Extracts t() and rich() calls with key and metadata
  * - Strips fallback argument in production builds
  */
 export function i18nExtractPlugin({ types: t }: { types: typeof BabelTypes }): PluginObject<PluginState> {
+  const visitCall = (path: NodePath<TranslateCall>, state: PluginState): void => {
+    if (!isTranslateCall(path)) return;
+
+    const args = path.node.arguments;
+    const keyArg = args[0];
+
+    if (!t.isExpression(keyArg)) return;
+
+    const key = getStringValue(t, keyArg);
+
+    if (key === null) return; // first arg must be string
+
+    const file = state.filename ?? '';
+    const line = path.node.loc?.start.line ?? 0;
+    const column = path.node.loc?.start.column ?? 0;
+    const report: ReportFn = (reason) => state.opts.onExtractionError({ key, reason, file, line, column });
+
+    // second arg is always meta (fallback string or object)
+    // may not exist if we're processing already-transformed code
+    const meta = args.length >= 2 && t.isExpression(args[1]) ? extractMeta(t, args[1], report) : { fallback: '' };
+
+    state.opts.onKeyExtracted({ key, meta, file, line });
+
+    // strip fallback in production
+    // t('key', 'fallback') → t('key')
+    // t('key', 'fallback', values) → t('key', undefined, values)
+    // rich('key', 'fallback', components, values) → rich('key', undefined, components, values)
+    if (!state.opts.stripFallbacks || args.length < 2) return;
+
+    const firstArg = args[0]!;
+
+    if (args.length === 2) {
+      path.node.arguments = [firstArg];
+    } else {
+      path.node.arguments = [firstArg, t.identifier('undefined'), ...args.slice(2)];
+    }
+  };
+
   return {
     name: '@astroscope/i18n/extract',
     visitor: {
-      CallExpression(path: NodePath<BabelTypes.CallExpression>, state: PluginState) {
-        // matched by name only — an aliased or reassigned `t` is invisible here
-        if (!path.get('callee').isIdentifier({ name: 't' })) return;
-
-        const args = path.node.arguments;
-        const keyArg = args[0];
-
-        if (!t.isExpression(keyArg)) return;
-
-        const key = getStringValue(t, keyArg);
-
-        if (key === null) return; // first arg must be string
-
-        const file = state.filename ?? '';
-        const line = path.node.loc?.start.line ?? 0;
-        const column = path.node.loc?.start.column ?? 0;
-        const report: ReportFn = (reason) => state.opts.onExtractionError({ key, reason, file, line, column });
-
-        // second arg is always meta (fallback string or object)
-        // may not exist if we're processing already-transformed code
-        const meta = args.length >= 2 && t.isExpression(args[1]) ? extractMeta(t, args[1], report) : { fallback: '' };
-
-        state.opts.onKeyExtracted({ key, meta, file, line });
-
-        // strip fallback in production
-        // t('key', 'fallback') → t('key')
-        // t('key', 'fallback', values) → t('key', undefined, values)
-        if (!state.opts.stripFallbacks || args.length < 2) return;
-
-        const firstArg = args[0]!;
-
-        if (args.length === 2) {
-          path.node.arguments = [firstArg];
-        } else {
-          path.node.arguments = [firstArg, t.identifier('undefined'), args[2]!];
-        }
-      },
+      CallExpression: visitCall,
+      OptionalCallExpression: visitCall,
     },
   };
 }

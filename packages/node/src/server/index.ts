@@ -10,8 +10,10 @@ import { setGetEnv } from 'astro/env/setup';
 import { options } from 'virtual:@astroscope/node/config';
 import { activateHealthChecks, deactivateHealthChecks } from '../health/store.js';
 import { setBootContext } from '../lifecycle/context.js';
+import { withShutdownDeadline } from '../lifecycle/deadline.js';
 import { type BootModule, runShutdown, runStartup } from '../lifecycle/lifecycle.js';
 import type { BootContext } from '../lifecycle/types.js';
+import { collectActionNames } from '../observability/action-names.js';
 import { createRequestInstrumentation } from '../observability/instrument.js';
 import { dumpEarlyLogs } from '../observability/log/construct.js';
 import { log } from '../observability/log/index.js';
@@ -223,9 +225,14 @@ export async function startServer(overrides?: {
   const client = resolveClientDir(runtimeOptions, import.meta.url);
   const appHandler = createAppHandler(app, runtimeOptions, client);
   const staticHandler = createStaticHandler(app, client);
+  // the warmup already imported the actions module, this only reads its registry
+  const actionsModule = await app.manifest.actions?.();
+  const actions = collectActionNames(actionsModule?.server);
   const instrument = createRequestInstrumentation({
     logging: runtimeOptions.logging,
     telemetry: runtimeOptions.telemetry ? { exclude: runtimeOptions.telemetry.exclude } : false,
+    actions,
+    redactedQueryParams: runtimeOptions.redactedQueryParams,
   });
 
   let tls: { cert: Buffer; key: Buffer } | undefined;
@@ -256,6 +263,10 @@ export async function startServer(overrides?: {
   };
 
   const server = tls ? https.createServer(tls, listener) : http.createServer(listener);
+
+  // above the reverse proxy's idle timeout, so it never reuses a connection node is closing
+  server.keepAliveTimeout = runtimeOptions.keepAliveTimeout;
+  server.headersTimeout = runtimeOptions.keepAliveTimeout + 1000;
 
   try {
     await withSpan('listen', { parent: startup.context }, () => {
@@ -311,13 +322,13 @@ export async function startServer(overrides?: {
 
     const drainMs = roundMs(performance.now() - drainStartedAt);
 
-    await shutdownLifecycle(shutdown.context);
+    await withShutdownDeadline('onShutdown', () => shutdownLifecycle(shutdown.context), runtimeOptions.shutdownTimeout);
 
     shutdown.span.end();
 
     log.info({ drainMs }, 'shutdown complete');
 
-    await shutdownTelemetry();
+    await withShutdownDeadline('telemetry', shutdownTelemetry, runtimeOptions.shutdownTimeout);
     resolveClosed();
   };
 

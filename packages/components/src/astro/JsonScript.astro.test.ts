@@ -41,4 +41,17 @@ describe('JsonScript', () => {
 
     expect(JSON.parse(scriptBody(html))).toEqual(data);
   });
+
+  test('keeps a quote in the id inside the attribute', async () => {
+    const html = await render({ data: { a: 1 }, id: 'x"><img src=x onerror=alert(1)>' });
+
+    expect(html).toContain('id="x&quot;><img src=x onerror=alert(1)>"');
+    expect(html.replace(/ id="[^"]*"/, '')).not.toContain('<img');
+  });
+
+  test('renders undefined data as null instead of throwing', async () => {
+    const html = await render({ data: undefined });
+
+    expect(scriptBody(html)).toBe('null');
+  });
 });

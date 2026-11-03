@@ -8,7 +8,7 @@ import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { createRequestInstrumentation } from '../observability/instrument';
 import { getLogStore, getRequestRecord } from '../observability/log/store';
 import { registerTestTracing } from '../observability/test-tracing';
-import { writeResponse } from './serve-app';
+import { createAppHandler, writeResponse } from './serve-app';
 
 const spans = new InMemorySpanExporter();
 const reader = new PeriodicExportingMetricReader({
@@ -68,6 +68,30 @@ function failingBody(): ReadableStream<Uint8Array> {
     },
   });
 }
+
+describe('createAppHandler', () => {
+  test('a rejected render answers 500 instead of leaving the client waiting', async () => {
+    getLogStore().root = pino({ base: null }, sink);
+
+    const app = {
+      match() {},
+      render: () => Promise.reject(new Error('astro gave up')),
+      getAllowedDomains: () => [],
+    };
+    const handler = createAppHandler(app as never, { port: 0, bodySizeLimit: 0 } as never, '/nonexistent');
+    const server = createServer((req, res) => void handler(req, res));
+
+    servers.push(server);
+
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+    const response = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/page`);
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe('Internal Server Error');
+    expect(logLines.find((line) => line['msg'] === 'could not render')).toMatchObject({ url: '/page' });
+  });
+});
 
 describe('writeResponse', () => {
   test('streams the body and completes the request', async () => {

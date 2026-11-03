@@ -40,7 +40,7 @@ export async function hashUser(user: ConversionUser, options: HashOptions = {}):
     hashOptional(normalizeName(user.firstName)),
     hashOptional(normalizeName(user.lastName)),
     hashOptional(normalizeName(user.city)),
-    hashOptional(normalizePostalCode(user.postalCode)),
+    hashOptional(normalizePostalCode(user.postalCode, user.country)),
     hashOptional(normalizeCountry(user.country)),
     hashOptional(user.externalId?.trim()),
   ]);
@@ -54,11 +54,15 @@ export function normalizeEmail(email: string | undefined): string | undefined {
 
 /**
  * Digits only, with the country calling code: a national number (one leading zero) gets the
- * site's code, `+` and `00` prefixes are dropped. Returns `undefined` for anything that is not
- * 8 to 15 digits afterwards.
+ * site's code and is dropped without one, `+` and `00` prefixes are dropped, as is a trunk zero
+ * written in parentheses after the code (`+49 (0) 151 …`). Returns `undefined` for anything that
+ * is not 8 to 15 digits afterwards.
  */
 export function normalizePhone(phone: string | undefined, countryCallingCode: string | undefined): string | undefined {
-  const compact = phone?.replaceAll(/[\s().-]/g, '');
+  const compact = phone
+    ?.trim()
+    .replace(/^(\+|00)\s*(\d+)\s*\(0\)/, '$1$2')
+    .replaceAll(/[\s()./-]/g, '');
 
   if (!compact) {
     return undefined;
@@ -66,7 +70,16 @@ export function normalizePhone(phone: string | undefined, countryCallingCode: st
 
   const international = compact.startsWith('+') || compact.startsWith('00');
   const national = compact.replace(/^\+?0*/, '');
-  const digits = international || !compact.startsWith('0') ? national : `${countryCallingCode ?? ''}${national}`;
+  let digits: string;
+
+  if (international || !compact.startsWith('0')) {
+    digits = national;
+  } else if (countryCallingCode) {
+    digits = `${countryCallingCode}${national}`;
+  } else {
+    // a national number nobody can complete hashes to something no platform matches
+    return undefined;
+  }
 
   return /^\d{8,15}$/.test(digits) ? digits : undefined;
 }
@@ -76,9 +89,15 @@ export function normalizeName(name: string | undefined): string | undefined {
   return name?.toLowerCase().replaceAll(/[\s!-/:-@[-`{-~]/g, '') || undefined;
 }
 
-/** lowercase without whitespace */
-export function normalizePostalCode(postalCode: string | undefined): string | undefined {
-  return postalCode?.toLowerCase().replaceAll(/\s/g, '') || undefined;
+/** lowercase without whitespace and dashes; the first five digits of a us zip code */
+export function normalizePostalCode(postalCode: string | undefined, country?: string | undefined): string | undefined {
+  const compact = postalCode?.toLowerCase().replaceAll(/[\s-]/g, '');
+
+  if (!compact) {
+    return undefined;
+  }
+
+  return normalizeCountry(country) === 'us' ? compact.slice(0, 5) : compact;
 }
 
 /** the lowercase two-letter code, anything else is dropped */

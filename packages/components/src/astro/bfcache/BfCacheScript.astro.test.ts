@@ -12,12 +12,12 @@ describe('BfCacheScript', () => {
     container = await AstroContainer.create();
   });
 
-  test('renders the pageshow reload + pagehide guard', async () => {
+  test('renders the pageshow reload', async () => {
     const html = await container.renderToString(BfCacheScript);
 
     expect(html).toContain('pageshow');
     expect(html).toContain('persisted');
-    expect(html).toContain('pagehide');
+    expect(html).not.toContain('pagehide');
   });
 
   test('ships no comments in the inline script', async () => {

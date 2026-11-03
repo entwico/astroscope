@@ -5,7 +5,7 @@ export type CrmRecord = {
   event: string;
   key: string | undefined;
   email: string | undefined;
-  clientAddress: string;
+  clientAddress: string | undefined;
 };
 
 /** what the crm "conversions api" received, for the page and the tests */

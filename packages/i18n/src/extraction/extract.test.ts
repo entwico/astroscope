@@ -99,6 +99,39 @@ describe('extractKeysFromFile', () => {
 
       expect(result.keys).toHaveLength(0);
     });
+
+    test('extracts rich() calls', async () => {
+      const code = `
+        import { rich } from '@astroscope/i18n/translate';
+        function render() {
+          return rich('tos', 'Read our {#link}Terms{/link}', { link: (c) => c });
+        }
+      `;
+
+      const result = await extractKeysFromFile({
+        filename: 'test.ts',
+        code,
+      });
+
+      expect(result.keys.map((k) => k.key)).toEqual(['tos']);
+      expect(result.keys[0]?.meta.fallback).toBe('Read our {#link}Terms{/link}');
+    });
+
+    test('extracts optional t() calls', async () => {
+      const code = `
+        import { t } from '@astroscope/i18n/translate';
+        function render() {
+          return t?.('hello', 'Hello World');
+        }
+      `;
+
+      const result = await extractKeysFromFile({
+        filename: 'test.ts',
+        code,
+      });
+
+      expect(result.keys.map((k) => k.key)).toEqual(['hello']);
+    });
   });
 
   describe('TSX files', () => {
@@ -172,6 +205,25 @@ describe('extractKeysFromFile', () => {
       });
 
       expect(result.code).toContain('Hello World');
+    });
+
+    test('leaves calls to a local function named t untouched', async () => {
+      const code = `
+        import { t as translate } from '@astroscope/i18n/translate';
+        function join(rows) {
+          const t = (a, b) => a + b;
+          return t('left', 'right') + translate('hello', 'Hello');
+        }
+      `;
+
+      const result = await extractKeysFromFile({
+        filename: 'test.ts',
+        code,
+        stripFallbacks: true,
+      });
+
+      expect(result.keys.map((k) => k.key)).not.toContain('left');
+      expect(result.code).toContain('t(\'left\', \'right\')');
     });
   });
 

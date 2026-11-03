@@ -1,6 +1,6 @@
 import tsParser from '@typescript-eslint/parser';
-import { RuleTester } from 'eslint';
-import { describe, it } from 'vitest';
+import { type Rule, RuleTester } from 'eslint';
+import { describe, expect, it, test } from 'vitest';
 import { noRawStringsInJsx } from './no-raw-strings-in-jsx.js';
 
 RuleTester.describe = describe;
@@ -53,6 +53,8 @@ tester.run('no-raw-strings-in-jsx', noRawStringsInJsx, {
     // mixed punctuation / symbols
     { code: '<div>/ —</div>;' },
     { code: '<div>&amp;</div>;' },
+    { code: `<div>{'{'}</div>;` },
+    { code: `<div title=" } " />;` },
     // hex colors
     { code: '<meta content="#003366" />;' },
     { code: '<meta content="#fff" />;' },
@@ -98,6 +100,9 @@ tester.run('no-raw-strings-in-jsx', noRawStringsInJsx, {
     // boolean attribute values
     { code: '<div contentEditable="false" />;' },
     { code: '<div spellcheck="false" />;' },
+    // ignorePatterns adds to the built-in patterns
+    { code: `<div>{'42'}{'#fff'}</div>;`, options: [{ ignorePatterns: ['^TODO'] }] },
+    { code: `<div>TODO later</div>;`, options: [{ ignorePatterns: ['^TODO'] }] },
   ],
   invalid: [
     {
@@ -130,7 +135,22 @@ tester.run('no-raw-strings-in-jsx', noRawStringsInJsx, {
       code: '<div aria-roledescription="slide" />;',
       errors: [{ messageId: 'rawString' }],
     },
+    // text that merely starts with a brace
+    {
+      code: '<input placeholder="{name} is required" />;',
+      errors: [{ messageId: 'rawString' }],
+    },
+    {
+      code: `<div>{'{ and more'}</div>;`,
+      errors: [{ messageId: 'rawString' }],
+    },
   ],
+});
+
+test('an invalid ignore pattern fails with a message naming it', () => {
+  const context = { options: [{ ignorePatterns: ['('] }] } as unknown as Rule.RuleContext;
+
+  expect(() => noRawStringsInJsx.create(context)).toThrow(/ignorePatterns entry "\(" is not a valid regular expression/);
 });
 
 // typescript-specific tests

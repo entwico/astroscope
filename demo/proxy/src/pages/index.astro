@@ -14,7 +14,13 @@ import Layout from '../../../shared/Layout.astro';
         <li>
           Requests to <code class="badge badge-ghost">/api/*</code> are proxied to JSONPlaceholder API
         </li>
-        <li>Any unmatched routes would fall through to a legacy backend (strangler fig pattern)</li>
+        <li>
+          Requests to <code class="badge badge-ghost">/h2/*</code> go to an upstream over HTTP/2, negotiated by ALPN
+        </li>
+        <li>
+          Requests to <code class="badge badge-ghost">/legacy/*</code> go to a legacy backend that is down — a
+          <code class="badge badge-ghost">502</code> (strangler fig pattern)
+        </li>
       </ul>
     </div>
   </div>

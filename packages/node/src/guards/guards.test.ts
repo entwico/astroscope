@@ -298,6 +298,25 @@ describe('guard', () => {
     expect(asBrowser.headers.get('location')).toBe('/login');
   });
 
+  test('reads a repeated form field as the value the guarded code will see: the first', async () => {
+    const owner = defineGuard({
+      name: 'owner',
+      input: { projectId: z.string() },
+      check: (_ctx, { projectId }) => {
+        if (projectId !== 'mine') deny('FORBIDDEN');
+      },
+    });
+    const body = new URLSearchParams([
+      ['projectId', 'theirs'],
+      ['projectId', 'mine'],
+    ]);
+    const ctx = createApiContext({}, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+
+    const { denied } = await guard(ctx, [owner]);
+
+    expect(denied?.status).toBe(403);
+  });
+
   test('answers 400 when a request carries no guard input', async () => {
     const { denied } = await guard(createApiContext({}, { method: 'GET' }), [secret]);
 
@@ -356,6 +375,27 @@ describe('per-request memo', () => {
     await guard(createApiContext(), [loader]);
 
     expect(check).toHaveBeenCalledTimes(2);
+  });
+
+  test('a guard reading input is checked against every input it runs with', async () => {
+    const owner = defineGuard({
+      name: 'owner',
+      input: { projectId: z.string() },
+      check: (_ctx, { projectId }) => {
+        if (projectId !== 'mine') deny('FORBIDDEN');
+
+        return { project: { id: projectId } };
+      },
+    });
+    const action = defineAction({
+      input: z.object({ projectId: z.string() }),
+      guards: [owner],
+      handler: (_input, ctx) => ctx.locals.project.id,
+    }) as unknown as Action;
+    const ctx = createApiContext();
+
+    expect(await action({ projectId: 'mine' }, ctx)).toBe('mine');
+    await expect(action({ projectId: 'theirs' }, ctx)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   test('a denial is not remembered', async () => {

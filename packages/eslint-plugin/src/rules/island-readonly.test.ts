@@ -69,5 +69,15 @@ tester.run('island-readonly', islandReadonly, {
       `,
       errors: [{ messageId: 'mutable', data: { comp: 'C' } }],
     },
+    // a member expression tag is an island like any other
+    {
+      filename,
+      code: `
+        function C(p: { a: { b: string } }) { return null as any; }
+        const UI = { C };
+        export const v = <UI.C client:load a={{ b: '' }} />;
+      `,
+      errors: [{ messageId: 'mutable', data: { comp: 'UI.C' } }],
+    },
   ],
 });

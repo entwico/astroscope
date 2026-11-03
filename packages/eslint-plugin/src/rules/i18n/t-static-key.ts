@@ -1,10 +1,11 @@
 import type { Rule } from 'eslint';
+import { isTranslateCall } from './translate-call.js';
 
 export const tStaticKey: Rule.RuleModule = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'require the first argument of `t()` to be a static string literal',
+      description: 'require the first argument of `t()` and `rich()` to be a static string literal',
     },
     messages: {
       dynamicKey: '`t()` key must be a static string literal. Dynamic keys cannot be extracted at build time.',
@@ -14,7 +15,7 @@ export const tStaticKey: Rule.RuleModule = {
   create(context) {
     return {
       CallExpression(node) {
-        if (node.callee.type !== 'Identifier' || node.callee.name !== 't') return;
+        if (!isTranslateCall(node.callee)) return;
 
         const firstArg = node.arguments[0];
 

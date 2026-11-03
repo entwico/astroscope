@@ -49,8 +49,6 @@ export type OpenAiPixelOptions = {
   countryCallingCode?: string | undefined;
 };
 
-let initializedUserKey: string | undefined;
-
 /**
  * The openai ads pixel as a destination: measures the `openai` payload of an event under the event's
  * id, so a conversion the server also reported through the conversions api counts once. The pixel
@@ -58,6 +56,9 @@ let initializedUserKey: string | undefined;
  * identifiers an event carries are hashed and sent through `init` right before it.
  */
 export function openAiPixel(options: OpenAiPixelOptions = {}): Destination<'openai'> {
+  // the visitor this pixel identified last, so the same identifiers are not sent again
+  const identified = { key: undefined as string | undefined };
+
   return {
     name: 'openai',
     ready: () => isBrowser() && typeof globalThis.window.oaiq === 'function',
@@ -65,19 +66,24 @@ export function openAiPixel(options: OpenAiPixelOptions = {}): Destination<'open
       const user = event.user ? hashUser(event.user, { countryCallingCode: options.countryCallingCode }) : undefined;
 
       void Promise.resolve(user)
-        .then((hashed) => measure(event, meta, hashed))
+        .then((hashed) => measure(event, meta, hashed, identified))
         .catch((error: unknown) => console.error('relay: destination openai failed', error));
     },
   };
 }
 
-function measure(event: OpenAiEvent, meta: EventMeta, hashed: HashedUser | undefined): void {
+function measure(
+  event: OpenAiEvent,
+  meta: EventMeta,
+  hashed: HashedUser | undefined,
+  identified: { key: string | undefined },
+): void {
   const oaiq = window.oaiq;
 
   if (!oaiq) return;
 
   if (hashed) {
-    identify(oaiq, hashed);
+    identify(oaiq, hashed, identified);
   }
 
   oaiq('measure', event.name, event.data as OpenAiEvent['data'], {
@@ -86,7 +92,7 @@ function measure(event: OpenAiEvent, meta: EventMeta, hashed: HashedUser | undef
   });
 }
 
-function identify(oaiq: Oaiq, hashed: HashedUser): void {
+function identify(oaiq: Oaiq, hashed: HashedUser, identified: { key: string | undefined }): void {
   const user = withoutEmpty({
     email_sha256: hashed.email,
     phone_number_sha256: hashed.phone,
@@ -95,11 +101,11 @@ function identify(oaiq: Oaiq, hashed: HashedUser): void {
   });
   const key = JSON.stringify(user);
 
-  if (key === initializedUserKey || Object.keys(user).length === 0) {
+  if (key === identified.key || Object.keys(user).length === 0) {
     return;
   }
 
-  initializedUserKey = key;
+  identified.key = key;
   oaiq('init', { user });
 }
 

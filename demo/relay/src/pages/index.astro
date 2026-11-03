@@ -1,5 +1,5 @@
 ---
-import { trackAttribute } from '@astroscope/relay';
+import { inlineTrack } from '@astroscope/relay';
 import { Track } from '@astroscope/relay/astro';
 import '../styles/index.css';
 import Layout from '../../../shared/Layout.astro';
@@ -27,7 +27,7 @@ const item: DemoItem = { id: 'demo', name: 'Demo item', price: 9.5 };
         watch the waiting events arrive.
       </p>
       <ConsentPanel client:load />
-      <a href="#offer" class="btn btn-sm mt-4" data-track={trackAttribute(selectOfferEvent(item, 'offers'))} data-testid="offer">
+      <a href="#offer" class="btn btn-sm mt-4" onclick={inlineTrack(selectOfferEvent(item, 'offers'))} data-testid="offer">
         Select the demo offer
       </a>
     </div>

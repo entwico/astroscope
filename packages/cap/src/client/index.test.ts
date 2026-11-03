@@ -4,8 +4,9 @@ vi.mock('virtual:@astroscope/cap/config', () => ({ path: '/_cap/' }));
 vi.mock('@cap.js/wasm/browser/cap_wasm_bg.wasm?url', () => ({ default: '/wasm' }));
 vi.mock('@cap.js/wasm/browser/hashwx.wasm?url', () => ({ default: '/hashwx' }));
 vi.mock('pako/browser/inflate?url', () => ({ default: '/pako' }));
+vi.mock('cap-widget', () => ({}));
 
-const { createCapSession } = await import('./index');
+const { createCapSession, solveCap } = await import('./index');
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -95,5 +96,62 @@ describe('createCapSession', () => {
 
     expect(await session.ensure()).toBeNull();
     expect(solve).toHaveBeenCalledTimes(2);
+  });
+
+  test('ensure resolves null when the solver throws', async () => {
+    const solve = vi.fn(() => Promise.reject(new Error('worker crashed')));
+    const session = createCapSession(solve);
+
+    expect(await session.ensure()).toBeNull();
+    expect(solve).toHaveBeenCalledTimes(1);
+  });
+
+  test('a prepare whose solver throws leaves nothing behind for ensure', async () => {
+    const solve = vi.fn<() => Promise<string | null>>().mockRejectedValueOnce(new Error('worker crashed'));
+    const session = createCapSession(solve);
+
+    session.prepare();
+
+    await vi.waitFor(() => expect(solve).toHaveBeenCalledTimes(1));
+
+    solve.mockResolvedValueOnce('token');
+
+    expect(await session.ensure()).toBe('token');
+    expect(solve).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('solveCap', () => {
+  // the vendor widget's solve() returns undefined while a solve of the same instance is running
+  class ReentrancyGuardedCap {
+    private _solving = false;
+    private _count = 0;
+
+    async solve() {
+      if (this._solving) return;
+
+      this._solving = true;
+      await Promise.resolve();
+      this._solving = false;
+
+      return { success: true, token: `token-${++this._count}` };
+    }
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('window', { Cap: ReentrancyGuardedCap });
+    vi.stubGlobal('document', { addEventListener: vi.fn() });
+    vi.stubGlobal('customElements', { whenDefined: () => Promise.resolve() });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test('concurrent solves each resolve a token', async () => {
+    const tokens = await Promise.all([solveCap(), solveCap()]);
+
+    expect(tokens).toEqual([expect.any(String), expect.any(String)]);
+    expect(tokens[0]).not.toBe(tokens[1]);
   });
 });

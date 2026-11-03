@@ -25,11 +25,14 @@ function getOrCreateMessageFormat(locale: string, message: string): MessageForma
   return mf;
 }
 
-export function compileMessage(locale: string, message: string): CompiledTranslation {
+/** takes a formatting error (an unresolved variable, a bad input); messageformat renders its best effort */
+export type FormatErrorHandler = (error: unknown) => void;
+
+export function compileMessage(locale: string, message: string, onError?: FormatErrorHandler): CompiledTranslation {
   try {
     const mf = getOrCreateMessageFormat(locale, message);
 
-    return (values) => mf.format(values);
+    return (values) => mf.format(values, onError);
   } catch {
     // if MF2 parsing fails, return raw message so the problem is visible to the user
     return () => message;
@@ -45,22 +48,31 @@ export function formatMessageToParts(
   locale: string,
   message: string,
   values?: Record<string, unknown> | undefined,
+  onError?: FormatErrorHandler,
 ): MessagePart<string>[] {
   try {
     const mf = getOrCreateMessageFormat(locale, message);
 
-    return mf.formatToParts(values);
+    return mf.formatToParts(values, onError);
   } catch {
     // if MF2 parsing fails, return a single literal part with the raw message
     return [{ type: 'literal', value: message }];
   }
 }
 
-export function compileTranslations(locale: string, raw: RawTranslations): CompiledTranslations {
-  const compiled: CompiledTranslations = {};
+/** an empty message is no message: it falls back like a missing key, as `rich()`, the chunks and the client do */
+export function compileTranslations(
+  locale: string,
+  raw: RawTranslations,
+  onError?: (key: string, error: unknown) => void,
+): CompiledTranslations {
+  // null prototype: a key like `__proto__` stays a translation instead of replacing the prototype
+  const compiled: CompiledTranslations = Object.create(null) as CompiledTranslations;
 
   for (const [key, message] of Object.entries(raw)) {
-    compiled[key] = compileMessage(locale, message);
+    if (message === '') continue;
+
+    compiled[key] = compileMessage(locale, message, onError && ((error) => onError(key, error)));
   }
 
   return compiled;

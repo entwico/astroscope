@@ -23,6 +23,13 @@ describe('gtm builders', () => {
     expect(gtm.search({ search_term: 'x' })).toEqual({ event: 'search', search_term: 'x' });
     expect(gtm.event('contactFormStatus', { status: 'success' })).toEqual({ event: 'contactFormStatus', status: 'success' });
   });
+
+  test('the parameters never rename the event', () => {
+    expect(gtm.search({ search_term: 'x' }, { event: 'other' })).toMatchObject({ event: 'search' });
+    expect(gtm.search({ search_term: 'x', event: 'other' })).toMatchObject({ event: 'search' });
+    expect(gtm.purchase({ transaction_id: 'o-1', value: 1, currency: 'EUR', items: [] }, { event: 'other' })).toMatchObject({ event: 'purchase' });
+    expect(gtm.event('contact', { event: 'other' })).toMatchObject({ event: 'contact' });
+  });
 });
 
 describe('gtmContainer', () => {

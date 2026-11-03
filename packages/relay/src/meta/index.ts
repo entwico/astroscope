@@ -43,7 +43,7 @@ export type MetaPixelOptions = {
  */
 export function metaPixel(options: MetaPixelOptions): Destination<'meta'> {
   const { pixelId, countryCallingCode } = options;
-  let initializedUserKey: string | undefined;
+  let identified = false;
 
   return {
     name: 'meta',
@@ -64,8 +64,14 @@ export function metaPixel(options: MetaPixelOptions): Destination<'meta'> {
     fbq(event.custom ? 'trackSingleCustom' : 'trackSingle', pixelId, event.name, event.data, { eventID: meta.id });
   }
 
-  // the base code initialized the pixel already; a conversion with identifiers initializes it again with them
+  // the base code initialized the pixel already; the first conversion with identifiers initializes
+  // it again with them. fbevents.js takes user data from a repeat init only while the pixel holds
+  // none and answers any later one with a "Duplicate Pixel ID" warning, so one set per page
   function identify(fbq: Fbq, hashed: HashedUser | undefined): void {
+    if (identified) {
+      return;
+    }
+
     const user = withoutEmpty({
       em: hashed?.email,
       ph: hashed?.phone,
@@ -76,13 +82,11 @@ export function metaPixel(options: MetaPixelOptions): Destination<'meta'> {
       country: hashed?.country,
       external_id: hashed?.externalId,
     });
-    const key = JSON.stringify(user);
-
-    if (key === initializedUserKey || Object.keys(user).length === 0) {
+    if (Object.keys(user).length === 0) {
       return;
     }
 
-    initializedUserKey = key;
+    identified = true;
     fbq('init', pixelId, user);
   }
 }

@@ -7,4 +7,6 @@ declare module 'virtual:@astroscope/i18n/manifest' {
 declare module 'virtual:@astroscope/i18n/config' {
   import type { ExcludePattern } from '@astroscope/node/excludes';
   export const exclude: ExcludePattern[] | null;
+  /** the chunk endpoint's url prefix, the site's base followed by `/_i18n/` */
+  export const chunkPrefix: string;
 }

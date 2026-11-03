@@ -76,6 +76,7 @@ type Pending = EventMeta & { payload: unknown };
 
 type DestinationState = {
   destination: Registered;
+  /** the deliveries made, by event key and id */
   delivered: Set<string>;
 };
 
@@ -90,6 +91,10 @@ export function createBus(env: BusEnvironment = {}): Bus {
   const schedule = env.schedule ?? defaultSchedule;
 
   let states: DestinationState[] = [];
+  // kept by destination name across configures, so a reconfigured destination gets nothing twice
+  const delivered = new Map<string, Set<string>>();
+  // a source is asked to call back once, however often the bus is configured with it
+  const watched = new WeakSet<ConsentHolder>();
   let debug: RelayConfig['debug'];
   // the event being tracked right now: its deliveries belong to its own log group, later ones get their own
   let tracking: string | undefined;
@@ -126,7 +131,7 @@ export function createBus(env: BusEnvironment = {}): Bus {
       if (!allowed) continue;
 
       const pending = buffer
-        .filter((emitted) => !state.delivered.has(emitted.id))
+        .filter((emitted) => !state.delivered.has(deliveryOf(emitted)))
         .map((emitted) => pendingOf(emitted, destination))
         .filter((entry) => entry !== undefined);
 
@@ -144,9 +149,11 @@ export function createBus(env: BusEnvironment = {}): Bus {
 
   const deliver = (state: DestinationState, entries: readonly Pending[]): void => {
     for (const { payload, ...meta } of entries) {
-      if (state.delivered.has(meta.id)) continue;
+      const delivery = deliveryOf(meta);
 
-      state.delivered.add(meta.id);
+      if (state.delivered.has(delivery)) continue;
+
+      state.delivered.add(delivery);
 
       try {
         state.destination.send(payload, meta);
@@ -172,7 +179,7 @@ export function createBus(env: BusEnvironment = {}): Bus {
 
       if (payload === undefined) continue;
 
-      const status = statusOf(state, emitted.id, consentOf(destination));
+      const status = statusOf(state, emitted, consentOf(destination));
 
       outcomes.push({ name: destination.name, payload, status });
     }
@@ -207,14 +214,23 @@ export function createBus(env: BusEnvironment = {}): Bus {
         }
       }
 
-      states = destinations.map((destination) => ({ destination, delivered: new Set() }));
+      states = destinations.map((destination) => {
+        const sent = delivered.get(destination.name) ?? new Set<string>();
+
+        delivered.set(destination.name, sent);
+
+        return { destination, delivered: sent };
+      });
       consent = next.consent;
       free = new Set(next.consent.free);
       debug = next.debug;
 
       dispatch();
 
-      next.consent.watch?.(notify);
+      if (!next.consent.watch || watched.has(next.consent)) return;
+
+      watched.add(next.consent);
+      next.consent.watch(notify);
     },
 
     track(input) {
@@ -233,8 +249,8 @@ export function createBus(env: BusEnvironment = {}): Bus {
       if (buffer.length > BUFFER_SIZE) {
         const evicted = buffer.splice(0, buffer.length - BUFFER_SIZE);
 
-        for (const state of states) {
-          for (const entry of evicted) state.delivered.delete(entry.id);
+        for (const sent of delivered.values()) {
+          for (const entry of evicted) sent.delete(deliveryOf(entry));
         }
       }
 
@@ -256,8 +272,8 @@ export function createBus(env: BusEnvironment = {}): Bus {
   };
 }
 
-function statusOf(state: DestinationState, id: string, allowed: ConsentAnswer): Outcome['status'] {
-  if (state.delivered.has(id)) return 'sent';
+function statusOf(state: DestinationState, emitted: Emitted, allowed: ConsentAnswer): Outcome['status'] {
+  if (state.delivered.has(deliveryOf(emitted))) return 'sent';
   if (allowed === undefined) return 'consent pending';
   if (!allowed) return 'declined';
 
@@ -279,6 +295,15 @@ function registeredDestinations(destinations: Destinations): Registered[] {
   }
 
   return registered;
+}
+
+/**
+ * What a destination gets once: the event under its id. The same event tracked again under its own
+ * id (a resubmitted order) is one conversion, another event under that id (the checkout before the
+ * purchase, both under the order number) is not.
+ */
+function deliveryOf({ key, id }: EventMeta): string {
+  return `${key ?? ''}\n${id}`;
 }
 
 function pendingOf(emitted: Emitted, destination: Registered): Pending | undefined {

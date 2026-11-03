@@ -3,6 +3,7 @@ import hashwxWasmUrl from '@cap.js/wasm/browser/hashwx.wasm?url';
 import type { Cap } from 'cap-widget';
 import pakoUrl from 'pako/browser/inflate?url';
 import { path } from 'virtual:@astroscope/cap/config';
+import { protectCreditsLink } from './credits.js';
 
 declare global {
   interface Window {
@@ -25,28 +26,43 @@ let registered: Promise<void> | undefined;
  * Loads the cap client once and resolves when `<cap-widget>` is defined. Any hand-written widget
  * needs this before it can solve. Everything the client would fetch from a cdn — the two wasm
  * solvers and the pako fallback for browsers without `DecompressionStream` — comes from this
- * origin instead, and the visible widget's credits link stops reporting the page url and referrer
- * to the vendor on click.
+ * origin instead, and a click on the visible widget's credits link opens the vendor site without
+ * the page url, a referrer or `window.opener`.
  */
 export function registerCapWidget(): Promise<void> {
-  registered ??= (async () => {
-    /* eslint-disable unicorn/no-global-object-property-assignment -- the cap widget reads its `window.CAP_*` globals on load, assigning them is its documented configuration mechanism */
-    window.CAP_CUSTOM_WASM_URL = capWasmUrl;
-    window.CAP_CUSTOM_HASHWX_URL = hashwxWasmUrl;
-    window.CAP_PAKO_URL = pakoUrl;
-    window.CAP_DISABLE_WIDGET_REF = true;
-    /* eslint-enable unicorn/no-global-object-property-assignment */
+  if (!registered) {
+    const loading = loadCapWidget();
 
-    await import('cap-widget');
-    await customElements.whenDefined('cap-widget');
-  })();
+    registered = loading;
+
+    // a load that failed (a chunk blip, a deploy swapping hashes) is retried by the next call
+    void loading.catch(() => {
+      if (registered === loading) registered = undefined;
+    });
+  }
 
   return registered;
 }
 
+async function loadCapWidget(): Promise<void> {
+  /* eslint-disable unicorn/no-global-object-property-assignment -- the cap widget reads its `window.CAP_*` globals on load, assigning them is its documented configuration mechanism */
+  window.CAP_CUSTOM_WASM_URL = capWasmUrl;
+  window.CAP_CUSTOM_HASHWX_URL = hashwxWasmUrl;
+  window.CAP_PAKO_URL = pakoUrl;
+  window.CAP_DISABLE_WIDGET_REF = true;
+  /* eslint-enable unicorn/no-global-object-property-assignment */
+
+  protectCreditsLink();
+
+  await import('cap-widget');
+  await customElements.whenDefined('cap-widget');
+}
+
 // the cap client appends its hidden widget to the document and never removes it, so one instance
-// serves every headless solve of the page
+// serves every headless solve of the page; its `solve()` answers nothing while one is running, so
+// the solves are queued behind each other
 let headless: Cap | undefined;
+let lastSolve: Promise<void> = Promise.resolve();
 
 /**
  * Solves a cap challenge without a widget — the proof of work runs in workers against the site's
@@ -54,7 +70,13 @@ let headless: Cap | undefined;
  * only: call it from an event handler, never during render.
  */
 export async function solveCap(): Promise<string | null> {
+  const previous = lastSolve;
+  const turn = Promise.withResolvers<void>();
+
+  lastSolve = turn.promise;
+
   try {
+    await previous;
     await registerCapWidget();
 
     headless ??= new window.Cap({ apiEndpoint: path });
@@ -64,6 +86,8 @@ export async function solveCap(): Promise<string | null> {
     return result?.success && result.token ? result.token : null;
   } catch {
     return null;
+  } finally {
+    turn.resolve();
   }
 }
 
@@ -94,6 +118,11 @@ export function createCapSession(solve: () => Promise<string | null> = solveCap)
       prepared = token === null ? null : { token, solvedAt: Date.now() };
 
       return token;
+    } catch {
+      // a custom solver that throws is a failed solve, not an error of the form
+      prepared = null;
+
+      return null;
     } finally {
       pending = null;
     }

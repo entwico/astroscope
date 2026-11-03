@@ -21,9 +21,30 @@ export type IslandRewriter = {
   end(): string;
 };
 
+/**
+ * a complete tag seen in the data state of html content (one the scanner has a name
+ * for), `[start, end)` its bounds in everything written so far
+ */
+export type TagHandler = (name: string, closing: boolean, start: number, end: number) => void;
+
 const ISLAND = 'astro-island';
-// raw text by name alone, also inside `<svg>`/`<math>` where the browser would not — a real island cannot sit there
 const RAW_TEXT = new Set(['style', 'textarea', 'title', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript']);
+
+// an island inside `<svg>`/`<math>` is a foreign element, never hydrated, so nothing is injected there:
+// the scanner tracks the namespaces the way the tree builder does — html start tags that break out of
+// foreign content, the integration points whose content follows html rules again — only to leave it at
+// the right place, and its raw-text rules apply to html content alone
+type Namespace = 'html' | 'svg' | 'math';
+
+const BREAKOUT = new Set(
+  (
+    'b big blockquote body br center code dd div dl dt em embed h1 h2 h3 h4 h5 h6 head hr i img li listing ' +
+    'menu meta nobr ol p pre ruby s small span strong strike sub sup table tt u ul var'
+  ).split(' '),
+);
+const SVG_INTEGRATION = new Set(['foreignobject', 'desc', 'title']);
+const MATH_INTEGRATION = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
+const ANNOTATION_ENCODINGS = new Set(['text/html', 'application/xhtml+xml']);
 
 // longest marker a raw-text scan must be able to complete across a chunk boundary: `</script` plus its terminator
 const RAW_TAIL = 9;
@@ -114,8 +135,12 @@ function decodeAttribute(value: string): string {
     });
 }
 
-const NAMES_BY_LENGTH: Record<number, string[]> = {
-  3: ['xmp'],
+type NamesByLength = Record<number, string[]>;
+
+// the names html content acts on — every other tag passes through without a lookup
+const HTML_NAMES: NamesByLength = {
+  3: ['xmp', 'svg'],
+  4: ['math'],
   5: ['style', 'title'],
   6: ['script', 'iframe'],
   7: ['noembed'],
@@ -123,6 +148,27 @@ const NAMES_BY_LENGTH: Record<number, string[]> = {
   9: ['plaintext'],
   12: [ISLAND],
 };
+
+// inside or right below foreign content the breakout tags and integration points matter too
+const FOREIGN_NAMES: NamesByLength = mergeNames(HTML_NAMES, [
+  ...BREAKOUT,
+  ...SVG_INTEGRATION,
+  ...MATH_INTEGRATION,
+  'annotation-xml',
+  'font',
+]);
+
+function mergeNames(base: NamesByLength, names: string[]): NamesByLength {
+  const merged: NamesByLength = Object.fromEntries(Object.entries(base).map(([length, list]) => [length, [...list]]));
+
+  for (const name of names) {
+    const list = (merged[name.length] ??= []);
+
+    if (!list.includes(name)) list.push(name);
+  }
+
+  return merged;
+}
 
 function equalsIgnoreCase(buf: string, start: number, name: string): boolean {
   for (let k = 0; k < name.length; k++) {
@@ -137,18 +183,21 @@ function equalsIgnoreCase(buf: string, start: number, name: string): boolean {
  * and the name itself only when it is one the scanner acts on — every other
  * tag passes through without allocating. null when not terminated in `buf`.
  */
-function readTagName(buf: string, i: number): { name: string | null; end: number } | null {
+function readTagName(buf: string, i: number, names: NamesByLength): { name: string | null; end: number } | null {
   const nameStart = i;
 
   while (i < buf.length && !isTagEnd(buf.charCodeAt(i))) i++;
 
   if (i >= buf.length) return null;
 
-  const candidates = NAMES_BY_LENGTH[i - nameStart];
+  const candidates = names[i - nameStart];
   const name = candidates?.find((candidate) => equalsIgnoreCase(buf, nameStart, candidate)) ?? null;
 
   return { name, end: i };
 }
+
+// whether the tag `scanAttributes` last completed carried the self-closing flag: a `/` directly before its `>`
+let selfClosing = false;
 
 /**
  * walks a tag's attributes from just after its name to its `>`, collecting them
@@ -160,10 +209,17 @@ function scanAttributes(buf: string, i: number, attrs: Record<string, string> | 
   const len = buf.length;
 
   for (;;) {
+    const between = i;
+
     while (i < len && (isWhitespace(buf.charCodeAt(i)) || buf.charCodeAt(i) === 0x2F)) i++;
 
     if (i >= len) return -1;
-    if (buf.charCodeAt(i) === 0x3E) return i + 1;
+
+    if (buf.charCodeAt(i) === 0x3E) {
+      selfClosing = i > between && buf.charCodeAt(i - 1) === 0x2F;
+
+      return i + 1;
+    }
 
     const nameStart = i;
 
@@ -261,13 +317,54 @@ function classifyScriptMarker(buf: string, lt: number): ScriptMarker {
   return incomplete ? 'incomplete' : 'none';
 }
 
-export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter {
+export function createIslandRewriter(onIsland: IslandTagHandler, onTag: TagHandler | null = null): IslandRewriter {
   let mode: Mode = DATA;
   let carry = '';
+  let written = 0;
   // islands inside `<template>` are inert until cloned, so they get nothing
   let templateDepth = 0;
+  // the namespace stack, innermost first; html content sits above an integration point
+  const namespaces: Namespace[] = ['html'];
 
-  const scan = (buf: string): string => {
+  const names = (): NamesByLength => (onTag || namespaces.length > 1 ? FOREIGN_NAMES : HTML_NAMES);
+
+  const foreign = (): boolean => namespaces[0] !== 'html';
+
+  const leaveForeign = (): void => {
+    while (foreign()) namespaces.shift();
+  };
+
+  // `</svg>` / `</math>` close through everything foreign above the matching element
+  const closeForeign = (name: Namespace): void => {
+    const at = namespaces.indexOf(name);
+    const html = namespaces.indexOf('html');
+
+    if (at === -1 || (html !== -1 && html < at)) return;
+
+    namespaces.splice(0, at + 1);
+  };
+
+  const opensIntegrationPoint = (name: string, attrs: Record<string, string> | null): boolean => {
+    if (namespaces[0] === 'svg') return SVG_INTEGRATION.has(name);
+    if (name === 'annotation-xml') return ANNOTATION_ENCODINGS.has(attrs?.['encoding']?.toLowerCase() ?? '');
+
+    return MATH_INTEGRATION.has(name);
+  };
+
+  // an end tag of the integration point html content sits in
+  const closesIntegrationPoint = (name: string): boolean => {
+    if (namespaces[1] === 'svg') return SVG_INTEGRATION.has(name);
+
+    return name === 'annotation-xml' || MATH_INTEGRATION.has(name);
+  };
+
+  const breaksOut = (name: string, attrs: Record<string, string> | null): boolean => {
+    if (name === 'font') return !!attrs && ('color' in attrs || 'face' in attrs || 'size' in attrs);
+
+    return BREAKOUT.has(name);
+  };
+
+  const scan = (buf: string, offset: number): string => {
     const len = buf.length;
     // output is the input with insertions: everything between `emitted` and the
     // scan position is untouched source, flushed as one slice when something is
@@ -470,7 +567,7 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
             const after = buf.charCodeAt(lt + 2);
 
             if (isLetter(after)) {
-              const tag = readTagName(buf, lt + 2);
+              const tag = readTagName(buf, lt + 2, names());
               const end = tag ? scanAttributes(buf, tag.end, null) : -1;
 
               if (end < 0) {
@@ -480,7 +577,21 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
 
               i = end;
 
-              if (tag!.name === 'template' && templateDepth > 0) templateDepth--;
+              const { name } = tag!;
+
+              if (name === null) break;
+
+              // any other end tag inside foreign content closes nothing the scanner tracks
+              if (name === 'svg' || name === 'math') {
+                closeForeign(name);
+              } else if (!foreign()) {
+                if (namespaces.length > 1 && closesIntegrationPoint(name)) {
+                  namespaces.shift();
+                } else {
+                  if (name === 'template' && templateDepth > 0) templateDepth--;
+                  if (onTag) onTag(name, true, offset + lt, offset + end);
+                }
+              }
             } else if (after === 0x3E) {
               i = lt + 3;
             } else {
@@ -492,7 +603,7 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
           }
 
           if (isLetter(next)) {
-            const head = readTagName(buf, lt + 1);
+            const head = readTagName(buf, lt + 1, names());
 
             if (!head) {
               hold(lt);
@@ -500,7 +611,9 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
             }
 
             const { name } = head;
-            const attrs: Record<string, string> | null = name === ISLAND ? Object.create(null) : null;
+            const inForeign = foreign();
+            const wantsAttrs = inForeign ? name === 'font' || name === 'annotation-xml' : name === ISLAND;
+            const attrs: Record<string, string> | null = wantsAttrs ? Object.create(null) : null;
             const end = scanAttributes(buf, head.end, attrs);
 
             if (end < 0) {
@@ -508,21 +621,59 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
               break;
             }
 
-            if (attrs && templateDepth === 0) {
-              const rewrite = onIsland(attrs);
-
-              if (rewrite?.prepend) {
-                flush(lt);
-                out += rewrite.prepend;
-              }
-            }
-
             i = end;
 
-            if (name === 'script') mode = { kind: 'script', escape: 0 };
-            else if (name !== null && RAW_TEXT.has(name)) mode = { kind: 'rawtext', endTag: `</${name}` };
-            else if (name === 'plaintext') mode = { kind: 'plaintext' };
-            else if (name === 'template') templateDepth++;
+            if (name === null) break;
+
+            if (inForeign) {
+              if (!breaksOut(name, attrs)) {
+                if (name === 'svg' || name === 'math') {
+                  if (!selfClosing) namespaces.unshift(name);
+                } else if (!selfClosing && opensIntegrationPoint(name, attrs)) {
+                  namespaces.unshift('html');
+                }
+
+                break;
+              }
+
+              // the breakout tag itself is html content
+              leaveForeign();
+            }
+
+            switch (name) {
+              case ISLAND: {
+                const rewrite = templateDepth === 0 ? onIsland(attrs!) : null;
+
+                if (rewrite?.prepend) {
+                  flush(lt);
+                  out += rewrite.prepend;
+                }
+
+                break;
+              }
+              case 'script': {
+                mode = { kind: 'script', escape: 0 };
+                break;
+              }
+              case 'plaintext': {
+                mode = { kind: 'plaintext' };
+                break;
+              }
+              case 'template': {
+                templateDepth++;
+                break;
+              }
+              case 'svg':
+              case 'math': {
+                if (!selfClosing) namespaces.unshift(name);
+
+                break;
+              }
+              default: {
+                if (RAW_TEXT.has(name)) mode = { kind: 'rawtext', endTag: `</${name}` };
+                else if (onTag) onTag(name, false, offset + lt, offset + end);
+              }
+            }
 
             break;
           }
@@ -541,10 +692,12 @@ export function createIslandRewriter(onIsland: IslandTagHandler): IslandRewriter
   return {
     write(chunk) {
       const buf = carry + chunk;
+      const offset = written - carry.length;
 
+      written += chunk.length;
       carry = '';
 
-      return scan(buf);
+      return scan(buf, offset);
     },
     end() {
       const tail = carry;

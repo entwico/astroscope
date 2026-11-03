@@ -22,7 +22,7 @@ export type {
 type Entry = { v?: unknown; l?: ((value: unknown) => void)[] | undefined };
 
 // eslint-disable-next-line unicorn/no-global-object-property-assignment -- `self.__wormholes__` is the entry store shared with the emitted merge scripts
-const store: Record<string, Entry> = ((globalThis as any).__wormholes__ ??= {});
+const store: Record<string, Entry> = ((globalThis as any).__wormholes__ ??= Object.create(null));
 
 const stubs = new Map<string, Wormhole<unknown>>();
 
@@ -33,7 +33,9 @@ function stub(name: string): Wormhole<unknown> {
     return wormhole;
   }
 
-  const entry = (): Entry => (store[name] ??= {});
+  // the merge scripts create the store without a prototype, but a page may have
+  // one from an older script, so builtins are never taken for entries
+  const entry = (): Entry => (Object.hasOwn(store, name) ? store[name]! : (store[name] = {}));
 
   wormhole = {
     name,

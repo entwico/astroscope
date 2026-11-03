@@ -34,6 +34,24 @@ describe('openAiPixel', () => {
       expect(oaiq).toHaveBeenCalledWith('measure', 'custom', { type: 'custom' }, { event_id: 'e-2', custom_event_name: 'quote_requested' }));
   });
 
+  test('every pixel identifies the visitor on its own, once', async () => {
+    const oaiq = vi.fn();
+    const user = { email: 'jane@example.com' };
+
+    vi.stubGlobal('oaiq', oaiq);
+
+    const first = openAiPixel();
+
+    first.send(openai.leadCreated(user), { id: 'e-1', at: 1 });
+    first.send(openai.leadCreated(user), { id: 'e-2', at: 1 });
+    await vi.waitFor(() => expect(oaiq).toHaveBeenCalledWith('measure', 'lead_created', expect.anything(), { event_id: 'e-2' }));
+
+    openAiPixel().send(openai.leadCreated(user), { id: 'e-3', at: 1 });
+    await vi.waitFor(() => expect(oaiq).toHaveBeenCalledWith('measure', 'lead_created', expect.anything(), { event_id: 'e-3' }));
+
+    expect(oaiq.mock.calls.filter(([command]) => command === 'init')).toHaveLength(2);
+  });
+
   test('a failing pixel is reported, never an unhandled rejection', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 

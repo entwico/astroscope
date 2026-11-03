@@ -21,6 +21,5 @@ describe('WithNoBfCache', () => {
 
     expect(html).toContain('<p>content</p>');
     expect(html).toContain('pageshow');
-    expect(html).toContain('pagehide');
   });
 });

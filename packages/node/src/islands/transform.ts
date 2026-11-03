@@ -42,7 +42,20 @@ export type IslandsTransformer = {
   createDocumentRewriter(context?: APIContext | undefined): IslandRewriter;
 };
 
-export function createIslandsTransformer(manifest: IslandsManifest): IslandsTransformer {
+export type IslandsTransformerOptions = {
+  /**
+   * false with `islands: false`: no preload links, no gate runtime, no eager
+   * imports — only the `html` the registered emitters contribute per island
+   * (their data delivery), which is why the rewriter still runs
+   */
+  preload?: boolean | undefined;
+};
+
+export function createIslandsTransformer(
+  manifest: IslandsManifest,
+  options?: IslandsTransformerOptions | undefined,
+): IslandsTransformer {
+  const preload = options?.preload ?? true;
   const graph = createChunkGraph(manifest);
   const fileNames = Object.keys(manifest.chunks);
   const resolveCache = new Map<string, ResolvedChunk | null>();
@@ -79,7 +92,9 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
 
   // islands repeat across requests: closures with the prefix applied, the link
   // tags and the emitter-free register script are computed once per island and
-  // shared — bounded by the manifest, since only resolvable islands are cached
+  // shared — only resolvable islands are cached, so astro's own markup bounds
+  // the maps by the manifest; raw island markup from `set:html` could add an
+  // entry per distinct prefix, but that is script injection already
   const islands = new Map<string, IslandInfo>();
   const linkTags = new Map<string, string>();
   const registerScripts = new WeakMap<IslandInfo, string>();
@@ -199,6 +214,10 @@ export function createIslandsTransformer(manifest: IslandsManifest): IslandsTran
         html = emissions.map((e) => e.html ?? '').join('');
       }
 
+      if (!preload) {
+        return { prepend: html || undefined };
+      }
+
       const directive = (island.client ?? '').replace(/-x$/, '');
 
       if (IMMEDIATE_DIRECTIVES.has(directive)) {
@@ -253,17 +272,26 @@ export type PageTransformOptions = {
 
 /**
  * Head content goes before `</head>`, falling back to right after `<head>`, then
- * the document start. End of head rather than start: meta charset, title etc come first
+ * the document start. End of head rather than start: meta charset, title etc come
+ * first. The tags are located by the islands scanner, so head-like text inside a
+ * script or a comment is never mistaken for them.
  */
 export function insertIntoHead(html: string, content: string): string {
-  const close = html.search(/<\/head\s*>/i);
+  let close = -1;
+  let open = -1;
+  const scanner = createIslandRewriter(
+    () => null,
+    (name, closing, start, end) => {
+      if (name !== 'head') return;
 
-  if (close !== -1) {
-    return html.slice(0, close) + content + html.slice(close);
-  }
+      if (closing) close = close === -1 ? start : close;
+      else open = open === -1 ? end : open;
+    },
+  );
 
-  const open = /<head[^>]*>/i.exec(html);
-  const at = open ? open.index + open[0].length : 0;
+  scanner.write(html);
+
+  const at = close === -1 ? Math.max(open, 0) : close;
 
   return html.slice(0, at) + content + html.slice(at);
 }

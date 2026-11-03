@@ -15,6 +15,8 @@ const PROXIED_ENDPOINTS = new Set(['challenge', 'redeem']);
 // cookies and other ambient headers never go upstream
 const FORWARDED_HEADERS = ['content-type', 'accept', 'user-agent'];
 
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
 /**
  * Serves the cap proxy under `path`: the browser solves the challenge against the site's own
  * origin, the site key is injected here and never appears client-side.
@@ -61,6 +63,9 @@ async function proxy(ctx: APIContext, endpoint: string): Promise<Response> {
       method: 'POST',
       headers,
       body: await ctx.request.arrayBuffer(),
+      // the visitor's request goes to the configured service and nowhere else
+      redirect: 'error',
+      signal: AbortSignal.any([ctx.request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]),
     });
 
     return new Response(response.body, {
@@ -68,9 +73,16 @@ async function proxy(ctx: APIContext, endpoint: string): Promise<Response> {
       headers: { 'content-type': response.headers.get('content-type') ?? 'application/json' },
     });
   } catch (error) {
-    log.error({ error, endpoint }, 'cap proxy request failed');
+    if (error instanceof Error && error.name === 'AbortError') {
+      // the browser went away, nobody is waiting for an answer
+      return new Response(null, { status: 499 });
+    }
 
-    return Response.json({ success: false, error: 'captcha unavailable' }, { status: 502 });
+    const timedOut = error instanceof Error && error.name === 'TimeoutError';
+
+    log.error({ error, endpoint }, timedOut ? 'cap proxy request timed out' : 'cap proxy request failed');
+
+    return Response.json({ success: false, error: 'captcha unavailable' }, { status: timedOut ? 504 : 502 });
   }
 }
 

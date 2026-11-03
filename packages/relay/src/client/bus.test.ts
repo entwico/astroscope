@@ -166,6 +166,28 @@ describe('delivery', () => {
     expect(group).toHaveBeenLastCalledWith(`%crelay hello #${id} → b, later`, expect.any(String));
     vi.restoreAllMocks();
   });
+
+  test('configuring again delivers nothing a destination already got', () => {
+    const bus = createTestBus();
+    const a = createDestination('a');
+
+    bus.configure({ destinations: { a: a.destination }, consent: given });
+    bus.track({ a: 'x' });
+    bus.configure({ destinations: { a: a.destination }, consent: given });
+
+    expect(a.payloads()).toEqual(['x']);
+  });
+
+  test('configuring again with the same source watches it once', () => {
+    const bus = createTestBus();
+    const watch = vi.fn();
+    const consent = { ...given, watch };
+
+    bus.configure({ destinations: { a: createDestination('a').destination }, consent });
+    bus.configure({ destinations: { a: createDestination('a').destination }, consent });
+
+    expect(watch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('defined events', () => {
@@ -312,6 +334,22 @@ describe('ids', () => {
     expect(error.mock.calls[1]?.[0]).toContain('"not valid!"');
 
     error.mockRestore();
+  });
+
+  test('two different events under the same own id both reach the destination', () => {
+    const bus = createTestBus();
+    const a = createDestination('a');
+    const checkout = defineEvent('checkout', (order: string) => ({ id: order, a: 'begin_checkout' }));
+    const purchase = defineEvent('purchase', (order: string) => ({ id: order, a: 'purchase' }));
+
+    bus.configure({ destinations: { a: a.destination }, consent: given });
+    bus.track(checkout('order-9'));
+    bus.track(purchase('order-9'));
+
+    expect(a.deliveries.map(({ payload, meta }) => [payload, meta.key])).toEqual([
+      ['begin_checkout', 'checkout'],
+      ['purchase', 'purchase'],
+    ]);
   });
 });
 

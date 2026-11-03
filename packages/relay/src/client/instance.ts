@@ -1,8 +1,8 @@
-import { RELAY_TRACK_ATTRIBUTE, type TrackInput, isBrowser, isTrackInput } from '../shared.js';
+import { type TrackInput, isBrowser, isTrackInput } from '../shared.js';
 import { type Bus, createBus } from './bus.js';
 import { installConsentHeader } from './fetch.js';
 
-/** what inline scripts push into before the bus is installed, and the bus itself afterwards */
+/** the queue the head script creates for inline calls before the bus is installed, and the bus itself afterwards */
 type Queue = { q: { push: (input: TrackInput) => void } };
 
 type RelayGlobal = Queue & Partial<Bus>;
@@ -18,8 +18,8 @@ export const bus: Bus = install();
 function install(): Bus {
   const existing = globalThis.__relay__;
 
-  if (existing?.track && existing.configure && existing.notify && existing.consent) {
-    return existing as Bus;
+  if (isBus(existing)) {
+    return existing;
   }
 
   const created = createBus();
@@ -37,31 +37,18 @@ function install(): Bus {
 
   if (isBrowser()) {
     installConsentHeader(created.consent);
-    document.addEventListener('click', trackClick, { capture: true });
   }
 
   return created;
 }
 
-// an element marked `data-track` (a button, a link) tracks the event serialized into the attribute
-// when clicked — before hydration too, and without a listener per component
-function trackClick(event: MouseEvent): void {
-  const target = event.target;
-
-  if (!(target instanceof Element)) return;
-
-  const element = target.closest(`[${CSS.escape(RELAY_TRACK_ATTRIBUTE)}]`);
-  const raw = element?.getAttribute(RELAY_TRACK_ATTRIBUTE);
-
-  if (!raw) return;
-
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return;
-  }
-
-  if (isTrackInput(parsed)) bus.track(parsed);
+// an installed bus, and not an element content clobbered the global with (`<form id="__relay__">`
+// with inputs named after the methods): the functions are what a later module instance needs
+function isBus(value: RelayGlobal | undefined): value is RelayGlobal & Bus {
+  return (
+    typeof value?.track === 'function' &&
+    typeof value.configure === 'function' &&
+    typeof value.notify === 'function' &&
+    typeof value.consent === 'function'
+  );
 }

@@ -54,7 +54,8 @@
   "devDependencies": {
     "astro": "^7.4.4",
     "tsdown": "^0.23.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5"
   },
   "peerDependencies": {
     "astro": "^7.0.0"

@@ -27,6 +27,24 @@ export interface ClientOptions {
    * @default 60000
    */
   keepAliveTimeout?: number | undefined;
+
+  /**
+   * Time to establish the upstream connection, in milliseconds
+   * @default 10000
+   */
+  connectTimeout?: number | undefined;
+
+  /**
+   * Time the upstream has to send its response headers, in milliseconds; 0 disables it
+   * @default 60000
+   */
+  headersTimeout?: number | undefined;
+
+  /**
+   * Time between two body chunks from the upstream, in milliseconds; 0 disables it
+   * @default 60000
+   */
+  bodyTimeout?: number | undefined;
 }
 
 /**
@@ -46,6 +64,7 @@ export interface ProxyOptions {
   /**
    * Called before proxying the request.
    * Can modify the request, return a Response to short-circuit, or return void to continue.
+   * The target is `targetUrl` (mutable); the url of a returned Request is ignored.
    */
   onRequest?:
     | ((context: APIContext, targetUrl: URL) => Request | Response | void | Promise<Request | Response | void>)
@@ -60,8 +79,9 @@ export interface ProxyOptions {
     | undefined;
 
   /**
-   * Called when an error occurs during proxying.
-   * Can return a custom error response or void for default 502 response.
+   * Called when an error occurs during proxying — the upstream request failed (default
+   * answer 502) or a hook threw (default answer 500).
+   * Can return a custom error response or void for the default.
    */
   onError?:
     ((context: APIContext, error: Error, targetUrl: URL) => Response | void | Promise<Response | void>) | undefined;

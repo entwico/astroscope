@@ -82,6 +82,19 @@ describe('detectLocale', () => {
     expect(detectLocale(requestWith('de ; q=0.8'))).toBe('de');
   });
 
+  test('never picks a language with quality zero', async () => {
+    const detectLocale = await createDetectLocale();
+
+    expect(detectLocale(requestWith('de;q=0'))).toBeUndefined();
+    expect(detectLocale(requestWith('fr,de;q=0'))).toBeUndefined();
+  });
+
+  test('matches configured locales that carry a region', async () => {
+    const detectLocale = await createDetectLocale(['de-CH', 'fr-CH']);
+
+    expect(detectLocale(requestWith('fr-CH,fr;q=0.9'))).toBe('fr-CH');
+  });
+
   test('returns undefined when i18n is not configured', async () => {
     vi.resetModules();
 

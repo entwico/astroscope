@@ -10,7 +10,7 @@ What it solves:
 - **Late destinations.** A cmp injects a pixel some time after consent. Events tracked before that wait on the bus until the destination is ready.
 - **Late consent.** Events tracked before the visitor chose stay in memory and flow once they accept.
 - **Double counting.** The browser pixel and the server-side conversions api fire under one event id.
-- **Forgotten gates.** An action never checks consent itself. The bus writes the `x-relay-consent` header onto every same-origin `fetch` and nowhere else, the middleware reads it, and the server `track()` reports to consented destinations only. Events live in memory; nothing is stored on the device.
+- **Forgotten gates.** An action never checks consent itself. The bus writes the `x-relay-consent` header onto every same-origin `fetch`, the middleware reads it, and the server `track()` reports to consented destinations only. Events live in memory; nothing is stored on the device.
 
 ## Installation
 
@@ -34,7 +34,7 @@ export default defineConfig({
 });
 ```
 
-The integration takes no options. It owns `src/relay/`, where a file's existence switches a half on:
+The integration takes no options. It owns `relay/` under `srcDir` (`src/relay/` by default), where a file's existence switches a half on:
 
 | File                  | Role                                                                                 |
 | --------------------- | ------------------------------------------------------------------------------------ |
@@ -46,7 +46,7 @@ The middleware that reads the consent header is always added, so `relayConsent()
 
 ## Events
 
-A definition takes the site's own objects and returns one payload per destination, under the destination's name, built with that destination's builders. The export is the key plus `Event`, one export per event, so an island bundles only the events it tracks and an event only an action imports never reaches the browser.
+A definition takes the site's own objects and returns one payload per destination, under the destination's name, built with that destination's builders. One export per event, so an island bundles only the events it tracks.
 
 ```ts
 // src/relay/events.ts
@@ -74,7 +74,7 @@ export const newsletterEvent = defineEvent('newsletter', (lead: { id?: string; u
 }));
 ```
 
-The optional `id` is the event's own id, an order number for example. Every destination on both sides then counts the conversion once. Without it, each `track()` call gets a fresh id.
+The optional `id` is the event's own id, an order number for example. Every destination on both sides then counts the event once under that id, however often it is tracked; another event under the same id (the checkout before the purchase) is its own conversion. Without it, each `track()` call gets a fresh id.
 
 The ga4 and gtm builders cover GA4's recommended events, typed by their parameters. `ga4.event(name, params)` and `gtm.event(name, params)` take any other name. A tag-manager container keeps its own event names: `gtm.event('contactFormStatus', { status: 'success' })`.
 
@@ -92,7 +92,7 @@ declare module '@astroscope/relay' {
 
 ## Tracking in the browser
 
-An island calls `track()`. A page tracks from server-rendered html with `<Track>`. A link or button tracks on click through the `data-track` attribute, which the bus listens for itself, before hydration too.
+An island calls `track()`. A page tracks from server-rendered html with `<Track>`. A link or button tracks on click with `inlineTrack()` in its `onclick`, before hydration too and without a listener per component. Events live in memory only: a click on a link whose destination sdk has not loaded yet is lost with the navigation.
 
 ```ts
 import { track } from '@astroscope/relay/track';
@@ -102,11 +102,11 @@ track(searchEvent(term));
 
 ```astro
 ---
-import { trackAttribute } from '@astroscope/relay';
+import { inlineTrack } from '@astroscope/relay';
 import { Track } from '@astroscope/relay/astro';
 ---
 <Track event={viewProductEvent(product)} />
-<a href={offer.url} rel="sponsored" data-track={trackAttribute(selectOfferEvent(offer))}>Zum Angebot</a>
+<a href={offer.url} rel="sponsored" onclick={inlineTrack(selectOfferEvent(offer))}>Zum Angebot</a>
 ```
 
 ```tsx
@@ -115,7 +115,7 @@ import { Track } from '@astroscope/relay/react';
 <Track event={viewProductListEvent(products)} />
 ```
 
-`@astroscope/relay/track` is the same import in an island and in an action: in the browser it is the bus, on the server the conversions reporter. `inlineTrack(event)` from the root entry gives the script body for hand-written html.
+`@astroscope/relay/track` is the same import in an island and in an action: in the browser it is the bus, on the server the conversions reporter. `inlineTrack(event)` from the root entry is the body of a `<script>` or of an `onclick` attribute (astro escapes the quotes, in hand-written html escape them yourself) and works before the bus module has loaded. A page with `security.csp` on has to allow its handler attributes itself.
 
 ### Batching list sightings
 
@@ -154,7 +154,7 @@ export default defineRelayClient({
 });
 ```
 
-`ccm19()` takes one rule per destination: the embedding with this id, an accepted cookie pattern, a function returning the answer, or `false` for a destination that needs no consent. It re-checks when the visitor closes the widget. For another cmp, write a `ConsentSource` of your own: `names`, `of(name)`, and optionally `free` and `watch(notify)`. An answer of `undefined` means the cmp has not read the stored choice yet, so events wait instead of being dropped.
+`ccm19()` takes one rule per destination: the embedding with this id, an accepted cookie pattern, a function returning the answer, or `false` for a destination that needs no consent. It re-checks when the visitor closes the widget. For another cmp, write a `ConsentSource` of your own: `names`, `of(name)`, and optionally `free` and `watch(notify)`. An answer of `undefined` (the cmp has not read the stored choice yet) makes events wait.
 
 A destination is a `name`, a `send(payload, meta)` and optionally `ready()`. It only sees events that carry a payload under its name. The bus polls `ready()` briefly and re-checks on the source's `watch`; `notifyRelay()` from `@astroscope/relay/client` re-checks by hand.
 
@@ -172,6 +172,10 @@ const crm: Destination<'crm'> = {
 ## Reporting from the server
 
 The bus writes the consented destination names into the `x-relay-consent` header of every same-origin `fetch`. The middleware reads it, and `track()` in an action, an endpoint or a page sends each consented server destination its payload. The call returns the event id, so the browser can fire its pixel under the same one.
+
+The reports go out in the background; a failure is logged, and reports still in flight when the server shuts down are awaited.
+
+The header rides `fetch` only: a navigation (a link, a plain form post) carries no consent, so `track()` in a page's frontmatter reports nothing. Track a conversion from the action that produced it, or from the page's html with `<Track>`.
 
 ```ts
 // src/actions/index.ts
@@ -199,7 +203,7 @@ const { data } = await actions.subscribe({ email });
 track(newsletterEvent({ id: data.eventId, user: { email } }));
 ```
 
-Outside a request, without the header, or for an excluded request `track()` reports nothing and still returns the id. A plain html form post carries no header and reports nothing.
+Outside a request, without the header, or for an excluded request `track()` reports nothing and still returns the id.
 
 The server destinations are the registry `src/relay/server.ts`. It carries secrets, so the client build refuses to import it.
 
@@ -217,20 +221,22 @@ export default defineRelayServer({
 });
 ```
 
-A server destination is a `name` and a `send(payload, meta)`, where `meta` adds the request: client address, headers, a cookie accessor and the source url. Its consent is the flag of its own name in the header. The `consent` map overrides that per name: `false` for a first-party record, or a function over the record to share another destination's flag, `crm: (record) => record.ga4`. `relayConsent()` from `@astroscope/relay/server` gives the record to anything else. `exclude` takes astroscope's path patterns or a predicate over the request context. `hashUser` and the normalizers are exported for a destination that matches on identifiers.
+A server destination is a `name` and a `send(payload, meta)`, where `meta` adds the request: client address, headers, a cookie accessor and the source url. Its consent is the flag of its own name in the header. The `consent` map overrides that per name: `false` for a first-party record, or a function over the record to share another destination's flag, `crm: (record) => record.ga4`. `relayConsent()` from `@astroscope/relay/server` gives the record to anything else. `exclude` takes astroscope's path patterns or a predicate over the request context. `hashUser` and the normalizers are exported for a destination that matches on identifiers; a national phone number gets the destination's `countryCallingCode`.
 
 ## Destinations
 
-| Entry                             | Builders                                                                                         | Destination                                                                                                             |
-| --------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `@astroscope/relay/ga4`           | `ga4.viewItem()`, `ga4.purchase()`, … and `ga4.event(name, params)`                              | `ga4Tag()`: the google tag via `gtag('event', …)`; installs the queue stub, ready once the tag loaded        |
-| `@astroscope/relay/gtm`           | `gtm.purchase(commerce, params?)`, … and `gtm.event(name, params)`                               | `gtmContainer()`: `dataLayer` pushes with `event_id`; consent is the container's own embedding              |
-| `@astroscope/relay/matomo`        | `matomo.event()`, `matomo.siteSearch()`, `matomo.order()`, `matomo.calls(…)`                      | `matomoTracker()`: the `_paq` queue; a cookieless setup is `false` in the consent source                    |
-| `@astroscope/relay/awin`          | `awin.sale({ amount, orderRef, currency, voucher?, parts? })`                                     | `awinMastertag({ advertiserId, testMode? })`: declares `AWIN.Tracking.Sale` and fires the fall-back pixel               |
-| `@astroscope/relay/openai`        | every event openai names: `openai.pageViewed()`, `contentsViewed()`, `itemsAdded()`, `checkoutStarted()`, `orderCreated()`, `leadCreated()`, `registrationCompleted()`, `appointmentScheduled()`, `subscriptionCreated()`, `trialStarted()`, and `custom(name)` | `openAiPixel({ countryCallingCode? })`: the openai ads pixel, identifiers hashed and sent through `init`       |
-| `@astroscope/relay/openai/server` | the same builders                                                                                | `openAiConversions({ apiKey, pixelId, integrationSource, countryCallingCode? })`: the conversions api                    |
-| `@astroscope/relay/meta`          | `meta.purchase()`, `meta.lead()`, `meta.subscribe()`, … the standard events, and `meta.event(name, data)` | `metaPixel({ pixelId, countryCallingCode? })`: the meta pixel the cmp's base code initialized, waited for, events fired on it alone, identifiers hashed into advanced matching; track `meta.pageView()` from the layout |
-| `@astroscope/relay/meta/server`   | the same builders                                                                                | `metaConversions({ accessToken, pixelId, testEventCode?, countryCallingCode? })`: the conversions api, with `fbp`/`fbc` off the pixel's cookies |
+Each entry exports a builder set under the destination's name (`ga4.viewItem()`, `ga4.event(name, params)`, …; the typings list them) and the destination itself.
+
+| Entry                             | Destination                                                                                       | Note                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `@astroscope/relay/ga4`           | `ga4Tag()`                                                                                        |                                                                  |
+| `@astroscope/relay/gtm`           | `gtmContainer()`                                                                                  | consent is the container's own embedding                         |
+| `@astroscope/relay/matomo`        | `matomoTracker()`                                                                                 | a cookieless setup is `false` in the consent source              |
+| `@astroscope/relay/awin`          | `awinMastertag({ advertiserId, testMode? })`                                                      |                                                                  |
+| `@astroscope/relay/openai`        | `openAiPixel({ countryCallingCode? })`                                                            |                                                                  |
+| `@astroscope/relay/openai/server` | `openAiConversions({ apiKey, pixelId, integrationSource, countryCallingCode? })`                  |                                                                  |
+| `@astroscope/relay/meta`          | `metaPixel({ pixelId, countryCallingCode? })`                                                     | the cmp's base code initializes the pixel; track `meta.pageView()` from the layout |
+| `@astroscope/relay/meta/server`   | `metaConversions({ accessToken, pixelId, testEventCode?, countryCallingCode? })`                  |                                                                  |
 
 A destination of your own follows the same shape: builders for the payload, a browser destination, a server destination, all under one name. `wellKnownEvents(create)` from the root entry makes a builder set of the well-known events.
 

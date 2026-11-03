@@ -29,7 +29,7 @@ export function openAiConversions(options: OpenAiConversionsOptions): ServerDest
 
   return {
     name: 'openai',
-    async send(event: OpenAiEvent, { id, request }) {
+    async send(event: OpenAiEvent, { id, at, request }) {
       const hashed = await hashUser(event.user ?? {}, { countryCallingCode: options.countryCallingCode });
       const body = {
         integration_source: options.integrationSource,
@@ -38,7 +38,7 @@ export function openAiConversions(options: OpenAiConversionsOptions): ServerDest
             id,
             type: event.name,
             ...(event.name === 'custom' && { custom_event_name: event.customName }),
-            timestamp_ms: Date.now(),
+            timestamp_ms: at,
             source_url: withoutQuery(request.sourceUrl),
             action_source: 'web',
             user: {

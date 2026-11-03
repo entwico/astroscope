@@ -83,6 +83,15 @@ describe('openAiConversions', () => {
     expect((calls[1]?.body as { events: unknown[] }).events[0]).not.toHaveProperty('custom_event_name');
   });
 
+  test('reports the event at the time it was tracked', async () => {
+    const { calls, fetch } = createFetch();
+    const conversions = openAiConversions({ apiKey: 'k', pixelId: 'p', integrationSource: 'test', fetch });
+
+    await conversions.send(openai.leadCreated(), createMeta({ at: 1000 }));
+
+    expect(calls[0]?.body).toMatchObject({ events: [{ timestamp_ms: 1000 }] });
+  });
+
   test('a failing response is an error for track() to log', async () => {
     const conversions = openAiConversions({
       apiKey: 'k',

@@ -135,24 +135,28 @@ Autofix rewrites `<!-- x -->` → `{/* x */}`. Declines to autofix when the comm
 
 ### `no-astro-define-action`
 
-`defineAction` from `astro:actions` has no place for guards, so an action defined with it is unguarded by construction and nothing in the type system says so. `@astroscope/node/guards` exports a `defineAction` that takes `guards` and narrows `locals` for the handler; every action goes through it, guarded or not. The other `astro:actions` exports (`ActionError`, `getActionContext`, `actions`) stay legal. The fix rewrites the import, splitting a mixed one.
+`defineAction` from `astro:actions` has no place for guards; `@astroscope/node/guards` exports a `defineAction` that takes `guards` and narrows `locals` for the handler. The other `astro:actions` exports (`ActionError`, `getActionContext`, `actions`) stay legal, and so do type-only imports. The fix rewrites the named import; a namespace import, a dynamic `import()` and a re-export are reported without a fix.
 
 ```ts
 // flagged
 import { defineAction } from 'astro:actions';
+import * as astroActions from 'astro:actions';
+export const like = astroActions.defineAction({ handler });
+export { defineAction } from 'astro:actions';
 
 // clean
 import { defineAction } from '@astroscope/node/guards';
 import { ActionError } from 'astro:actions';
+import type { defineAction as DefineAction } from 'astro:actions';
 ```
 
 Option `source` (default `@astroscope/node/guards`) names the module the fix imports from, for a project wrapping the platform's `defineAction` once more.
 
 ### `no-server-action-calls`
 
-Astro frontmatter and template expressions run during server rendering — a plain GET page render. Calling an action there fires the mutation on every render, outside the action endpoint's POST-only + origin-checked delivery, and couples the page to the controller. A direct `actions.<name>()` call also throws `ActionCalledFromServerError` at runtime; `Astro.callAction()` is Astro's escape hatch around that error and is flagged the same. When an action and astro code need the same logic, put it in its own module and import it from both.
+Astro frontmatter and template expressions run during server rendering, so an action called there fires on every GET render, outside the action endpoint's POST-only, origin-checked delivery. A direct `actions.<name>()` call also throws at runtime; `Astro.callAction()` is flagged the same. Logic an action and astro code share goes into its own module, imported from both.
 
-Non-call references stay legal — passing `actions.<name>` to a form or to `Astro.getActionResult()` is the intended server-side usage, and client `<script>` blocks are unaffected.
+Non-call references stay legal: passing `actions.<name>` to a form or to `Astro.getActionResult()` is the intended usage, and client `<script>` blocks are unaffected. Aliases (`const like = actions.like`) are not followed.
 
 ```astro
 ---
@@ -172,7 +176,7 @@ const submitted = Astro.getActionResult(actions.like);
 
 ### `prefer-ssr-guard`
 
-Unlike `typeof window !== 'undefined'`, `import.meta.env.SSR` lets the bundler tree-shake the browser-only code out of the SSR build.
+Unlike `typeof window !== 'undefined'`, `import.meta.env.SSR` lets the bundler tree-shake the browser-only code out of the SSR build. In a commonjs file the check is reported but not fixed; in a file plain node runs (configs, scripts) `import.meta.env` is `undefined`, so turn the rule off there.
 
 ```ts
 // flagged
@@ -195,7 +199,7 @@ Rules for projects using `@astroscope/i18n`, opt-in alongside `recommended`. The
 | Rule                                     | Severity | Fixable | Description                                                                                                 |
 | ---------------------------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------- |
 | `@astroscope/i18n/t-import-source`       | error    |         | `t` must be imported from `@astroscope/i18n/translate`                                                      |
-| `@astroscope/i18n/no-module-level-t`     | error    |         | `t()` must not be called at module level (needs request context on server, hydrated translations on client) |
+| `@astroscope/i18n/no-module-level-t`     | error    |         | `t()` / `rich()` must not be called at module level (needs request context on server, hydrated translations on client) |
 | `@astroscope/i18n/t-static-key`          | error    |         | first argument must be a static string literal (dynamic keys break build-time extraction)                   |
 | `@astroscope/i18n/t-static-meta`         | warn     |         | second argument must be statically analyzable: no concatenation, interpolation or tagged templates (extraction reads it at build time) |
 | `@astroscope/i18n/t-requires-meta`       | warn     |         | second argument (fallback/meta) should be provided for development DX                                       |
@@ -219,7 +223,7 @@ import { t } from './my-translate';
 
 ### `no-module-level-t`
 
-Forbids calling `t()` at module scope. On the server, `t()` reads from `AsyncLocalStorage` (request context). On the client, it reads from `window.__i18n__`. Neither is available during module evaluation.
+Forbids calling `t()` or `rich()` at module scope: the request context and the loaded translations exist only later.
 
 ```ts
 // good
@@ -233,7 +237,7 @@ const title = t('key', 'fallback');
 
 ### `t-static-key`
 
-The first argument must be a string literal. Dynamic keys cannot be extracted at build time by the Babel plugin.
+The first argument of `t()` and `rich()` must be a string literal; dynamic keys cannot be extracted at build time.
 
 ```ts
 // good
@@ -247,7 +251,7 @@ t(`prefix.${suffix}`, 'fallback');
 
 ### `t-requires-meta`
 
-The second argument (fallback string or meta object) provides the fallback text shown during development when translations are missing.
+The second argument of `t()` and `rich()` (fallback string or meta object) provides the fallback text shown during development when translations are missing.
 
 ```ts
 // good
@@ -273,7 +277,7 @@ const translate = t;
 
 ### `no-raw-strings-in-jsx`
 
-Warns when JSX contains raw string literals that may need translation. Ignores whitespace, numbers, and common non-translatable attributes (`className`, `href`, `type`, etc.).
+Warns when JSX contains raw string literals that may need translation. Ignores whitespace, numbers, punctuation, hex colors, dimensions, booleans and common non-translatable attributes (`className`, `href`, `type`, etc.).
 
 ```tsx
 // warns
@@ -292,14 +296,14 @@ Warns when JSX contains raw string literals that may need translation. Ignores w
 
 ```js
 '@astroscope/i18n/no-raw-strings-in-jsx': ['warn', {
-  // additional regex patterns to ignore (applied to text content)
+  // additional regex patterns to ignore (applied to text content), on top of the built-in ones
   ignorePatterns: ['^TODO'],
-  // additional attribute names to ignore
+  // attribute names to ignore, replacing the built-in list
   ignoreAttributes: ['data-tooltip'],
 }]
 ```
 
-The default ignore list is exported as `DEFAULT_IGNORE_ATTRIBUTES` for consumers who want to extend it:
+`ignorePatterns` adds to the built-in patterns (exported as `DEFAULT_IGNORE_PATTERNS`). `ignoreAttributes` replaces the built-in list, exported as `DEFAULT_IGNORE_ATTRIBUTES` for consumers who want to extend it:
 
 ```js
 import astroscope, { DEFAULT_IGNORE_ATTRIBUTES } from '@astroscope/eslint-plugin';
@@ -340,7 +344,7 @@ const { cart } = wormholes;
 
 ### `server-readonly`
 
-Astro frontmatter and template expressions run on the server, where wormhole values are request-scoped and read-only: `set()` throws at runtime and `subscribe()` never fires. Client `<script>` blocks are unaffected.
+Astro frontmatter and template expressions run on the server, where wormhole values are request-scoped and read-only: `set()` throws at runtime and `subscribe()` never fires. Client `<script>` blocks are unaffected. Aliases (`const cart = wormholes.cart`) are not followed.
 
 ```astro
 ---
@@ -373,6 +377,9 @@ The registry carries the handlers, and with them server code — a client build 
 ```tsx
 // bad
 import { wormholes } from '@/wormholes';
+import '@/wormholes';
+export { wormholes } from '@/wormholes';
+const registry = await import('@/wormholes');
 
 // good
 import { wormholes } from '@astroscope/wormhole';

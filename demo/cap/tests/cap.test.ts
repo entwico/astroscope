@@ -130,7 +130,7 @@ describe.each([
       const before = stub!.calls.length;
       const token = await solve(port);
 
-      expect(token).toMatch(/^cap-/);
+      expect(token).toMatch(/^demo:/);
 
       const forwarded = stub!.calls.slice(before);
 
@@ -174,7 +174,7 @@ describe.each([
       const statuses: number[] = [];
 
       for (let i = 0; i < 4; i++) {
-        const response = await post(port, '/_actions/contact', { name: 'x', message: 'y', _cap: 'invented' });
+        const response = await post(port, '/_actions/contact', { name: 'x', message: 'y', _cap: 'demo:invented:x' });
 
         statuses.push(response.status);
       }

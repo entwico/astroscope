@@ -61,6 +61,12 @@ function isMarkupPart(part: Part): part is MessageMarkupPart {
   return part.type === 'markup';
 }
 
+// tag names come from the translation, so only own components count — `{#valueOf}`
+// must not reach the inherited builtin
+function componentFor<T>(components: RichComponents<T>, name: string): RichComponents<T>[string] | undefined {
+  return Object.hasOwn(components, name) ? components[name] : undefined;
+}
+
 function applyMarkupPart<T>(
   part: MessageMarkupPart,
   stack: StackFrame<T>[],
@@ -85,7 +91,7 @@ function applyMarkupPart<T>(
         break;
       }
 
-      const component = components[frame.name];
+      const component = componentFor(components, frame.name);
       const parent = stack.length > 0 ? stack.at(-1)!.children : result;
 
       if (component) {
@@ -100,7 +106,7 @@ function applyMarkupPart<T>(
 
     case 'standalone': {
       // self-closing: {#icon/}
-      const component = components[part.name];
+      const component = componentFor(components, part.name);
 
       if (component) {
         target.push(addKeyIfNeeded(component([]), nextKey()));

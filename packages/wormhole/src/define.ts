@@ -111,6 +111,11 @@ export function getWormholeSource<T>(wormhole: Wormhole<T>): WormholeSource | un
  */
 export function assignWormholeNames(registry: Record<string, object>): void {
   for (const [name, wormhole] of Object.entries(registry)) {
+    // an object literal key `__proto__` sets the prototype, so the name could never be delivered
+    if (name === '__proto__') {
+      throw new Error('"__proto__" cannot be a wormhole name');
+    }
+
     const assign = (wormhole as { [ASSIGN]?: (next: string) => void })[ASSIGN];
 
     if (typeof assign !== 'function') {

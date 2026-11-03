@@ -1,7 +1,7 @@
 import { isTypeReadonly } from '@typescript-eslint/type-utils';
 import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 
-import { type PluginDocs, isIslandElement, resolvePropsType } from '../utils/island.js';
+import { type PluginDocs, isIslandElement, resolvePropsType, tagName } from '../utils/island.js';
 
 const createRule = ESLintUtils.RuleCreator<PluginDocs>(
   (name) => `https://github.com/entwico/astroscope/tree/main/packages/eslint-plugin#${name}`,
@@ -50,7 +50,7 @@ export const islandReadonly = createRule<[], 'mutable'>({
 
         // strict: no allowlist — opaque/non-serializable types can't cross the island boundary anyway
         if (!isTypeReadonly(services.program, propsType)) {
-          context.report({ node: tag, messageId: 'mutable', data: { comp: tag.name } });
+          context.report({ node: tag, messageId: 'mutable', data: { comp: tagName(tag) } });
         }
       },
     };

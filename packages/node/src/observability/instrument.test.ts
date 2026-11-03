@@ -1,6 +1,12 @@
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { SpanStatusCode, context, trace } from '@opentelemetry/api';
+import { SpanStatusCode, context, metrics, trace } from '@opentelemetry/api';
+import {
+  AggregationTemporality,
+  InMemoryMetricExporter,
+  MeterProvider,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics';
 import { InMemorySpanExporter, type ReadableSpan, SimpleSpanProcessor } from '@opentelemetry/sdk-trace';
 import pino, { type DestinationStream } from 'pino';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -160,6 +166,26 @@ describe('request tracing', () => {
     expect(spans.find((s) => s.name === 'GET')?.attributes['url.path']).toBe('/traced');
   });
 
+  test('the query string is recorded with the sensitive parameters redacted', async () => {
+    const url = await startServer((_req, res) => res.end('ok'));
+
+    await drain(`${url}/signed?X-Goog-Signature=abc&page=2`);
+
+    const spans = await waitForSpans(2);
+
+    expect(spans.find((s) => s.name === 'GET')?.attributes['url.query']).toBe('X-Goog-Signature=REDACTED&page=2');
+  });
+
+  test('the redacted parameters are configurable', async () => {
+    const url = await startServer((_req, res) => res.end('ok'), { redactedQueryParams: ['code'] });
+
+    await drain(`${url}/callback?code=abc&sig=kept`);
+
+    const spans = await waitForSpans(2);
+
+    expect(spans.find((s) => s.name === 'GET')?.attributes['url.query']).toBe('code=REDACTED&sig=kept');
+  });
+
   test('action requests are named after the action', async () => {
     const url = await startServer((_req, res) => res.end('{}'));
 
@@ -290,5 +316,44 @@ describe('request logging', () => {
     expect(req['query']).toBe('q=astro');
     expect(req['remoteAddress']).toBe('10.0.0.1');
     expect((req['headers'] as Record<string, unknown>)['x-forwarded-for']).toBe('10.0.0.1, 10.0.0.2');
+  });
+});
+
+describe('request metrics', () => {
+  test('requests to unknown action paths do not mint an action series each', async () => {
+    const reader = new PeriodicExportingMetricReader({
+      exporter: new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE),
+      exportIntervalMillis: 60_000,
+    });
+    const provider = new MeterProvider({ readers: [reader] });
+
+    metrics.setGlobalMeterProvider(provider);
+
+    try {
+      const url = await startServer(
+        (_req, res) => {
+          res.statusCode = 404;
+          res.end();
+        },
+        { actions: new Set(['like']) },
+      );
+
+      for (let i = 0; i < 5; i++) {
+        await drain(`${url}/_actions/made-up-${i}`, { method: 'POST' });
+      }
+
+      await drain(`${url}/_actions/like`, { method: 'POST' });
+
+      const { resourceMetrics } = await reader.collect();
+      const points = resourceMetrics.scopeMetrics
+        .flatMap((scope) => scope.metrics)
+        .filter((metric) => metric.descriptor.name === 'astro.action.duration')
+        .flatMap((metric) => metric.dataPoints.map((point) => point.attributes['astro.action.name']));
+
+      expect(points.toSorted((a, b) => String(a).localeCompare(String(b)))).toEqual(['like', 'unknown']);
+    } finally {
+      metrics.disable();
+      await provider.shutdown();
+    }
   });
 });

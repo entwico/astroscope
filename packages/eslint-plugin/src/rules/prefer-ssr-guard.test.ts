@@ -60,6 +60,22 @@ tester.run('prefer-ssr-guard', preferSsrGuard, {
       filename,
       code: `if (typeof window >= 'undefined') { /* nonsense, but not our rule */ }`,
     },
+    // a local binding named like the global is a plain value
+    {
+      filename,
+      code: `export function f(window?: Window) { return typeof window === 'undefined'; }`,
+    },
+    {
+      filename,
+      code: `
+        const document = load();
+        if (typeof document !== 'undefined') { use(document); }
+      `,
+    },
+    {
+      filename,
+      code: `import { self } from './worker'; export const isBrowser = typeof self !== 'undefined';`,
+    },
   ],
 
   invalid: [
@@ -197,6 +213,60 @@ tester.run('prefer-ssr-guard', preferSsrGuard, {
         if (typeof window !== 'undefined') { /* not flagged */ }
         if (!import.meta.env.SSR) { /* flagged */ }
       `,
+    },
+    // a declared global is still the global
+    {
+      filename,
+      code: `export const isBrowser = typeof window !== 'undefined';`,
+      languageOptions: { globals: { window: 'readonly' } },
+      errors: [err('window', '!import.meta.env.SSR')],
+      output: `export const isBrowser = !import.meta.env.SSR;`,
+    },
+    // shadowing in an inner scope leaves the outer check alone
+    {
+      filename,
+      code: `
+        function inner(window: unknown) { return typeof window === 'undefined'; }
+        const outer = typeof window === 'undefined';
+      `,
+      errors: [err('window', 'import.meta.env.SSR')],
+      output: `
+        function inner(window: unknown) { return typeof window === 'undefined'; }
+        const outer = import.meta.env.SSR;
+      `,
+    },
+    // commonjs files get the report without the fix
+    {
+      filename: 'test.cjs',
+      code: `if (typeof window !== 'undefined') { start(); }`,
+      output: null,
+      errors: [err('window', '!import.meta.env.SSR')],
+    },
+    {
+      filename: 'test.cts',
+      code: `if (typeof window !== 'undefined') { start(); }`,
+      output: null,
+      errors: [err('window', '!import.meta.env.SSR')],
+    },
+  ],
+});
+
+const commonJsTester = new RuleTester({
+  languageOptions: {
+    sourceType: 'commonjs',
+    parserOptions: { ecmaVersion: 2022 },
+  },
+});
+
+commonJsTester.run('prefer-ssr-guard (commonjs)', preferSsrGuard, {
+  valid: [],
+  invalid: [
+    // a commonjs program gets the report without the fix, whatever the file extension
+    {
+      filename: 'test.js',
+      code: `if (typeof window !== 'undefined') { start(); }`,
+      output: null,
+      errors: [err('window', '!import.meta.env.SSR')],
     },
   ],
 });

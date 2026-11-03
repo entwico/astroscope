@@ -29,7 +29,7 @@ function createApiContext(): APIContext {
   return { request: new Request('http://localhost/'), locals: {} } as APIContext;
 }
 
-async function setup(manifest?: Partial<ExtractionManifest>) {
+async function setup(manifest?: Partial<ExtractionManifest>, chunkPrefix?: string) {
   vi.stubGlobal(REGISTRY, []);
   vi.stubGlobal(DOCUMENT_REGISTRY, []);
 
@@ -48,7 +48,7 @@ async function setup(manifest?: Partial<ExtractionManifest>) {
   await i18n.configure({ locales: ['en', 'de'] });
   i18n.setTranslations('en', { 'cart.title': 'Cart', 'lazy.text': 'Lazy' });
 
-  registerI18nEmitters();
+  registerI18nEmitters({ chunkPrefix });
 
   const emitter = ((globalThis as Record<symbol, unknown>)[REGISTRY] as IslandEmitter[])[0]!;
 
@@ -76,6 +76,18 @@ describe('i18n islands emitter', () => {
     // links warm only what hydration fetches now
     expect(emission?.links).toHaveLength(1);
     expect(emission?.links?.[0]).toMatch(/^\/_i18n\/en\/Cart\.Cabc\.[0-9a-f]{8}\.js$/);
+  });
+
+  test('links and imports the chunks under the configured prefix', async () => {
+    const { emitter, setRequestLocale } = await setup(undefined, '/docs/_i18n/');
+    const context = createApiContext();
+
+    setRequestLocale(context, 'en');
+
+    const emission = emitter(createIsland(), context);
+
+    expect(emission?.links?.[0]).toMatch(/^\/docs\/_i18n\/en\/Cart\.Cabc\.[0-9a-f]{8}\.js$/);
+    expect(emission?.imports?.[1]).toMatch(/^\/docs\/_i18n\/en\/Lazy\.Cddd\.[0-9a-f]{8}\.js$/);
   });
 
   test('emits eager imports for the full closure, dynamic chunks included', async () => {

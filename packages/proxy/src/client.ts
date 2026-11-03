@@ -6,6 +6,9 @@ const DEFAULT_CLIENT_OPTIONS: Required<ClientOptions> = {
   allowH2: true,
   maxConcurrentStreams: 128,
   keepAliveTimeout: 60_000,
+  connectTimeout: 10_000,
+  headersTimeout: 60_000,
+  bodyTimeout: 60_000,
 };
 
 export function createHttpAgent(options?: ClientOptions): Agent {
@@ -16,6 +19,9 @@ export function createHttpAgent(options?: ClientOptions): Agent {
     allowH2: config.allowH2,
     maxConcurrentStreams: config.maxConcurrentStreams,
     keepAliveTimeout: config.keepAliveTimeout,
+    headersTimeout: config.headersTimeout,
+    bodyTimeout: config.bodyTimeout,
+    connect: { timeout: config.connectTimeout },
     autoSelectFamily: true,
     autoSelectFamilyAttemptTimeout: 25,
   });

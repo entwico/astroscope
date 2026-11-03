@@ -14,14 +14,41 @@ export function isClientDirective(attr: TSESTree.JSXAttribute | TSESTree.JSXSpre
   );
 }
 
-/** Whether a JSX opening element is a hydrated island: capitalized tag + a `client:*` directive. */
-export function isIslandElement(node: TSESTree.JSXOpeningElement): node is TSESTree.JSXOpeningElement & {
-  name: TSESTree.JSXIdentifier;
-} {
-  const tag = node.name;
+/** the tag of a component element: a plain name or a member expression (`UI.Card`) */
+export type ComponentTag = TSESTree.JSXIdentifier | TSESTree.JSXMemberExpression;
 
+/** Whether a JSX tag names a component: a capitalized name, or a member expression ending in one. */
+export function isComponentTag(tag: TSESTree.JSXTagNameExpression): tag is ComponentTag {
   // lowercase → intrinsic HTML element, not a component
-  if (tag.type !== 'JSXIdentifier' || /^[a-z]/.test(tag.name)) {
+  if (tag.type === 'JSXIdentifier') {
+    return !/^[a-z]/.test(tag.name);
+  }
+
+  if (tag.type === 'JSXMemberExpression') {
+    return !/^[a-z]/.test(tag.property.name);
+  }
+
+  return false;
+}
+
+/** The tag as written in the source: `Card`, `UI.Card`, `svg:path`. */
+export function tagName(tag: TSESTree.JSXTagNameExpression): string {
+  if (tag.type === 'JSXIdentifier') {
+    return tag.name;
+  }
+
+  if (tag.type === 'JSXMemberExpression') {
+    return `${tagName(tag.object)}.${tag.property.name}`;
+  }
+
+  return `${tag.namespace.name}:${tag.name.name}`;
+}
+
+/** Whether a JSX opening element is a hydrated island: a component tag + a `client:*` directive. */
+export function isIslandElement(node: TSESTree.JSXOpeningElement): node is TSESTree.JSXOpeningElement & {
+  name: ComponentTag;
+} {
+  if (!isComponentTag(node.name)) {
     return false;
   }
 

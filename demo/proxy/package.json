@@ -9,8 +9,11 @@
     "build": "astro build",
     "preview": "astro preview",
     "typecheck": "astro check",
-    "lint": "eslint src astro.config.ts --cache",
-    "lint:fix": "eslint src astro.config.ts --fix"
+    "lint": "eslint src tests astro.config.ts --cache",
+    "lint:fix": "eslint src tests astro.config.ts --fix",
+    "start:prod": "node ./dist/server/entry.mjs",
+    "stub": "node ./stub/upstream.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@astroscope/node": "workspace:*",
@@ -20,6 +23,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
     "@tailwindcss/vite": "^4.3.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5"
   }
 }

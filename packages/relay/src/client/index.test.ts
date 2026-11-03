@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { defineEvent, trackAttribute } from '../shared.js';
 import { testConsent } from '../test-destinations.js';
 import type { Destination } from './bus.js';
 
@@ -45,11 +44,27 @@ describe('install', () => {
     expect(a.payloads).toEqual(['early']);
 
     // what a later inline script does, plain or defined
-    globalThis.__relay__?.q.push({ a: 'late' });
-    globalThis.__relay__?.q.push({ key: 'defined', event: { a: 'later' } });
+    globalThis.__relay__?.track?.({ a: 'late' });
+    globalThis.__relay__?.track?.({ key: 'defined', event: { a: 'later' } });
 
     expect(a.payloads).toEqual(['early', 'late', 'later']);
     expect(a.keys).toEqual([undefined, undefined, 'defined']);
+  });
+
+  test('a global clobbered by content is replaced, not adopted', async () => {
+    // what `<form id="__relay__">` with inputs named after the bus methods looks like to the script
+    const clobbered = { track: {}, configure: {}, notify: {}, consent: {}, q: undefined };
+
+    vi.stubGlobal('__relay__', clobbered);
+
+    const { configureRelay, track } = await installRelay();
+    const a = createDestination();
+
+    configureRelay({ destinations: { a: a.destination }, consent: testConsent(['a']) });
+    track({ a: 'tracked' });
+
+    expect(a.payloads).toEqual(['tracked']);
+    expect(globalThis.__relay__).not.toBe(clobbered);
   });
 
   test('a second module instance reuses the installed bus', async () => {
@@ -61,25 +76,6 @@ describe('install', () => {
     second.track({ a: 'from-second' });
 
     expect(a.payloads).toEqual(['from-second']);
-  });
-});
-
-describe('clicks', () => {
-  test('an element marked data-track tracks the event serialized into it, through its children too', async () => {
-    const { configureRelay } = await installRelay();
-    const a = createDestination();
-    const selectOffer = defineEvent('selectOffer', (id: string) => ({ a: `select ${id}` }));
-
-    configureRelay({ destinations: { a: a.destination }, consent: testConsent(['a']) });
-
-    document.body.innerHTML = `<a id="offer" href="#" data-track='${trackAttribute(selectOffer('x'))}'><span id="label">buy</span></a><button id="plain">no</button><i id="broken" data-track="{nope">x</i>`;
-
-    document.querySelector('#label')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    document.querySelector('#plain')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    document.querySelector('#broken')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
-    expect(a.payloads).toEqual(['select x']);
-    expect(a.keys).toEqual(['selectOffer']);
   });
 });
 

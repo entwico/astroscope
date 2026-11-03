@@ -50,7 +50,7 @@ export function onStartup() {
 }
 ```
 
-Until `cap.configure()` has run, the proxy answers `503` and the guard denies with `SERVICE_UNAVAILABLE`.
+`baseUrl` is the service's origin with an optional base path. Until `cap.configure()` has run, the proxy answers `503` and the guard denies with `SERVICE_UNAVAILABLE`. A service that cannot be reached answers `502`, one that does not answer within 10 s `504`; redirects from the service are not followed.
 
 ### 3. Guard the request
 
@@ -71,7 +71,7 @@ export const server = {
 };
 ```
 
-The guard adds `_cap` to the input schema itself. Put `rateLimit` ahead of it: Cap rate-limits challenge and redeem per visitor, but a request with an invented token still costs a siteverify call, and a flood of those is refused by the limiter before any call is made. The same `captcha()` goes into `defineRoute` for endpoints and `guard(Astro, [...])` for pages — see [`@astroscope/node/guards`](../node/README.md#guards) for `rateLimit`, `defineRoute` and `guard`. On a json or form body the token is read from the `_cap` field.
+The guard adds `_cap` to the input schema itself; put `rateLimit` ahead of it, so a flood of invented tokens never reaches siteverify. The same `captcha()` goes into `defineRoute` for endpoints and `guard(Astro, [...])` for pages — see [`@astroscope/node/guards`](../node/README.md#guards) for `rateLimit`, `defineRoute` and `guard`. On a json or form body the token is read from the `_cap` field.
 
 ### 4. Solve on the client
 
@@ -146,14 +146,14 @@ Hand-written widgets outside React: `registerCapWidget()` from `@astroscope/cap/
 | --------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------- | --------------- |
 | no `_cap` in the request                            | `ActionError` `BAD_REQUEST` (input validation) | the page renders with the validation error           | `400`           |
 | token rejected (`success: false` or a 4xx from Cap) | `ActionError` `FORBIDDEN`                      | the page renders with the error as the action result | `403`           |
-| Cap unreachable, 5xx or not configured              | `ActionError` `SERVICE_UNAVAILABLE`            | same, `SERVICE_UNAVAILABLE`                          | `503`           |
+| Cap unreachable, 5xx, wrong credentials or not configured | `ActionError` `SERVICE_UNAVAILABLE`            | same, `SERVICE_UNAVAILABLE`                          | `503`           |
 
-Endpoints and pages answer per the request: `{ error: { code, message } }` for an api caller, a plain status page for a browser navigation.
+Endpoints and pages answer per the request: `{ error: { code, message } }` for an api caller, a plain status page for a browser navigation. A token is verified once per request, however many `captcha()` guards see it.
 
 ## Notes
 
-- **Logging**: rejected tokens log at `info`. An unreachable or misconfigured Cap service logs at `error`.
-- **No third-party requests**: both wasm solvers (`@cap.js/wasm`) and the pako fallback for browsers without `DecompressionStream` are served from your origin, nothing is fetched from a CDN. The visible widget's vendor credits link reports no page url or referrer on click and carries `rel="noreferrer"`. Browsers without WebAssembly or Web Workers can't solve.
+- **Logging**: rejected tokens log at `info`, an unreachable or misconfigured Cap service at `error`.
+- **No third-party requests**: the wasm solvers and the pako fallback are served from your origin, nothing is fetched from a CDN, and the widget's credits link opens without the page url or a referrer. Browsers without WebAssembly or Web Workers can't solve.
 - **Privacy policy**: two first-party processings to name — the visitor's IP is forwarded to your Cap service for rate limiting, and Cap's instrumentation step runs a bot-detection script from your service in a sandboxed iframe and sends its browser signals back to it.
 - **Content Security Policy**: the solver needs `worker-src blob:` and `'wasm-unsafe-eval'`, and Cap's instrumentation step runs an inline script in a sandboxed `srcdoc` iframe (`window.CAP_SCRIPT_NONCE` passes a nonce through).
 

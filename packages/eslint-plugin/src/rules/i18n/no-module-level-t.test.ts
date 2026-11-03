@@ -20,6 +20,8 @@ tester.run('no-module-level-t', noModuleLevelT, {
     `class Foo { render() { return t('key', 'fallback'); } }`,
     // nested functions
     `function outer() { function inner() { return t('key', 'fallback'); } }`,
+    // rich() inside a component
+    `const Tos = () => rich('tos', 'Read {#link}more{/link}', { link: (c) => c });`,
   ],
   invalid: [
     {
@@ -32,6 +34,10 @@ tester.run('no-module-level-t', noModuleLevelT, {
     },
     {
       code: `console.log(t('key', 'fallback'));`,
+      errors: [{ messageId: 'moduleLevelT' }],
+    },
+    {
+      code: `const tos = rich('tos', 'Read {#link}more{/link}', { link: (c) => c });`,
       errors: [{ messageId: 'moduleLevelT' }],
     },
   ],

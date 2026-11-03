@@ -12,6 +12,7 @@ const wormholeNames = ['session', 'cart', 'flags', 'locale', 'theme', 'consent',
 const manifest: WormholeManifest = {
   chunks: Object.fromEntries(chunkNames.map((name, i) => [name, [wormholeNames[i % 8]!, wormholeNames[(i * 3) % 8]!]])),
   scripts: ['session', 'consent'],
+  scriptsByRoute: {},
   routes: {},
 };
 

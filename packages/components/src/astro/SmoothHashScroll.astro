@@ -1,9 +1,16 @@
 ---
-// intercept plain left-clicks on same-page hash links and smoothly scroll to the target
+// intercept plain left-clicks on same-document hash links and smoothly scroll to the target.
+//
+// the listener sits on `document`, so the component works from <head> as well as <body>. a link
+// is same-document only when origin, path and query all match the current location — `/page#x`
+// from `/page?tab=2` is another document and stays with the browser, as do links that open
+// elsewhere (`target`, `download`), modified clicks and anything already handled.
+//
+// comments live here, not in the inline script below, which ships to the browser verbatim.
 ---
 
 <script is:inline>
-  document.body.addEventListener('click', (event) => {
+  document.addEventListener('click', (event) => {
     const modifierKey = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 
     if (modifierKey || event.defaultPrevented || event.button !== 0) {
@@ -12,24 +19,33 @@
 
     let target = event.target;
 
-    while (target && target !== document.body) {
+    while (target) {
       if (target.tagName === 'A') {
-        const raw = target.getAttribute('href') || '';
-        let hash = '';
+        const opensElsewhere = (target.target && target.target !== '_self') || target.hasAttribute('download');
 
-        if (raw.startsWith('#')) {
-          hash = raw;
-        } else if (target.href.startsWith(`${window.location.origin}${window.location.pathname}#`)) {
-          hash = new URL(target.href).hash;
+        if (opensElsewhere) {
+          return;
         }
 
-        if (hash.length > 1) {
+        let url;
+
+        try {
+          url = new URL(target.href);
+        } catch {
+          return;
+        }
+
+        const current = window.location;
+        const sameDocument =
+          url.origin === current.origin && url.pathname === current.pathname && url.search === current.search;
+
+        if (sameDocument && url.hash.length > 1) {
           let id;
 
           try {
-            id = decodeURIComponent(hash.slice(1));
+            id = decodeURIComponent(url.hash.slice(1));
           } catch {
-            id = hash.slice(1);
+            id = url.hash.slice(1);
           }
 
           const el = document.getElementById(id);
@@ -37,8 +53,8 @@
           if (el) {
             event.preventDefault();
 
-            if (hash !== window.location.hash) {
-              window.history.pushState(null, '', hash);
+            if (url.hash !== current.hash) {
+              window.history.pushState(null, '', url.hash);
             }
 
             el.scrollIntoView({ behavior: 'smooth' });

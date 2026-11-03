@@ -18,6 +18,25 @@ describe('cap.configure', () => {
     expect(() => cap.configure(config)).toThrow(key);
     expect(cap.isConfigured()).toBe(false);
   });
+
+  test.each(['cap.cap:3000', '/cap', 'ftp://cap.cap', 'https://cap.cap?x=1', 'https://cap.cap/#cap'])(
+    'rejects the base url %s',
+    (baseUrl) => {
+      expect(() => cap.configure({ baseUrl, siteKey: 'site', secretKey: 'secret' })).toThrow('baseUrl');
+      expect(cap.isConfigured()).toBe(false);
+    },
+  );
+
+  test('keeps a base path', () => {
+    cap.configure({ baseUrl: 'https://cap.cap:3000/captcha/', siteKey: 'site', secretKey: 'secret' });
+
+    expect(cap.getConfig()?.baseUrl).toBe('https://cap.cap:3000/captcha');
+  });
+
+  test.each(['a/b', 'a?b', 'a#b'])('rejects the site key %s', (siteKey) => {
+    expect(() => cap.configure({ baseUrl: 'https://cap.cap', siteKey, secretKey: 'secret' })).toThrow('siteKey');
+    expect(cap.isConfigured()).toBe(false);
+  });
 });
 
 describe('normalizeCapPath', () => {

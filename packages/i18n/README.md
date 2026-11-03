@@ -64,7 +64,7 @@ i18n({
 
 #### Middleware
 
-The integration injects two middlewares: one serving the `/_i18n/` translation chunks ahead of your own middleware, and the locale middleware after it — it resolves the request's locale and provides the request context for `t()`. Running after your middleware means the locale resolver sees what a session middleware put on `locals`.
+The integration injects two middlewares: one serving the `/_i18n/` translation chunks ahead of your own middleware, and the locale middleware after it, so the locale resolver sees what a session middleware put on `locals`.
 
 Both middlewares are injected in the order of your `integrations` array.
 
@@ -144,7 +144,7 @@ That's it — client delivery is automatic. Use plain `client:*` directives; tra
 
 ### `t(key, fallback, values?)`
 
-Translate a key with optional interpolation values. The fallback is used when a translation is missing and also serves as an example for translators. Uses [MessageFormat 2](https://github.com/unicode-org/message-format-wg) syntax.
+Translate a key with optional interpolation values. The fallback is used when a translation is missing or empty and also serves as an example for translators. Uses [MessageFormat 2](https://github.com/unicode-org/message-format-wg) syntax.
 
 ```ts
 // simple text
@@ -293,8 +293,10 @@ Translation chunks ship as raw MessageFormat 2 strings and are compiled in the b
 
 Through the adapter's telemetry (no-op without its SDK):
 
-- `astro.i18n.missing` {`astro.i18n.locale`} — lookups that fell back. `t()` caches the fallback per locale until the next `setTranslations`, so a key counts once per translations version; `rich()` counts per call. The key itself goes to a debug log line (`missing translation`), never into the label.
-- `astro.i18n.translations.age` {`astro.i18n.locale`} — seconds since the locale's last `setTranslations`. An app that refreshes translations periodically shows a sawtooth; a stalled refresh loop shows a line going up.
+- `astro.i18n.missing` {`astro.i18n.locale`} — lookups that fell back; the key goes to a debug log line (`missing translation`), never into the label
+- `astro.i18n.translations.age` {`astro.i18n.locale`} — seconds since the locale's last `setTranslations`
+
+A message that fails to format (an unresolved variable, an input a formatter cannot take) renders messageformat's best effort and is logged once (`translation failed to format`).
 
 `/_i18n/` chunk requests are excluded from request logging and telemetry by the adapter's default excludes.
 

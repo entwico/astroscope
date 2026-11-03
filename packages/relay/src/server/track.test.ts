@@ -1,3 +1,4 @@
+import { emit } from '@astroscope/node/events';
 import type { APIContext } from 'astro';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { RelayServerConfig, ServerDestination, ServerEventMeta } from '../runtime.js';
@@ -7,9 +8,9 @@ import { createRelayMiddleware } from './middleware.js';
 import { track } from './track.js';
 import '../test-destinations.js';
 
-vi.mock('@astroscope/node/log', () => ({
-  log: { error: vi.fn(), debug: vi.fn(), info: vi.fn() },
-}));
+const log = vi.hoisted(() => ({ error: vi.fn(), debug: vi.fn(), info: vi.fn() }));
+
+vi.mock('@astroscope/node/log', () => ({ log }));
 
 // the registry the integration would resolve: set per test
 let config: RelayServerConfig = { destinations: {} };
@@ -67,6 +68,7 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 afterEach(() => {
   config = { destinations: {} };
+  vi.clearAllMocks();
 });
 
 describe('track on the server', () => {
@@ -130,6 +132,17 @@ describe('track on the server', () => {
     expect(byName.payloads()).toEqual([]);
   });
 
+  test('a destination named like an Object.prototype member gets no inherited consent rule', async () => {
+    const named = createDestination('constructor' as TestName);
+
+    configure({ destinations: { constructor: named.destination } as RelayServerConfig['destinations'], consent: {} });
+
+    await inRequest(() => track({ constructor: 'for constructor' } as never), withConsent('a'));
+    await flush();
+
+    expect(named.payloads()).toEqual([]);
+  });
+
   test('outside a request, without a consented destination, or excluded nothing is reported and the id is still returned', async () => {
     const { log } = await import('@astroscope/node/log');
     const a = createDestination('a');
@@ -170,8 +183,88 @@ describe('track on the server', () => {
     expect(log.error).toHaveBeenCalledWith(expect.objectContaining({ destination: 'b', id: 'evt-1' }), 'failed to report conversion');
   });
 
+  test('a destination registered under another name is rejected, like in the browser', async () => {
+    const { log } = await import('@astroscope/node/log');
+    const a = createDestination('a');
+
+    configure({ destinations: { b: a.destination } as unknown as RelayServerConfig['destinations'] });
+
+    await inRequest(() => track({ a: 'x', b: 'y' }), withConsent('a,b'));
+    await flush();
+
+    expect(a.sent).toEqual([]);
+    expect(log.error).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('registered under b'));
+  });
+
+  test('a request without a client address never makes track throw', async () => {
+    const a = createDestination('a');
+    const middleware = createRelayMiddleware();
+    // what astro does for a prerendered route
+    const unavailable = {
+      get: () => {
+        throw new Error('clientAddress cannot be used inside prerendered route');
+      },
+    };
+
+    configure({ destinations: { a: a.destination } });
+
+    let id: string | undefined;
+
+    await middleware(Object.defineProperty(createContext(withConsent('a')), 'clientAddress', unavailable), () => {
+      id = track({ a: 'x' });
+
+      return Promise.resolve(new Response('ok'));
+    });
+
+    expect(id).toEqual(expect.any(String));
+  });
+
   test('the consent of the request is readable where the server destinations are written', async () => {
     expect(relayConsent()).toEqual({});
     expect(await inRequest(() => relayConsent(), withConsent('a, b'))).toEqual({ a: true, b: true });
+  });
+
+  test('the shutdown waits for the reports in flight', async () => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    const a = createDestination('a', { send: () => promise });
+
+    configure({ destinations: { a: a.destination } });
+
+    await inRequest(() => track({ a: 'slow' }), withConsent('a'));
+
+    const shutdown = emit('beforeOnShutdown', { dev: false, host: 'localhost', port: 0 });
+    const settled = vi.fn();
+
+    void shutdown.finally(settled);
+    await flush();
+
+    expect(settled).not.toHaveBeenCalled();
+
+    resolve();
+    await shutdown;
+
+    expect(settled).toHaveBeenCalled();
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  test('the shutdown gives up on a hung report after the timeout', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const a = createDestination('a', { send: () => new Promise(() => {}) });
+
+      configure({ destinations: { a: a.destination } });
+
+      await inRequest(() => track({ a: 'hung' }), withConsent('a'));
+
+      const shutdown = emit('beforeOnShutdown', { dev: false, host: 'localhost', port: 0 });
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      await shutdown;
+
+      expect(log.error).toHaveBeenCalledWith({ pending: 1 }, 'conversion reports still in flight at shutdown');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

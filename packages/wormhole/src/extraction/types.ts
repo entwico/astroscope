@@ -13,6 +13,11 @@ export type WormholeManifest = {
   /** names reachable from astro `<script>` entries — non-island consumers, delivered at stream end */
   scripts: string[];
   /**
+   * the script-reachable names per route pattern, from the routes owning each script's component;
+   * a route absent here is unknown and gets `scripts`
+   */
+  scriptsByRoute: Record<string, string[]>;
+  /**
    * names the middleware must load per route pattern: reads on the server —
    * frontmatter, endpoints, helpers and server-rendered islands, from the server
    * build's module graph — plus the reads of `<script>` entries the route's

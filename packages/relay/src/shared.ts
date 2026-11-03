@@ -6,9 +6,6 @@
  */
 export const RELAY_CONSENT_HEADER = 'x-relay-consent';
 
-/** the attribute of an element whose click tracks the event serialized into it */
-export const RELAY_TRACK_ATTRIBUTE = 'data-track';
-
 /** what the visitor allowed, by destination name */
 export type ConsentRecord = Readonly<Record<string, boolean>>;
 
@@ -87,7 +84,7 @@ export type DomainEvent<E extends RelayEvent = RelayEvent> = {
 /** what a definition returns: the payloads, and the id where the site's data has one */
 export type DefinedPayloads = RelayEvent & { id?: string | undefined };
 
-/** what `track()`, `<Track>` and `data-track` take: a defined event or a plain one */
+/** what `track()`, `<Track>` and `inlineTrack()` take: a defined event or a plain one */
 export type TrackInput = RelayEvent | DomainEvent;
 
 /** a defined event: builds the event from the site's own arguments and carries its key */
@@ -101,10 +98,9 @@ export type EventDefinition<
 
 /**
  * One of the site's events: a function that turns the site's own objects into the payloads of the
- * destinations the event is meant for, under the key that identifies it in a `data-track`
- * attribute and in logs. One export per event, so an island bundles only the events
- * it tracks and an event only an action imports never reaches the browser; the key is the export's
- * name.
+ * destinations the event is meant for, under the key that identifies it in logs. One export per
+ * event, so an island bundles only the events it tracks and an event only an action imports never
+ * reaches the browser; the key is the export's name.
  */
 export function defineEvent<const K extends string, Args extends unknown[], E extends DefinedPayloads>(
   key: K,
@@ -132,7 +128,7 @@ export function toTracked(input: TrackInput): { event: RelayEvent; key: string |
     : { event: input, key: undefined, id: undefined };
 }
 
-/** a plain object with the right shape, from untrusted json (an attribute, the queue, storage) */
+/** a plain object with the right shape, from an inline push before the bus installed */
 export function isTrackInput(value: unknown): value is TrackInput {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
 
@@ -141,11 +137,6 @@ export function isTrackInput(value: unknown): value is TrackInput {
   if (candidate.key === undefined && candidate.event === undefined) return true;
 
   return isDomainEvent(candidate as TrackInput);
-}
-
-/** the value of the `data-track` attribute of an element whose click tracks the event */
-export function trackAttribute(input: TrackInput): string {
-  return JSON.stringify(input);
 }
 
 /** the payload of a destination in an event, `undefined` when the event is not meant for it */

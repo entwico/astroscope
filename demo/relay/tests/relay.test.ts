@@ -126,8 +126,9 @@ describe.each([
       const res = await fetch(`http://localhost:${port}/`);
       const html = await res.text();
 
-      expect(html).toMatch(/<script>\(self\.__relay__\?\?=\{q:\[\]\}\)\.q\.push\(\{"key":"viewProduct","event":\{.*"name":"view_item".*\);<\/script>/);
-      expect(html).toMatch(/data-track="\{&quot;key&quot;:&quot;selectOffer&quot;/);
+      expect(html).toContain('self.__relay__??={q:[],track(e){this.q.push(e)}};');
+      expect(html).toMatch(/<script>__relay__\.track\(\{"key":"viewProduct","event":\{.*"name":"view_item".*\);<\/script>/);
+      expect(html).toMatch(/onclick="__relay__\.track\(\{&quot;key&quot;:&quot;selectOffer&quot;/);
       expect(html).toMatch(/<script type="module"[^>]*src="[^"]*"|relay\.client/);
     });
   });

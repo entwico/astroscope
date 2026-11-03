@@ -148,16 +148,19 @@ export interface NodeOptions {
    * emits `modulepreload` links (and preload data for deferred islands, fired by a
    * small gate runtime with the directive's own scheduling) for each island's
    * chunk closure, removing the hydration request waterfall. Production-only —
-   * dev has no chunk graph. Set to `false` to disable the preloading; the islands
-   * middleware itself stays active for packages that registered island or document
-   * emitters (e.g. `@astroscope/i18n`, `@astroscope/wormhole`).
+   * dev has no chunk graph. Set to `false` to disable the preloading; the chunk
+   * manifest is still built and the islands middleware stays active for packages
+   * that deliver data per island or per document through its emitter seams
+   * (`@astroscope/i18n`, `@astroscope/wormhole`).
    */
   islands?: false | undefined;
 
   /**
    * On-demand image processing (`astro:assets` through the `/_image`
-   * endpoint). `'auto'`: enabled only when the astro config sets
-   * `image.service` itself; otherwise processing is disabled — any
+   * endpoint). `'auto'`: enabled only when the astro config sets an
+   * `image.service` other than astro's default sharp (an explicit
+   * `sharpImageService()` is indistinguishable from the default, use `'on'`);
+   * otherwise processing is disabled — any
    * `<Image>`/`getImage()` use throws with an explanation and `/_image`
    * answers 404, as if the endpoint did not exist. `'on'` keeps astro's default sharp service; `'off'` disables
    * even over an explicit `image.service`. Off unless configured because the
@@ -176,11 +179,32 @@ export interface NodeOptions {
   bodySizeLimit?: number | undefined;
 
   /**
+   * Query parameters whose values are redacted in the server spans' `url.query`
+   * and in extended request logs, matched case-sensitively. Replaces the
+   * default (`OTEL_REDACTED_QUERY_PARAMS`, the signed-url credentials
+   * OpenTelemetry's semantic conventions name) entirely when provided; spread
+   * it to add a site's own secrets, an oauth `code`, a reset `token`.
+   */
+  redactedQueryParams?: string[] | undefined;
+
+  /**
    * How long to wait (ms) for in-flight requests to finish on shutdown before
-   * remaining connections are closed forcefully.
+   * remaining connections are closed forcefully. The same bound applies to
+   * `onShutdown` and the telemetry flush, each: a phase exceeding it is logged
+   * as an error and the process exits anyway.
    * @default 10000
    */
   shutdownTimeout?: number | undefined;
+
+  /**
+   * How long (ms) an idle keep-alive connection stays open. Must exceed the
+   * idle timeout of the reverse proxy in front, or the proxy reuses a
+   * connection node is closing and answers 502: traefik keeps backend
+   * connections 90 s, nginx and ingress-nginx 60 s, the cloud balancers 60 s.
+   * Node's `headersTimeout` is set one second above it.
+   * @default 120000
+   */
+  keepAliveTimeout?: number | undefined;
 }
 
 /**
@@ -193,6 +217,8 @@ export interface RuntimeOptions {
   server: string;
   bodySizeLimit: number;
   shutdownTimeout: number;
+  keepAliveTimeout: number;
+  redactedQueryParams: string[];
   health: false | { host?: string | undefined; port?: number | undefined; paths?: HealthProbePaths | undefined };
   logging: false | { exclude: ExcludePattern[]; extended: boolean };
   telemetry:

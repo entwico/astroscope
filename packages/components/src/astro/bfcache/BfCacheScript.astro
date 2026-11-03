@@ -3,7 +3,8 @@
 // must be set from a component whose frontmatter runs before the response streams (Page / WithNoBfCache).
 //
 // pageshow with persisted=true means the page was restored from bfcache → force a fresh load.
-// registering a pagehide handler is enough to opt some browsers out of bfcache.
+// the `no-store` header keeps the page out of bfcache in the first place; a pagehide listener
+// would not (only `unload` ever did), so the script registers none.
 //
 // comments live here, not in the inline script below, which ships to the browser verbatim.
 ---
@@ -14,6 +15,4 @@
       window.location.reload();
     }
   });
-
-  window.addEventListener('pagehide', () => {});
 </script>

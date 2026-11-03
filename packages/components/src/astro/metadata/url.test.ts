@@ -11,6 +11,18 @@ describe('toAbsolute', () => {
     expect(toAbsolute('https://other.com/p', 'https://x.com')).toBe('https://other.com/p');
   });
 
+  test('resolves a protocol-relative url against the origin scheme', () => {
+    expect(toAbsolute('//cdn.example.com/og.png', 'https://x.com')).toBe('https://cdn.example.com/og.png');
+  });
+
+  test('resolves a bare relative path against the origin', () => {
+    expect(toAbsolute('og.png', 'https://x.com')).toBe('https://x.com/og.png');
+  });
+
+  test('returns a value that is no url as given', () => {
+    expect(toAbsolute('http://[', 'https://x.com')).toBe('http://[');
+  });
+
   test('passes undefined through', () => {
     expect(toAbsolute(undefined, 'https://x.com')).toBeUndefined();
   });

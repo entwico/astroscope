@@ -10,6 +10,7 @@ export type {
 } from './types.js';
 export type { InstrumentationContext } from './platform/prepare.js';
 export { registerIslandEmitter } from './islands/emitters.js';
+export { OTEL_REDACTED_QUERY_PARAMS } from './observability/redact-query.js';
 export { getRequestRouteData } from './server/route-store.js';
 export type { IslandEmission, IslandEmitter, IslandInfo } from './islands/types.js';
 export type { BootContext } from './lifecycle/types.js';

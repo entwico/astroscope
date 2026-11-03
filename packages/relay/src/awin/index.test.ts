@@ -39,6 +39,17 @@ describe('awin builders', () => {
       voucher: '',
     });
   });
+
+  test('a commission group name never adds a part', () => {
+    expect(() => awin.sale({ amount: 10, orderRef: 'o-3', currency: 'EUR', parts: { 'BOOKS|BONUS:500': 10 } })).toThrow(TypeError);
+    expect(() => awin.sale({ amount: 10, orderRef: 'o-3', currency: 'EUR', parts: { 'BOOKS BONUS': 10 } })).toThrow('BOOKS BONUS');
+    expect(awin.sale({ amount: 10, orderRef: 'o-3', currency: 'EUR', parts: { 'BOOKS-2_b': 10 } }).parts).toBe('BOOKS-2_b:10.00');
+  });
+
+  test('an amount that is not a finite number is rejected', () => {
+    expect(() => awin.sale({ amount: NaN, orderRef: 'o-4', currency: 'EUR' })).toThrow(TypeError);
+    expect(() => awin.sale({ amount: 10, orderRef: 'o-4', currency: 'EUR', parts: { BOOKS: Infinity } })).toThrow('parts.BOOKS');
+  });
 });
 
 describe('awinMastertag', () => {

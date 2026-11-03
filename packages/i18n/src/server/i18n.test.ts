@@ -268,13 +268,13 @@ describe('getChunkBody', () => {
 });
 
 describe('getHashes', () => {
-  test('returns empty object when no translations were set', async () => {
+  test('returns empty object without a chunk manifest', async () => {
     const i18n = await createConfiguredI18n();
 
     expect(i18n.getHashes('en')).toEqual({});
   });
 
-  test('computes hashes on setTranslations when chunks exist', async () => {
+  test('computes hashes when chunks exist', async () => {
     const i18n = await createConfiguredI18n({ chunks: { 'Cart.Cabc': ['cart.title'] } });
 
     i18n.setTranslations('en', { 'cart.title': 'Cart' });
@@ -294,6 +294,37 @@ describe('getHashes', () => {
     i18n.setTranslations('en', { 'cart.title': 'Basket' });
 
     expect(i18n.getHashes('en')['Cart.Cabc']).not.toBe(before);
+  });
+
+  test('hash changes whenever the served chunk body changes', async () => {
+    const chunks = { 'Cart.Cabc': ['cart.title'] };
+    const before = await createConfiguredI18n({ keys: [{ key: 'cart.title', meta: { fallback: 'Cart' }, files: [] }], chunks });
+
+    before.setTranslations('en', {});
+
+    const beforeHash = before.getHashes('en')['Cart.Cabc'];
+    const beforeBody = new TextDecoder().decode(before.getChunkBody('en', 'Cart.Cabc'));
+
+    const after = await createConfiguredI18n({ keys: [{ key: 'cart.title', meta: { fallback: 'Basket' }, files: [] }], chunks });
+
+    after.setTranslations('en', {});
+
+    const afterBody = new TextDecoder().decode(after.getChunkBody('en', 'Cart.Cabc'));
+
+    expect(afterBody).not.toBe(beforeBody);
+    expect(after.getHashes('en')['Cart.Cabc']).not.toBe(beforeHash);
+  });
+
+  test('has hashes for chunks of a locale whose translations were never set', async () => {
+    const i18n = await createConfiguredI18n({
+      keys: [{ key: 'cart.title', meta: { fallback: 'Cart' }, files: [] }],
+      chunks: { 'Cart.Cabc': ['cart.title'] },
+    });
+
+    i18n.setTranslations('en', { 'cart.title': 'Cart' });
+
+    expect(i18n.getTranslations('de')).toEqual({ 'cart.title': 'Cart' });
+    expect(i18n.getHashes('de')['Cart.Cabc']).toMatch(/^[0-9a-f]{8}$/);
   });
 
   test('does not compute hashes without chunks', async () => {
@@ -320,13 +351,13 @@ describe('getScriptChunkHashes', () => {
     expect(hashes['hoisted.Cdef']).toMatch(/^[0-9a-f]{8}$/);
   });
 
-  test('skips script chunks without translations for the locale', async () => {
+  test('skips script chunks the manifest has no translation chunk for', async () => {
     const i18n = await createConfiguredI18n({
       chunks: { 'hoisted.Cdef': ['banner.text'] },
       scripts: ['hoisted.Cdef', 'other.Cxyz'],
     });
 
-    expect(i18n.getScriptChunkHashes('en')).toEqual({});
+    expect(Object.keys(i18n.getScriptChunkHashes('en'))).toEqual(['hoisted.Cdef']);
   });
 });
 

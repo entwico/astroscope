@@ -1,14 +1,20 @@
 import type { MiddlewareHandler } from 'astro';
 import { log } from '../observability/log/index.js';
 import { getRequestRouteData } from '../server/route-store.js';
-import { getDocumentEmitters } from './emitters.js';
-import { type IslandsTransformer, createIslandsTransformer, createPageTransformStream } from './transform.js';
+import { getDocumentEmitters, getIslandEmitters } from './emitters.js';
+import {
+  type IslandsTransformer,
+  type IslandsTransformerOptions,
+  createIslandsTransformer,
+  createPageTransformStream,
+} from './transform.js';
 import type { IslandsManifest } from './types.js';
 
 /**
  * Streams every html page response through the delivery pipeline: the islands
- * rewriter (when a manifest exists — prod with preloading enabled) plus the
- * document emissions registered by other packages, head scripts inserted after
+ * rewriter (when a manifest exists — prod; with `islands: false` it runs only
+ * for registered island emitters, which deliver their data per island through
+ * it) plus the document emissions registered by other packages, head scripts inserted after
  * `<head>` and end scripts appended once the rewriter finished. Non-page routes
  * (an endpoint or proxy catch-all returning html), non-html responses,
  * already-encoded bodies and html declaring a charset other than utf-8 pass
@@ -20,14 +26,19 @@ import type { IslandsManifest } from './types.js';
  * past that window. Injected bytes invalidate a pre-computed length, so
  * `content-length` is dropped — streamed responses never carry one anyway.
  */
-export function createIslandsMiddleware(manifest: IslandsManifest | null): MiddlewareHandler {
+export function createIslandsMiddleware(
+  manifest: IslandsManifest | null,
+  options?: IslandsTransformerOptions | undefined,
+): MiddlewareHandler {
+  const preload = options?.preload ?? true;
   let transformer: IslandsTransformer | undefined;
 
   return async (context, next) => {
     const response = await next();
     const emitters = getDocumentEmitters();
+    const rewriting = manifest !== null && (preload || getIslandEmitters().length > 0);
 
-    if (!manifest && emitters.length === 0) {
+    if (!rewriting && emitters.length === 0) {
       return response;
     }
 
@@ -68,12 +79,12 @@ export function createIslandsMiddleware(manifest: IslandsManifest | null): Middl
       }
     }
 
-    if (!manifest && heads.length === 0 && ends.length === 0) {
+    if (!rewriting && heads.length === 0 && ends.length === 0) {
       return response;
     }
 
-    if (manifest) {
-      transformer ??= createIslandsTransformer(manifest);
+    if (manifest && rewriting) {
+      transformer ??= createIslandsTransformer(manifest, { preload });
     }
 
     const stream = createPageTransformStream({

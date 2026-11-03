@@ -444,6 +444,9 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(@vitest/coverage-v8@5.0.5)(happy-dom@21.0.4)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   demo/proxy-migration:
     dependencies:
@@ -653,9 +656,6 @@ importers:
       '@jridgewell/trace-mapping':
         specifier: ^0.3.31
         version: 0.3.31
-      magic-string:
-        specifier: ^1.4.5
-        version: 1.4.5
       messageformat:
         specifier: ^4.1.0
         version: 4.1.0
@@ -672,6 +672,9 @@ importers:
       astro:
         specifier: ^7.4.4
         version: 7.4.4(@types/node@26.6.6)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1)
+      magic-string:
+        specifier: ^1.4.5
+        version: 1.4.5
       tsdown:
         specifier: ^0.23.4
         version: 0.23.4(@volar/typescript@2.4.28(typescript@6.0.3))(typescript@6.0.3)
@@ -773,6 +776,9 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(@vitest/coverage-v8@5.0.5)(happy-dom@21.0.4)(vite@8.3.4(@types/node@26.6.6)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/react:
     dependencies:

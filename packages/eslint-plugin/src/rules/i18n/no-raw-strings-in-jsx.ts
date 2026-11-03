@@ -1,12 +1,12 @@
 import type { Rule } from 'eslint';
 
-const DEFAULT_IGNORE_PATTERNS = [
+// always applied; `ignorePatterns` adds to them
+export const DEFAULT_IGNORE_PATTERNS: readonly RegExp[] = [
   /^\s*$/, // whitespace only
-  /^\s*[{}]\s*/, // just braces
   /^[0-9.]+$/, // numbers
   /^\s*\|\s*$/, // pipe separators
   /^\s*[•·–—]\s*$/, // bullets / dashes
-  /^[\s\p{P}\p{S}]+$/u, // punctuation / symbols only (e.g. "(", ",", "/ —")
+  /^[\s\p{P}\p{S}]+$/u, // punctuation / symbols only (e.g. "(", ",", "{", "/ —")
   /^#[0-9a-fA-F]{3,8}$/, // hex colors (e.g. "#003366", "#fff")
   /^\d+x\d+$/, // dimensions (e.g. "180x180")
   /^(true|false)$/, // boolean attribute values (e.g. aria-modal="true", spellcheck="false")
@@ -157,6 +157,17 @@ type Options = {
   ignoreAttributes?: string[] | undefined;
 };
 
+function compilePattern(pattern: string): RegExp {
+  try {
+    return new RegExp(pattern);
+  } catch (error) {
+    throw new Error(
+      `no-raw-strings-in-jsx: ignorePatterns entry ${JSON.stringify(pattern)} is not a valid regular expression: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+}
+
 export const noRawStringsInJsx: Rule.RuleModule = {
   meta: {
     type: 'suggestion',
@@ -186,9 +197,7 @@ export const noRawStringsInJsx: Rule.RuleModule = {
   create(context) {
     const options: Options = context.options[0] ?? {};
 
-    const allPatterns = options.ignorePatterns
-      ? options.ignorePatterns.map((p) => new RegExp(p))
-      : DEFAULT_IGNORE_PATTERNS;
+    const allPatterns = [...DEFAULT_IGNORE_PATTERNS, ...(options.ignorePatterns ?? []).map((p) => compilePattern(p))];
 
     const ignoreAttributes = new Set(options.ignoreAttributes ?? DEFAULT_IGNORE_ATTRIBUTES);
 

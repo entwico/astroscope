@@ -110,8 +110,9 @@ export function CapWidget({
 
     if (!element) return;
 
-    // the vendor credits link ships without rel; the widget's tamper watchdog enforces href, text
-    // and visibility but leaves rel alone, so no referrer leaves the page on a click
+    // a click is taken over by registerCapWidget(); the rel covers a middle click, which navigates
+    // the anchor natively — the vendor link ships without one and its tamper watchdog enforces
+    // href, text and visibility but leaves rel alone
     void registerCapWidget().then(() => {
       element.shadowRoot?.querySelector('.credits')?.setAttribute('rel', 'nofollow noopener noreferrer');
     });

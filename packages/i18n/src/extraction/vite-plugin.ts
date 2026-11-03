@@ -3,10 +3,9 @@ import path from 'node:path';
 import { type ExcludePattern, serializeExcludePatterns } from '@astroscope/node/excludes';
 import { isScriptEntry } from '@astroscope/node/islands';
 import type { AstroIntegrationLogger } from 'astro';
-import MagicString from 'magic-string';
-import type { Plugin } from 'vite';
+import type { Plugin, Rolldown } from 'vite';
 import type { ConsistencyCheckLevel } from '../integration/types.js';
-import { chunkIdToName } from '../shared/url.js';
+import { chunkIdToName, chunkPrefixFor } from '../shared/url.js';
 import { ALL_EXTENSIONS, extractKeysFromFile } from './extract.js';
 import { KeyStore } from './key-store.js';
 import { getGlobalState, getManifest } from './manifest.js';
@@ -31,7 +30,28 @@ export type I18nVitePluginOptions = {
   consistency: ConsistencyCheckLevel;
   /** the locale middleware's exclude patterns, null for the default */
   exclude: ExcludePattern[] | null;
+  /** astro's `base`, the chunk endpoint lives under it */
+  base: string;
 };
+
+type ChunkSourceMap = NonNullable<Rolldown.OutputChunk['map']>;
+
+/**
+ * The map of a chunk after a line was prepended to its code: every mapping moves
+ * down one line, which a leading empty line in the mappings expresses exactly.
+ */
+function shiftSourceMapDown(map: ChunkSourceMap): ChunkSourceMap {
+  const shifted = { ...map, mappings: `;${map.mappings}` };
+  const json = JSON.stringify(shifted);
+
+  return {
+    ...shifted,
+    toString: () => json,
+    toUrl: () => `data:application/json;charset=utf-8;base64,${Buffer.from(json).toString('base64')}`,
+  };
+}
+
+const INLINE_SOURCE_MAP_COMMENT = /\n?\/\/# sourceMappingURL=data:[^\n]*$/;
 
 /**
  * Describe a non-extractable t() call for a developer.
@@ -71,6 +91,7 @@ function formatExtractionErrors(errors: ExtractionError[], projectRoot: string):
  */
 export function i18nVitePlugin(options: I18nVitePluginOptions): Plugin {
   const { logger, consistency, exclude } = options;
+  const chunkPrefix = chunkPrefixFor(options.base);
 
   const store = new KeyStore(logger, consistency);
 
@@ -129,7 +150,10 @@ export function i18nVitePlugin(options: I18nVitePluginOptions): Plugin {
     load(id) {
       if (id === RESOLVED_CONFIG_VIRTUAL_MODULE_ID) {
         // exclude patterns may contain RegExp — serialized as code, not JSON
-        return `export const exclude = ${exclude ? serializeExcludePatterns(exclude) : 'null'};`;
+        return (
+          `export const exclude = ${exclude ? serializeExcludePatterns(exclude) : 'null'};\n` +
+          `export const chunkPrefix = ${JSON.stringify(chunkPrefix)};`
+        );
       }
 
       if (!isResolvedVirtualModuleId(id)) {
@@ -206,7 +230,7 @@ export function getManifest() { return _getManifest(); }
       return null; // dev mode: keep fallbacks
     },
 
-    generateBundle(_, bundle) {
+    generateBundle(outputOptions, bundle) {
       const state = getGlobalState();
 
       // reset for each build (server + client run separately)
@@ -302,20 +326,34 @@ export function getManifest() { return _getManifest(); }
 
         if (!chunksWithI18n.has(chunkName)) continue;
 
-        // the loader awaits the chunk's own translation chunk before the module body runs
+        // the loader awaits the chunk's own translation chunk before the module body runs;
+        // it takes a line of its own so the chunk's source map shifts by whole lines
         const loaderCode =
           `if(typeof window!=='undefined'&&window.__i18n__){` +
           `const _=window.__i18n__,h=_.hashes[${JSON.stringify(chunkName)}];` +
-          `if(h)await import(\`/_i18n/\${_.locale}/${chunkName}.\${h}.js\`);` +
-          `}`;
+          `if(h)await import(${JSON.stringify(chunkPrefix)}+_.locale+${JSON.stringify(`/${chunkName}.`)}+h+".js");` +
+          `}\n`;
 
-        const s = new MagicString(chunk.code);
+        chunk.code = loaderCode + chunk.code;
 
-        s.prepend(loaderCode);
-        chunk.code = s.toString();
+        if (!chunk.map) continue;
 
-        if (chunk.map) {
-          chunk.map = s.generateMap({ hires: true }) as typeof chunk.map;
+        // the chunk's map is emitted as its own asset (or inlined in the code), which
+        // rolldown does not regenerate from `chunk.map` — both carriers are updated here
+        const map = shiftSourceMapDown(chunk.map);
+
+        chunk.map = map;
+
+        if (outputOptions.sourcemap === 'inline') {
+          chunk.code = `${chunk.code.replace(INLINE_SOURCE_MAP_COMMENT, '')}\n//# sourceMappingURL=${map.toUrl()}`;
+
+          continue;
+        }
+
+        const mapAsset = bundle[chunk.sourcemapFileName ?? `${fileName}.map`];
+
+        if (mapAsset?.type === 'asset') {
+          mapAsset.source = map.toString();
         }
       }
 

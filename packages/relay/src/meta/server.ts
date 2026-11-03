@@ -32,7 +32,7 @@ export type MetaConversionsOptions = {
  */
 export function metaConversions(options: MetaConversionsOptions): ServerDestination<'meta'> {
   const doFetch = options.fetch ?? fetch;
-  const url = `${CONVERSIONS_API_URL}/${options.apiVersion ?? CONVERSIONS_API_VERSION}/${encodeURIComponent(options.pixelId)}/events`;
+  const url = `${CONVERSIONS_API_URL}/${encodeURIComponent(options.apiVersion ?? CONVERSIONS_API_VERSION)}/${encodeURIComponent(options.pixelId)}/events`;
 
   return {
     name: 'meta',

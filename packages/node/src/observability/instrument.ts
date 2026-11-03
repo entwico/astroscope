@@ -3,8 +3,10 @@ import { createMatcher } from '@entwico/dash/match';
 import { ROOT_CONTEXT, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
 import type { Logger } from 'pino';
 import type { ExcludePattern } from '../excludes/index.js';
+import { resolveActionName } from './action-names.js';
 import { generateReqId } from './log/index.js';
 import { type RequestRecord, getLogStore } from './log/store.js';
+import { OTEL_REDACTED_QUERY_PARAMS, redactQuery } from './redact-query.js';
 import {
   recordActionDuration,
   recordHttpRequestDuration,
@@ -30,6 +32,14 @@ export interface RequestTelemetryConfig {
 export interface RequestInstrumentationConfig {
   logging: RequestLoggingConfig | false;
   telemetry: RequestTelemetryConfig | false;
+  /**
+   * the names of the actions astro can resolve; any other `/_actions/` path is
+   * labelled `unknown`, so probing cannot mint a metric series and a span name
+   * per path. Absent in dev, where every path is taken as it is
+   */
+  actions?: ReadonlySet<string> | undefined;
+  /** the query parameters whose values are redacted in spans and extended logs; default OpenTelemetry's */
+  redactedQueryParams?: readonly string[] | undefined;
 }
 
 function getClientIp(req: IncomingMessage): string | undefined {
@@ -66,6 +76,7 @@ function chunkSize(chunk: unknown): number {
  * are excluded the request passes through untouched.
  */
 export function createRequestInstrumentation(config: RequestInstrumentationConfig) {
+  const redactedQueryParams = new Set(config.redactedQueryParams ?? OTEL_REDACTED_QUERY_PARAMS);
   const tracer = trace.getTracer(LIB_NAME);
   const store = getLogStore();
   const loggingExcluded = config.logging ? createMatcher(config.logging.exclude) : () => true;
@@ -75,6 +86,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
     const url = req.url ?? '';
     const queryIndex = url.indexOf('?');
     const pathname = queryIndex === -1 ? url : url.slice(0, queryIndex);
+    const query = queryIndex === -1 ? '' : redactQuery(url.slice(queryIndex + 1), redactedQueryParams);
     const method = req.method ?? 'GET';
 
     const logging = config.logging && !loggingExcluded(pathname) ? config.logging : false;
@@ -96,7 +108,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
       const reqData: Record<string, unknown> = { method, url: pathname };
 
       if (logging.extended) {
-        reqData['query'] = queryIndex === -1 ? '' : url.slice(queryIndex + 1);
+        reqData['query'] = query;
         reqData['headers'] = req.headers;
         reqData['remoteAddress'] = getClientIp(req) ?? req.socket.remoteAddress;
       }
@@ -112,7 +124,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
       method,
       route: undefined,
       routeOverride: false,
-      actionName: isAction ? pathname.slice(ACTIONS_PREFIX.length).replace(/\/$/, '') : undefined,
+      actionName: isAction ? resolveActionName(pathname.slice(ACTIONS_PREFIX.length), config.actions) : undefined,
       truncated: false,
     };
 
@@ -133,7 +145,7 @@ export function createRequestInstrumentation(config: RequestInstrumentationConfi
           attributes: {
             'http.request.method': method,
             'url.path': pathname,
-            'url.query': queryIndex === -1 ? '' : url.slice(queryIndex + 1),
+            'url.query': query,
             'url.scheme': 'http',
             'user_agent.original': req.headers['user-agent'] ?? '',
             ...(host && { 'server.address': host }),

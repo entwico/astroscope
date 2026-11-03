@@ -14,6 +14,7 @@ tester.run('t-static-key', tStaticKey, {
     `t('checkout.title', 'Checkout');`,
     // template literal with no expressions
     { code: 't(`checkout.title`, `Checkout`);' },
+    `rich('tos', 'Read our {#link}Terms{/link}', { link: (c) => c });`,
   ],
   invalid: [
     {
@@ -29,6 +30,11 @@ tester.run('t-static-key', tStaticKey, {
     {
       // string concatenation
       code: `t('prefix.' + suffix, 'fallback');`,
+      errors: [{ messageId: 'dynamicKey' }],
+    },
+    {
+      // rich() is extracted like t()
+      code: `rich(key, 'fallback', { link: (c) => c });`,
       errors: [{ messageId: 'dynamicKey' }],
     },
   ],

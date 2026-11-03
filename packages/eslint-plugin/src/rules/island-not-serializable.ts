@@ -1,7 +1,7 @@
 import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 import ts from 'typescript';
 
-import { type PluginDocs, isIslandElement, resolvePropsType } from '../utils/island.js';
+import { type PluginDocs, isIslandElement, resolvePropsType, tagName } from '../utils/island.js';
 
 const createRule = ESLintUtils.RuleCreator<PluginDocs>(
   (name) => `https://github.com/entwico/astroscope/tree/main/packages/eslint-plugin#${name}`,
@@ -22,6 +22,11 @@ const SERIALIZABLE_PRIMITIVE_FLAGS =
 
 // can't be decided — skip rather than risk a false positive
 const UNDECIDABLE_FLAGS = ts.TypeFlags.Any | ts.TypeFlags.Unknown;
+
+// a props type nested deeper than this is left undecided rather than walked further: a generic
+// that instantiates a fresh type on every level (`type Deep<T> = { next: Deep<[T]> }`) never
+// repeats an identity, so without a bound the walk would not terminate
+const MAX_DEPTH = 32;
 
 // not representable in JSON
 const NON_SERIALIZABLE_PRIMITIVE_FLAGS =
@@ -52,6 +57,18 @@ function hasCallLikeProperty(type: ts.Type, checker: ts.TypeChecker, site: ts.No
   });
 }
 
+// the declaration a generic instantiation comes from: the alias of `Deep<[T]>` or the target of
+// `Box<T>`; a type whose declaration is already on the current path is recursing on itself
+function declarationOf(type: ts.Type): ts.Symbol | undefined {
+  if (type.aliasSymbol) {
+    return type.aliasSymbol;
+  }
+
+  const objectFlags = (type as ts.ObjectType).objectFlags ?? 0;
+
+  return (objectFlags & ts.ObjectFlags.Reference) === 0 ? undefined : (type as ts.TypeReference).target.symbol;
+}
+
 function joinPath(path: string[]): string {
   let out = '';
 
@@ -64,14 +81,19 @@ function joinPath(path: string[]): string {
   return out;
 }
 
-function walk(
-  type: ts.Type,
-  path: string[],
-  seen: Set<ts.Type>,
-  out: Set<string>,
-  checker: ts.TypeChecker,
-  site: ts.Node,
-): void {
+interface Walk {
+  seen: Set<ts.Type>;
+  lineage: ts.Symbol[];
+  out: Set<string>;
+  checker: ts.TypeChecker;
+  site: ts.Node;
+}
+
+function walk(type: ts.Type, path: string[], { seen, lineage, out, checker, site }: Walk): void {
+  if (path.length > MAX_DEPTH) {
+    return;
+  }
+
   const resolved = resolveTypeParameter(type, checker);
 
   if (resolved === null) {
@@ -80,9 +102,11 @@ function walk(
 
   type = resolved;
 
+  const state: Walk = { seen, lineage, out, checker, site };
+
   if (type.isUnion()) {
     for (const member of type.types) {
-      walk(member, path, seen, out, checker, site);
+      walk(member, path, state);
     }
 
     return;
@@ -92,7 +116,7 @@ function walk(
   // constituent covers the merged shape and reuses all object/array/index logic
   if (type.isIntersection()) {
     for (const member of type.types) {
-      walk(member, path, seen, out, checker, site);
+      walk(member, path, state);
     }
 
     return;
@@ -122,7 +146,7 @@ function walk(
   // arrays and tuples: descend into element types under one '[]' segment
   if (checker.isArrayType(type) || isTupleType(type)) {
     for (const element of checker.getTypeArguments(type as ts.TypeReference)) {
-      walk(element, [...path, '[]'], seen, out, checker, site);
+      walk(element, [...path, '[]'], state);
     }
 
     return;
@@ -135,6 +159,12 @@ function walk(
 
     seen.add(type);
 
+    const declaration = declarationOf(type);
+
+    if (declaration && lineage.includes(declaration)) {
+      return;
+    }
+
     // a method/function-valued property means this is class-like (Date, URL, Map, …) — report it whole
     if (hasCallLikeProperty(type, checker, site)) {
       out.add(joinPath(path));
@@ -142,14 +172,16 @@ function walk(
       return;
     }
 
+    const nested: Walk = { ...state, lineage: declaration ? [...lineage, declaration] : lineage };
+
     const indexType = type.getStringIndexType() ?? type.getNumberIndexType();
 
     if (indexType) {
-      walk(indexType, [...path, '[]'], seen, out, checker, site);
+      walk(indexType, [...path, '[]'], nested);
     }
 
     for (const prop of type.getProperties()) {
-      walk(checker.getTypeOfSymbolAtLocation(prop, site), [...path, prop.name], seen, out, checker, site);
+      walk(checker.getTypeOfSymbolAtLocation(prop, site), [...path, prop.name], nested);
     }
 
     return;
@@ -209,7 +241,13 @@ export const islandNotSerializable = createRule<[], 'notSerializable'>({
               continue;
             }
 
-            walk(checker.getTypeOfSymbolAtLocation(prop, tsTagNode), [prop.name], new Set(), out, checker, tsTagNode);
+            walk(checker.getTypeOfSymbolAtLocation(prop, tsTagNode), [prop.name], {
+              seen: new Set(),
+              lineage: [],
+              out,
+              checker,
+              site: tsTagNode,
+            });
           }
         }
 
@@ -223,7 +261,7 @@ export const islandNotSerializable = createRule<[], 'notSerializable'>({
           node: tag,
           messageId: 'notSerializable',
           data: {
-            comp: tag.name,
+            comp: tagName(tag),
             names: names.map((n) => `'${n}'`).join(', '),
             v: names.length > 1 ? 'are' : 'is',
           },

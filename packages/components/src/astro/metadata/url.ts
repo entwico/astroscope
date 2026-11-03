@@ -1,6 +1,18 @@
-/** Prefix a root-relative path (`/x`) with the origin; pass absolute URLs and `undefined` through. */
+/**
+ * Resolve a url against the origin: root-relative (`/x`), protocol-relative (`//cdn/x`) and bare
+ * relative (`x`) paths become absolute, absolute urls and `undefined` pass through. A value that is
+ * no url at all is returned as given.
+ */
 export function toAbsolute(value: string | undefined, origin: string): string | undefined {
-  return value?.startsWith('/') ? origin + value : value;
+  if (value === undefined) {
+    return undefined;
+  }
+
+  try {
+    return new URL(value, `${origin}/`).href;
+  } catch {
+    return value;
+  }
 }
 
 export interface CanonicalInput {

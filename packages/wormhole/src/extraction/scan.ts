@@ -62,16 +62,28 @@ function isMember(node: Node | null): node is Node {
   return node?.type === 'MemberExpression' || node?.type === 'OptionalMemberExpression';
 }
 
+const TS_EXTENSIONS = ['.ts', '.mts', '.cts', '.tsx', '.astro'];
+// compiled astro output is not jsx; compiled mdx is parsed like jsx
+const NO_JSX_EXTENSIONS = ['.ts', '.mts', '.cts', '.astro'];
+
+function isDynamicImportOfPackage(node: Node): boolean {
+  if (node.type !== 'ImportExpression') {
+    return false;
+  }
+
+  const source = node['source'] as Node;
+
+  return source.type === 'StringLiteral' && source['value'] === PACKAGE_NAME;
+}
+
 export function scanWormholeAccess(code: string, id: string): WormholeScan | null {
-  const isTs = id.endsWith('.ts') || id.endsWith('.tsx') || id.endsWith('.astro');
   const plugins: ('typescript' | 'jsx')[] = [];
 
-  if (isTs) {
+  if (TS_EXTENSIONS.some((ext) => id.endsWith(ext))) {
     plugins.push('typescript');
   }
 
-  // compiled astro output is not jsx
-  if (!id.endsWith('.ts') && !id.endsWith('.astro')) {
+  if (NO_JSX_EXTENSIONS.every((ext) => !id.endsWith(ext))) {
     plugins.push('jsx');
   }
 
@@ -116,13 +128,16 @@ export function scanWormholeAccess(code: string, id: string): WormholeScan | nul
     }
   }
 
-  if (locals.size === 0 && !scan.dynamic) {
-    return null;
-  }
-
   walk(
     program,
     (node, parent, key) => {
+      // import('@astroscope/wormhole') hands the proxy over at runtime — its accesses are untrackable
+      if (isDynamicImportOfPackage(node)) {
+        scan.dynamic = true;
+
+        return;
+      }
+
       if (!parent || node.type !== 'Identifier' || !locals.has(node['name'] as string)) {
         return;
       }
@@ -156,6 +171,10 @@ export function scanWormholeAccess(code: string, id: string): WormholeScan | nul
     null,
     '',
   );
+
+  if (locals.size === 0 && !scan.dynamic) {
+    return null;
+  }
 
   return scan;
 }

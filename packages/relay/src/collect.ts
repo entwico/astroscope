@@ -13,57 +13,91 @@ type KeyOption<Ctx> = Ctx extends string
   ? { key?: ((context: Ctx) => string) | undefined }
   : { key: (context: Ctx) => string };
 
+export type Collect = <Ctx, Item>(
+  options: CollectOptions<Ctx, Item> & KeyOption<Ctx>,
+) => (context: Ctx, item: Item) => void;
+
 type Batch<Ctx, Item> = {
   context: Ctx;
   items: Item[];
   cancel: () => void;
 };
 
+/** where the sightings of one scope are kept apart: the current scope and how to run a flush inside it */
+export type CollectScope<Scope extends object> = {
+  current: () => Scope | undefined;
+  run: (scope: Scope, fn: () => void) => void;
+};
+
 const DEFAULT_WITHIN = 500;
 
 /**
- * Folds single sightings into batched events: a list of items is seen one item at a time as the
- * rows enter the viewport, while `view_item_list` is one event with the items. The collector
- * keeps a buffer per key and flushes it after the quiet time, in chunks of at most `max` items.
- * Buffers are shared by every caller of the collector, so sightings with the same key from
- * several components go out as one batch.
+ * Makes the `collect()` of one environment. The scope separates the buffers: sightings seen under
+ * different scope objects never share a batch, and a batch flushes inside the scope it was seen in.
+ * The browser has no scope, the server one per request (its relay context), so a batch there goes
+ * out under the request's consent. Outside any scope the buffers are shared by every caller.
  */
-export function collect<Ctx, Item>(
-  options: CollectOptions<Ctx, Item> & KeyOption<Ctx>,
-): (context: Ctx, item: Item) => void {
-  const { flush, within = DEFAULT_WITHIN } = options;
-  const max = Math.max(1, options.max ?? Infinity);
-  const keyOf = options.key ?? ((context: Ctx) => context as string);
-  const batches = new Map<string, Batch<Ctx, Item>>();
+export function createCollect<Scope extends object>(scope?: CollectScope<Scope> | undefined): Collect {
+  return <Ctx, Item>(options: CollectOptions<Ctx, Item> & KeyOption<Ctx>): ((context: Ctx, item: Item) => void) => {
+    const { flush, within = DEFAULT_WITHIN } = options;
+    const max = Math.max(1, options.max ?? Infinity);
+    const keyOf = options.key ?? ((context: Ctx) => context as string);
+    const unscoped = new Map<string, Batch<Ctx, Item>>();
+    const scoped = new WeakMap<Scope, Map<string, Batch<Ctx, Item>>>();
 
-  const flushBatch = (key: string): void => {
-    const batch = batches.get(key);
+    const batchesOf = (scope: Scope | undefined): Map<string, Batch<Ctx, Item>> => {
+      if (!scope) {
+        return unscoped;
+      }
 
-    if (!batch) {
-      return;
-    }
+      let batches = scoped.get(scope);
 
-    batches.delete(key);
+      if (!batches) {
+        batches = new Map();
+        scoped.set(scope, batches);
+      }
 
-    for (let start = 0; start < batch.items.length; start += max) {
-      flush(batch.context, batch.items.slice(start, start + max));
-    }
-  };
-
-  return (context, item) => {
-    const key = keyOf(context);
-    const existing = batches.get(key);
-
-    existing?.cancel();
-
-    const handle = setTimeout(() => flushBatch(key), within);
-    const batch: Batch<Ctx, Item> = {
-      context: existing?.context ?? context,
-      items: existing?.items ?? [],
-      cancel: () => clearTimeout(handle),
+      return batches;
     };
 
-    batch.items.push(item);
-    batches.set(key, batch);
+    const flushBatch = (batches: Map<string, Batch<Ctx, Item>>, key: string): void => {
+      const batch = batches.get(key);
+
+      if (!batch) {
+        return;
+      }
+
+      batches.delete(key);
+
+      for (let start = 0; start < batch.items.length; start += max) {
+        flush(batch.context, batch.items.slice(start, start + max));
+      }
+    };
+
+    return (context, item) => {
+      const current = scope?.current();
+      const batches = batchesOf(current);
+      const key = keyOf(context);
+      const existing = batches.get(key);
+
+      existing?.cancel();
+
+      const flushScoped = (): void => {
+        if (scope && current) {
+          scope.run(current, () => flushBatch(batches, key));
+        } else {
+          flushBatch(batches, key);
+        }
+      };
+      const handle = setTimeout(flushScoped, within);
+      const batch: Batch<Ctx, Item> = {
+        context: existing?.context ?? context,
+        items: existing?.items ?? [],
+        cancel: () => clearTimeout(handle),
+      };
+
+      batch.items.push(item);
+      batches.set(key, batch);
+    };
   };
 }
