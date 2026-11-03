@@ -1,5 +1,11 @@
 # @astroscope/relay
 
+## 2.0.1
+
+### Patch Changes
+
+- a4c7865: the server report log tells why nothing went out
+
 ## 2.0.0
 
 ### Major Changes
