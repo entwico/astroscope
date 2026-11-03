@@ -151,7 +151,15 @@ describe('track on the server', () => {
     expect(log.debug).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String) }), 'tracked outside a request, nothing reported');
 
     expect(await inRequest(() => track({ a: 'x' }), withConsent('a'))).toEqual(expect.any(String));
-    expect(log.debug).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String) }), 'no consented server destination, nothing reported');
+    expect(log.debug).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String) }), 'no server destination registered, nothing reported');
+
+    configure({ destinations: { a: a.destination } });
+
+    expect(await inRequest(() => track({ a: 'x' }), withConsent('b'))).toEqual(expect.any(String));
+    expect(log.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ id: expect.any(String), consent: { b: true }, destinations: ['a'] }),
+      'no consented server destination, nothing reported',
+    );
 
     configure({ destinations: { a: a.destination }, exclude: (ctx) => ctx.request.headers.get('x-e2e') === '1' });
 
@@ -180,7 +188,11 @@ describe('track on the server', () => {
     await flush();
 
     expect(a.payloads()).toEqual(['x']);
-    expect(log.error).toHaveBeenCalledWith(expect.objectContaining({ destination: 'b', id: 'evt-1' }), 'failed to report conversion');
+    expect(log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.any(Error), destination: 'b', id: 'evt-1' }),
+      'failed to report conversion',
+    );
+    expect(log.debug).toHaveBeenCalledWith(expect.objectContaining({ destination: 'a', id: 'evt-1' }), 'conversion reported');
   });
 
   test('a destination registered under another name is rejected, like in the browser', async () => {

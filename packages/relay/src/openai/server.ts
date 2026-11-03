@@ -65,6 +65,10 @@ export function openAiConversions(options: OpenAiConversionsOptions): ServerDest
       if (!response.ok) {
         throw new Error(`conversions api responded ${response.status}: ${await response.text()}`);
       }
+
+      const answer = await response.text();
+
+      return { status: response.status, body: answer.slice(0, 200) };
     },
   };
 }

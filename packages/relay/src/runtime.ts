@@ -25,8 +25,12 @@ export type ServerEventMeta = EventMeta & {
 export type ServerDestination<N extends DestinationName = DestinationName> = {
   /** the destination's name: its key in every event; by default also the browser destination whose consent it shares */
   name: N;
-  send: (payload: RelayDestinations[N], meta: ServerEventMeta) => void | Promise<void>;
+  /** reports the payload; what it resolves to is logged with the report, e.g. the api's receipt */
+  send: (payload: RelayDestinations[N], meta: ServerEventMeta) => ServerReceipt | Promise<ServerReceipt>;
 };
+
+/** what a conversions api answered, for the log: a trace id, a count — or nothing */
+export type ServerReceipt = Record<string, string | number | undefined> | undefined | void;
 
 /** a server destination of any registered name */
 export type AnyServerDestination = { [N in DestinationName]: ServerDestination<N> }[DestinationName];

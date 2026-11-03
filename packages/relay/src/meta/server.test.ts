@@ -29,7 +29,7 @@ function createFetch() {
   const doFetch = vi.fn((url: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(url), body: JSON.parse(String(init?.body)) as SentBody });
 
-    return Promise.resolve(new Response('{"events_received":1}', { status: 200 }));
+    return Promise.resolve(new Response('{"events_received":1,"fbtrace_id":"AbC"}', { status: 200 }));
   });
 
   return { calls, fetch: doFetch as unknown as typeof fetch };
@@ -40,11 +40,12 @@ describe('metaConversions', () => {
     const { calls, fetch } = createFetch();
     const conversions = metaConversions({ accessToken: 't', pixelId: '123', countryCallingCode: '49', fetch });
 
-    await conversions.send(
+    const receipt = await conversions.send(
       meta.lead({ content_name: 'contact' }, { email: 'Jane@Example.com', phone: '0171 2345678', city: 'München', country: 'de' }),
       createMeta({}, { _fbp: 'fb.1.1.browser', _fbc: 'fb.1.1.click' }),
     );
 
+    expect(receipt).toEqual({ eventsReceived: 1, traceId: 'AbC' });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe('https://graph.facebook.com/v24.0/123/events');
     expect(calls[0]?.body).toEqual({

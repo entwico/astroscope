@@ -1,5 +1,5 @@
 import { hashUser } from '../conversion-user.js';
-import type { RelayRequest, ServerDestination } from '../runtime.js';
+import type { RelayRequest, ServerDestination, ServerReceipt } from '../runtime.js';
 import { withoutQuery } from '../source-url.js';
 import type { MetaEvent } from './shared.js';
 
@@ -77,8 +77,21 @@ export function metaConversions(options: MetaConversionsOptions): ServerDestinat
       if (!response.ok) {
         throw new Error(`conversions api responded ${response.status}: ${await response.text()}`);
       }
+
+      return receiptOf(await response.text());
     },
   };
+}
+
+/** what the api confirms: how many events it took and the trace id to quote in a support request */
+function receiptOf(body: string): ServerReceipt {
+  try {
+    const answer = JSON.parse(body) as { events_received?: number; fbtrace_id?: string };
+
+    return { eventsReceived: answer.events_received, traceId: answer.fbtrace_id };
+  } catch {
+    return { body: body.slice(0, 200) };
+  }
 }
 
 /** the click id in the pixel's cookie format, from the `fbclid` of the page the conversion happened on */

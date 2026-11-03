@@ -1,7 +1,7 @@
 import { on } from '@astroscope/node/events';
 import { shouldExclude } from '@astroscope/node/excludes';
 import { log } from '@astroscope/node/log';
-import type { RelayServerConfig, ServerConsent, ServerEventMeta } from '../runtime.js';
+import type { RelayServerConfig, ServerConsent, ServerEventMeta, ServerReceipt } from '../runtime.js';
 import { type ConsentRecord, type TrackFunction, eventIdOf, payloadOf, toTracked, unusableEventId } from '../shared.js';
 import { getServerConfig } from './config.js';
 import { type RelayRequestContext, getRelayContext } from './context.js';
@@ -9,7 +9,7 @@ import { type RelayRequestContext, getRelayContext } from './context.js';
 // the destinations as the reporter holds them: the payload type is the destination's business
 type Registered = {
   name: string;
-  send(payload: unknown, meta: ServerEventMeta): void | Promise<void>;
+  send(payload: unknown, meta: ServerEventMeta): ServerReceipt | Promise<ServerReceipt>;
 };
 
 // how long a shutdown waits for the reports still in flight; the conversions apis time out sooner
@@ -57,11 +57,22 @@ export const track: TrackFunction = (input) => {
   }
 
   const meta: ServerEventMeta = { id, at: Date.now(), key, request: requestOf(context) };
-  const destinations = registeredDestinations(config.destinations).filter((destination) =>
+  const registered = registeredDestinations(config.destinations);
+
+  if (registered.length === 0) {
+    log.debug({ key, id }, 'no server destination registered, nothing reported');
+
+    return id;
+  }
+
+  const destinations = registered.filter((destination) =>
     consentOf(destination.name, config.consent, context.consent));
 
+  // the record the request carried next to the names it was checked against: what to compare when nothing goes out
   if (destinations.length === 0) {
-    log.debug({ key, id }, 'no consented server destination, nothing reported');
+    const destinationNames = registered.map((destination) => destination.name);
+
+    log.debug({ key, id, consent: context.consent, destinations: destinationNames }, 'no consented server destination, nothing reported');
 
     return id;
   }
@@ -157,9 +168,10 @@ async function drainReports(): Promise<void> {
 
 async function report(destination: Registered, payload: unknown, meta: ServerEventMeta): Promise<void> {
   try {
-    await destination.send(payload, meta);
-    log.debug({ destination: destination.name, key: meta.key, id: meta.id }, 'conversion reported');
+    const receipt = await destination.send(payload, meta);
+
+    log.debug({ ...receipt, destination: destination.name, key: meta.key, id: meta.id }, 'conversion reported');
   } catch (error) {
-    log.error({ error, destination: destination.name, key: meta.key, id: meta.id }, 'failed to report conversion');
+    log.error({ err: error, destination: destination.name, key: meta.key, id: meta.id }, 'failed to report conversion');
   }
 }
