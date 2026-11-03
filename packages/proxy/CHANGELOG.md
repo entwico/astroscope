@@ -1,5 +1,25 @@
 # @astroscope/proxy
 
+## 1.0.0
+
+### Major Changes
+
+- bdbf485: every package of this release is a major: the audit behind it changed behaviour applications may have relied on, so read the entries before upgrading
+- bdbf485: a hook that throws answers 500 instead of 502 "Upstream is down", and releases the upstream connection
+- bdbf485: hop-by-hop headers (`connection`, `keep-alive`, `transfer-encoding`, …) are forwarded in neither direction; chunked uploads and `expect: 100-continue` requests reach the upstream instead of failing with 502
+- bdbf485: the upstream is given 10 s to connect, 60 s to answer with headers and 60 s between body chunks, where there was no limit; `client.connectTimeout` / `headersTimeout` / `bodyTimeout` change them, `0` disables one
+- bdbf485: the path of the `upstream` url, previously ignored, is put in front of every proxied path; an upstream with credentials, a query or a fragment is rejected
+- bdbf485: redirects to the upstream's own origin are rewritten to the site, and cookies scoped to the upstream host lose their `Domain`
+
+### Minor Changes
+
+- bdbf485: the upstream receives `x-forwarded-for` (client address appended), `x-forwarded-host` and `x-forwarded-proto`
+
+### Patch Changes
+
+- bdbf485: the upstream body is read only as fast as the client consumes it; a connection that breaks mid-body errors the response instead of hanging
+- bdbf485: a 205 (and any other null-body status) from the upstream is passed through instead of answering 502
+
 ## 0.4.1
 
 ### Patch Changes

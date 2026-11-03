@@ -1,5 +1,37 @@
 # @astroscope/i18n
 
+## 4.0.0
+
+### Major Changes
+
+- bdbf485: every package of this release is a major: the audit behind it changed behaviour applications may have relied on, so read the entries before upgrading
+- bdbf485: translation chunks are served and fetched under astro's `base`, like `/_astro/` assets
+- bdbf485: an empty translation falls back like a missing one on the server too, so the server and the browser render the same text
+- bdbf485: a resolved locale outside the configured ones falls back to the default locale
+
+### Patch Changes
+
+- bdbf485: translation chunk urls change when a fallback text changes and exist for locales whose translations were never set; a chunk requested under a stale hash is no longer cached as immutable
+- bdbf485: detectLocale() skips languages with q=0 and matches region-tagged locales
+- bdbf485: a message that fails to format is logged once per locale and key through the platform logger instead of a process warning per render
+- bdbf485: source maps of client chunks with the translation loader stay accurate (the loader no longer shifts or erases the mappings)
+- bdbf485: keys, `rich()` tags and chunk names inherited from `Object.prototype` are unknown ones: `t()` falls back, `rich()` ignores the tag instead of throwing, the chunk endpoint answers 404 without echoing the name
+- bdbf485: extraction picks up `rich()` keys and optional calls (`t?.()`), and only `t()` / `rich()` imported from `@astroscope/i18n/translate`, so a local function named `t` keeps its arguments
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+  - @astroscope/node@5.0.0
+
 ## 3.0.1
 
 ### Patch Changes

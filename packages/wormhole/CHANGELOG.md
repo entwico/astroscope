@@ -1,5 +1,33 @@
 # @astroscope/wormhole
 
+## 4.0.0
+
+### Major Changes
+
+- bdbf485: every package of this release is a major: the audit behind it changed behaviour applications may have relied on, so read the entries before upgrading
+- bdbf485: prerendered pages get no wormhole data
+- bdbf485: values read by a page `<script>` are delivered at stream end only on the routes owning that script, no longer on every page where the value is open
+
+### Patch Changes
+
+- bdbf485: wormholes named like an `Object.prototype` member (`constructor`, `toString`, …) are delivered as own entries; `__proto__` is rejected as a name
+- bdbf485: the scan covers `.mts`, `.cts`, `.mjs`, `.cjs` modules, `.mdx` pages and modules reaching the proxy through `import('@astroscope/wormhole')`, which received no wormholes
+- bdbf485: a wormhole value that cannot be serialized is dropped alone instead of withholding the other wormholes of the page
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+  - @astroscope/node@5.0.0
+
 ## 3.0.2
 
 ### Patch Changes

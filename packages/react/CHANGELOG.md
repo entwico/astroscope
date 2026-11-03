@@ -1,5 +1,32 @@
 # @astroscope/react
 
+## 3.0.0
+
+### Major Changes
+
+- bdbf485: every package of this release is a major: the audit behind it changed behaviour applications may have relied on, so read the entries before upgrading
+
+### Patch Changes
+
+- bdbf485: a suspense boundary that threw, or a client-render comment inside injected html, no longer moves an island to the streaming renderer for good
+- bdbf485: the actions form body is parsed once per request, not once per island
+- bdbf485: only the resources react hoists ahead of an island are dropped; in-place stylesheets, slot html and script text keep their `<link>` tags
+- bdbf485: ssr effect stripping leaves non-callback effect arguments and locally rebound hook names untouched
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+- Updated dependencies [bdbf485]
+  - @astroscope/node@5.0.0
+
 ## 2.1.0
 
 ### Minor Changes

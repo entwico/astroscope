@@ -1,5 +1,29 @@
 # @astroscope/node
 
+## 5.0.0
+
+### Major Changes
+
+- bdbf485: requests to action paths astro cannot resolve are recorded as `unknown` in `astro.action.duration` and the span name, instead of minting a series per path
+- bdbf485: every package of this release is a major: the audit behind it changed behaviour applications may have relied on, so read the entries before upgrading
+- bdbf485: idle keep-alive connections stay open 120 s by default, above the idle timeout of traefik, nginx and the cloud balancers, so a proxy no longer reuses a connection node is closing; `keepAliveTimeout` sets it
+- bdbf485: `shutdownTimeout` also bounds `onShutdown` and the telemetry flush: a hanging phase is logged and the process exits instead of waiting for the orchestrator to kill it
+
+### Minor Changes
+
+- bdbf485: server spans and extended request logs redact the values of sensitive query parameters, by default the signed-url credentials of the OpenTelemetry conventions (`OTEL_REDACTED_QUERY_PARAMS`); `redactedQueryParams` sets the list
+
+### Patch Changes
+
+- bdbf485: guard input reads a repeated form field like actions do, the first value, and a guard reading input runs again for a different input within the same request
+- bdbf485: head emissions are inserted before the real `</head>` (never before head-like text inside a script or comment, `<header>` is not the head) and the islands rewriter never injects inside `<script>`/`<style>` within inline svg or mathml
+- bdbf485: `islands: false` no longer withholds the per-island data of `@astroscope/wormhole` and `@astroscope/i18n`; it switches off the preloading only
+- bdbf485: native mounts match the request path with dot segments resolved, the same path astro routes on
+- bdbf485: `rateLimit` drops expired windows as new ones start instead of rescanning every bucket per new key under load
+- bdbf485: a render that rejects outright, or a response node refuses to write, answers 500 instead of leaving the client waiting until the request timeout
+- bdbf485: the static handler never redirects: the trailing-slash setting is enforced by the path redirect ahead of it, which refuses paths browsers resolve against another host
+- bdbf485: pre-compressed variants are served for directory indexes, extension-less pages of `build.format: 'file'` and percent-encoded file names, and never for an encoding the request refuses with `q=0`
+
 ## 4.2.0
 
 ### Minor Changes

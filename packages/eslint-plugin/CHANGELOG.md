@@ -1,5 +1,22 @@
 # @astroscope/eslint-plugin
 
+## 3.0.0
+
+### Major Changes
+
+- bdbf485: `no-excess-jsx-props` checks the elements of optional array props and of tuples
+- bdbf485: every package of this release is a major: the audit behind it changed behaviour applications may have relied on, so read the entries before upgrading
+- bdbf485: `no-astro-define-action` reports `defineAction` reached through a namespace import, a dynamic `import()` or a re-export of `astro:actions`, and leaves type-only imports alone instead of rewriting them into value imports
+- bdbf485: the island rules check components written as member expressions (`<UI.Card client:load>`)
+- bdbf485: `no-raw-strings-in-jsx`: `ignorePatterns` adds to the built-in patterns (exported as `DEFAULT_IGNORE_PATTERNS`) instead of replacing them, an entry that is not a valid regular expression fails the lint run with a message naming it, and text that merely starts with a brace is no longer skipped
+- bdbf485: the i18n call rules (`t-static-key`, `t-requires-meta`, `t-static-meta`, `no-module-level-t`) cover `rich()` too
+- bdbf485: `no-server-action-calls`, `no-registry-import`, `server-readonly` and `no-use-wormhole-in-astro` see through namespace imports, dynamic imports, re-exports, computed members and typescript wrappers (`no-server-action-calls` also every read of `Astro.callAction`, `no-registry-import` also `.mjs`/`.cjs`/`.tsx` registry files)
+
+### Patch Changes
+
+- bdbf485: `island-not-serializable` no longer overflows the stack on a generic props type that expands on every level
+- bdbf485: `prefer-ssr-guard` leaves `typeof` checks on a local binding named like a global alone and offers no `import.meta` fix in commonjs files
+
 ## 2.2.0
 
 ### Minor Changes
