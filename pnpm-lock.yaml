@@ -700,7 +700,7 @@ importers:
         specifier: ^1.1.2
         version: 1.1.2
       '@opentelemetry/api':
-        specifier: ^1.9.1
+        specifier: ^1.10.0
         version: 1.10.0
       '@opentelemetry/exporter-prometheus':
         specifier: ^0.300.0
