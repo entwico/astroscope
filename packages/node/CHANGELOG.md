@@ -1,5 +1,11 @@
 # @astroscope/node
 
+## 5.0.1
+
+### Patch Changes
+
+- 279f39a: `@opentelemetry/api` 1.10 is required, as the sdk line in use needs; a lockfile that kept 1.9 failed the build on a missing `logs` export
+
 ## 5.0.0
 
 ### Major Changes
