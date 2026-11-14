@@ -1,5 +1,11 @@
 # @astroscope/components
 
+## 2.1.0
+
+### Minor Changes
+
+- 94e1ecb: `Page`, `PageMetadata`, `Seo` and `OpenGraph` take `maxImagePreview` (the `max-image-preview` robots directive) and `article` (the `article:*` Open Graph tags; `og:type` then defaults to `article`).
+
 ## 2.0.0
 
 ### Major Changes
