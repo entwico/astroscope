@@ -1,3 +1,15 @@
+/** The `article:*` Open Graph tags of an article page. */
+export type OpenGraphArticle = {
+  /** `article:published_time`. A `Date` or any parseable date string, normalized to ISO 8601 (UTC). */
+  publishedTime?: Date | string | undefined;
+  /** `article:modified_time`. A `Date` or any parseable date string, normalized to ISO 8601 (UTC). */
+  modifiedTime?: Date | string | undefined;
+  /** `article:section` — the one section the article belongs to. */
+  section?: string | undefined;
+  /** `article:tag` — one tag per entry. */
+  tags?: readonly string[] | undefined;
+};
+
 export type SeoAlternate = {
   /** Language/region code, e.g. `en`, `de-CH`, or `x-default`. */
   hreflang: string;
@@ -24,6 +36,11 @@ export type WebpageMetadata = {
    * Google-only; other engines ignore it.
    */
   unavailableAfter?: Date | string | undefined;
+  /**
+   * Largest image preview search engines may show for the page (the `max-image-preview` directive).
+   * `large` is what Google Discover needs for its large cards. Omitted when `noindex`.
+   */
+  maxImagePreview?: 'none' | 'standard' | 'large' | undefined;
   /** Canonical URL (`<link rel="canonical">`). Relative paths are absolutized; omitted when `noindex`. */
   canonical?: string | undefined;
   /** `hreflang` alternates (`<link rel="alternate">`) for other language/region variants. */
@@ -34,8 +51,10 @@ export type WebpageMetadata = {
   ogTitle?: string | undefined;
   /** `og:description` override; falls back to `description`. */
   ogDescription?: string | undefined;
-  /** `og:type`. Defaults to `website`. */
+  /** `og:type`. Defaults to `article` when `article` is set, else `website`. */
   ogType?: string | undefined;
+  /** The `article:*` tags of an article page. */
+  article?: OpenGraphArticle | undefined;
   /** `twitter:card` type. Defaults to `summary_large_image` when an image is set, else `summary`. */
   twitterCard?: 'summary' | 'summary_large_image' | undefined;
   /** `twitter:site` — the site's `@handle`. */
@@ -50,7 +69,7 @@ type WithOrigin = {
 /** Props for `<Seo>` — the search-metadata subset of {@link WebpageMetadata}. */
 export type SeoProps = Pick<
   WebpageMetadata,
-  'title' | 'description' | 'index' | 'follow' | 'canonical' | 'unavailableAfter' | 'alternates'
+  'title' | 'description' | 'index' | 'follow' | 'canonical' | 'unavailableAfter' | 'maxImagePreview' | 'alternates'
 >
 & WithOrigin;
 
@@ -60,7 +79,7 @@ export type SeoProps = Pick<
  */
 export type OpenGraphProps = Pick<
   WebpageMetadata,
-  'title' | 'description' | 'ogType' | 'ogImage' | 'canonical' | 'twitterCard' | 'twitterSite'
+  'title' | 'description' | 'ogType' | 'article' | 'ogImage' | 'canonical' | 'twitterCard' | 'twitterSite'
 >
 & WithOrigin & {
   /** Site name (`og:site_name`). */

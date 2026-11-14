@@ -56,4 +56,20 @@ describe('computeRobots', () => {
       'unavailable_after: 2030-01-01T00:00:00.000Z',
     ]);
   });
+
+  test('max-image-preview is emitted on an otherwise permissive page', () => {
+    expect(computeRobots({ maxImagePreview: 'large' })).toEqual(['max-image-preview:large']);
+  });
+
+  test('max-image-preview is dropped on a noindex page, where nothing is previewed', () => {
+    expect(computeRobots({ index: false, maxImagePreview: 'large' })).toEqual(['noindex']);
+  });
+
+  test('max-image-preview coexists with nofollow and unavailable_after', () => {
+    expect(computeRobots({ follow: false, maxImagePreview: 'standard', unavailableAfter: '2030-01-01' })).toEqual([
+      'nofollow',
+      'max-image-preview:standard',
+      'unavailable_after: 2030-01-01T00:00:00.000Z',
+    ]);
+  });
 });

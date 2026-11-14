@@ -5,7 +5,7 @@ import { resolveCanonical } from './url';
 
 type Props = SeoProps;
 
-const { title, description, index = true, follow = true, unavailableAfter, alternates } = Astro.props;
+const { title, description, index = true, follow = true, unavailableAfter, maxImagePreview, alternates } = Astro.props;
 
 const origin = Astro.props.origin || Astro.url.origin;
 
@@ -16,7 +16,7 @@ const canonical = resolveCanonical({
   hasSearchParams: Astro.url.searchParams.size > 0,
 });
 
-const robots = computeRobots({ index, follow, unavailableAfter });
+const robots = computeRobots({ index, follow, unavailableAfter, maxImagePreview });
 ---
 
 {robots.length > 0 && <meta name="robots" content={robots.join(', ')} />}

@@ -17,6 +17,7 @@ const p = Astro.props;
   follow={p.follow}
   canonical={p.canonical}
   unavailableAfter={p.unavailableAfter}
+  maxImagePreview={p.maxImagePreview}
   alternates={p.alternates}
 />
 
@@ -27,6 +28,7 @@ const p = Astro.props;
   title={p.ogTitle || p.title}
   description={p.ogDescription || p.description}
   ogType={p.ogType}
+  article={p.article}
   canonical={p.canonical}
   ogImage={p.ogImage}
   twitterCard={p.twitterCard}

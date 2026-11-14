@@ -61,4 +61,10 @@ describe('Seo', () => {
     expect(html).not.toContain('rel="canonical"');
     expect(html).not.toContain('rel="alternate"');
   });
+
+  test('emits max-image-preview on an indexable page', async () => {
+    const html = await render({ title: 'Hello', maxImagePreview: 'large' });
+
+    expect(html).toContain('<meta name="robots" content="max-image-preview:large">');
+  });
 });

@@ -115,6 +115,19 @@ const metadata: WebpageMetadata = {
 
 `<PageMetadata>` emits title, description, `robots`, an absolutized `<link rel="canonical">` (only when `index`), the full `og:*` set **including `og:url`**, a `twitter:card`, and `<link rel="alternate" hreflang>` for every `alternates` entry. Relative `canonical` / `ogImage` values are absolutized against the request origin, which is whatever `Host` the request named: in production pass `origin` from your config, or set astro's `security.allowedDomains`.
 
+For an article page, pass `article` and `maxImagePreview`:
+
+```astro
+<PageMetadata
+  siteName="example.com"
+  {...metadata}
+  maxImagePreview="large"
+  article={{ publishedTime: post.publishedAt, modifiedTime: post.updatedAt, section: 'News', tags: post.tags }}
+/>
+```
+
+`article` renders the `article:*` tags and makes `og:type` default to `article`; `maxImagePreview` adds the `max-image-preview` directive to `robots` on an indexable page (`large` is what Google Discover needs for its large cards).
+
 Everything `<PageMetadata>` renders belongs in `<head>`. JSON-LD is intentionally **not** included — it's valid in `<head>` or at the end of `<body>`, so place `<JsonLd>` separately wherever you prefer.
 
 Need only a piece? Use `<Seo>` (search metadata) or `<OpenGraph>` (social) directly — each resolves its own URLs (canonical / `og:url` absolutization), so they work standalone. `<PageMetadata>` is just a distributor that splits the props across the two.

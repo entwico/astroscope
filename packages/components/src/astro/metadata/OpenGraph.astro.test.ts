@@ -53,4 +53,42 @@ describe('OpenGraph', () => {
 
     expect(html).toContain('<meta name="twitter:card" content="summary">');
   });
+
+  test('article tags switch og:type to article and normalize the dates to ISO 8601', async () => {
+    const html = await render({
+      siteName: 'Site',
+      title: 'Hello',
+      article: {
+        publishedTime: '2030-01-01',
+        modifiedTime: new Date('2030-06-15T12:00:00Z'),
+        section: 'News',
+        tags: ['robots', 'lawn'],
+      },
+    });
+
+    expect(html).toContain('<meta property="og:type" content="article">');
+    expect(html).toContain('<meta property="article:published_time" content="2030-01-01T00:00:00.000Z">');
+    expect(html).toContain('<meta property="article:modified_time" content="2030-06-15T12:00:00.000Z">');
+    expect(html).toContain('<meta property="article:section" content="News">');
+    expect(html).toContain('<meta property="article:tag" content="robots">');
+    expect(html).toContain('<meta property="article:tag" content="lawn">');
+  });
+
+  test('an explicit ogType wins over the article default', async () => {
+    const html = await render({ siteName: 'Site', title: 'Hello', ogType: 'video.other', article: { section: 'News' } });
+
+    expect(html).toContain('<meta property="og:type" content="video.other">');
+  });
+
+  test('an unparseable article date is dropped', async () => {
+    const html = await render({ siteName: 'Site', title: 'Hello', article: { publishedTime: 'not a date' } });
+
+    expect(html).not.toContain('article:published_time');
+  });
+
+  test('renders no article tags without the article prop', async () => {
+    const html = await render({ siteName: 'Site', title: 'Hello' });
+
+    expect(html).not.toContain('property="article:');
+  });
 });
