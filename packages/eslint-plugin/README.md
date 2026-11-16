@@ -35,6 +35,7 @@ export default [
 | `@astroscope/island-not-serializable`                | error    |         | yes        | require a hydrated island's props to be directly serializable plain data          |
 | `@astroscope/no-client-directive-on-astro-component` | error    |         |            | disallow `client:*` directives on Astro components (they only hydrate frameworks) |
 | `@astroscope/no-html-comments`                       | error    | yes     |            | disallow HTML comments in `.astro` templates — they render into the output HTML   |
+| `@astroscope/no-frontmatter-only-page`               | error    |         |            | disallow `.astro` pages with frontmatter but no template — write a `.ts` endpoint |
 | `@astroscope/no-server-action-calls`                 | error    |         |            | disallow calling actions during server rendering of `.astro` files                |
 | `@astroscope/prefer-ssr-guard`                       | error    | yes     |            | prefer `import.meta.env.SSR` over `typeof window !== 'undefined'` (and friends)   |
 | `@astroscope/no-astro-define-action`                 | error    | yes     |            | require the platform `defineAction` (with guards) instead of the `astro:actions` one |
@@ -133,6 +134,29 @@ HTML comments (`<!-- -->`) in `.astro` templates render into the served HTML and
 
 Autofix rewrites `<!-- x -->` → `{/* x */}`. Declines to autofix when the comment body contains `*/` (would terminate the JSX comment early).
 
+### `no-frontmatter-only-page`
+
+An `.astro` file under `pages/` with frontmatter and no template only redirects or responds, which is what an endpoint is for. Whitespace and comments do not count as a template; components and other non-page files are not checked.
+
+```astro
+---
+// flagged: src/pages/onboarding/index.astro
+const { denied, account } = await guard(Astro, [onboarding]);
+
+if (denied) return denied;
+
+return Astro.redirect(await getOnboardingResumeRoute(account.id), 302);
+---
+```
+
+```ts
+// clean: src/pages/onboarding/index.ts
+export const GET = defineRoute({
+  guards: [onboarding],
+  handler: async ({ locals, redirect }) => redirect(await getOnboardingResumeRoute(locals.account.id), 302),
+});
+```
+
 ### `no-astro-define-action`
 
 `defineAction` from `astro:actions` has no place for guards; `@astroscope/node/guards` exports a `defineAction` that takes `guards` and narrows `locals` for the handler. The other `astro:actions` exports (`ActionError`, `getActionContext`, `actions`) stay legal, and so do type-only imports. The fix rewrites the named import; a namespace import, a dynamic `import()` and a re-export are reported without a fix.
@@ -203,6 +227,9 @@ Rules for projects using `@astroscope/i18n`, opt-in alongside `recommended`. The
 | `@astroscope/i18n/t-static-key`          | error    |         | first argument must be a static string literal (dynamic keys break build-time extraction)                   |
 | `@astroscope/i18n/t-static-meta`         | warn     |         | second argument must be statically analyzable: no concatenation, interpolation or tagged templates (extraction reads it at build time) |
 | `@astroscope/i18n/t-requires-meta`       | warn     |         | second argument (fallback/meta) should be provided for development DX                                       |
+| `@astroscope/i18n/t-valid-message`       | error    |         | the fallback must be a valid MessageFormat 2 message using known functions                                  |
+| `@astroscope/i18n/t-message-values`      | error    |         | the values passed must match the variables of the fallback message                                          |
+| `@astroscope/i18n/rich-message-components` | error  |         | the components passed to `rich()` must match the markup tags of the fallback message                        |
 | `@astroscope/i18n/no-t-reassign`         | error    |         | forbids aliasing or reassigning `t` (the extractor only recognizes `t()` calls)                             |
 | `@astroscope/i18n/no-raw-strings-in-jsx` | warn     |         | warns when raw strings appear in JSX that may need translation                                              |
 
@@ -274,6 +301,50 @@ import { t } from '@astroscope/i18n/translate';
 import { t as translate } from '@astroscope/i18n/translate';
 const translate = t;
 ```
+
+### `t-valid-message`
+
+Parses the fallback as MessageFormat 2 and reports syntax errors, selectors without an annotation or a catch-all variant, and functions `@astroscope/i18n` does not know.
+
+```ts
+// good
+t('count', '{$count :number} items', { count });
+
+// bad
+t('count', '{$count :number items', { count }); // unclosed placeholder
+t('count', '{$count :nubmer} items', { count }); // unknown function
+```
+
+### `t-message-values`
+
+Compares the variables of the fallback message with the values passed to `t()` (third argument) or `rich()` (fourth argument), and with the `variables` meta. Values that are not an inline object literal (a variable, a call, an object with a spread) are checked for missing names through their TypeScript type when the file is linted with type information, and left alone otherwise; so are types that can hold any name (`any`, `Record<string, …>`). Unused values are reported for the named keys of an inline object only, since a wider object passed as a variable is fine.
+
+```ts
+// good
+t('greeting', 'Hello {$name}', { name });
+
+// bad
+t('greeting', 'Hello {$name}'); // no `name` value
+t('greeting', 'Hello', { name }); // `name` is not used
+t('greeting', 'Hello {name}', { name }); // `{name}` is literal text, the variable is `{$name}`
+t('greeting', { fallback: 'Hello {$name}', variables: { user: { description: '…' } } }, { name }); // stale meta
+```
+
+### `rich-message-components`
+
+Compares the markup tags of the fallback message with the components passed to `rich()`, with the same handling of components that are not an inline object literal. Also reports tags that are not opened and closed in pairs.
+
+```tsx
+// good
+rich('tos', 'Read our {#link}Terms{/link}', { link: (children) => <a href="/tos">{children}</a> });
+
+// bad
+rich('tos', 'Read our {#link}Terms{/link}', {}); // no `link` component
+rich('tos', 'Read our Terms', { link: (children) => <a href="/tos">{children}</a> }); // `link` is not used
+rich('tos', 'Read our {#link}Terms', { link }); // never closed
+```
+
+These three rules read the fallback only; a translation that drops a variable or a tag is not their concern.
 
 ### `no-raw-strings-in-jsx`
 

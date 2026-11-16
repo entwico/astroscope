@@ -1,6 +1,6 @@
 import type { MessagePart } from 'messageformat';
 import { describe, expect, test } from 'vitest';
-import { formatMessageToParts } from './compiler';
+import { compileMessage, formatMessageToParts } from './compiler';
 import { type RichComponents, partsToNodes } from './rich';
 
 type Part = MessagePart<string>;
@@ -80,8 +80,33 @@ describe('partsToNodes', () => {
     expect(partsToNodes(parts, {})).toEqual(['a', 'b']);
   });
 
-  test('stringifies value-bearing parts like numbers', () => {
-    const parts = [text('count: '), { type: 'number', value: 5 } as unknown as Part];
+  test('renders number variables, annotated or not', () => {
+    const annotated = formatMessageToParts('de', 'count: {$count :number}', { count: 1234 });
+    const bare = formatMessageToParts('de', 'count: {$count}', { count: 1234 });
+
+    expect(partsToNodes(annotated, {})).toEqual(['count: ', '1.234']);
+    expect(partsToNodes(bare, {})).toEqual(['count: ', '1.234']);
+  });
+
+  test('renders formatted variables the way format() does', () => {
+    const message = '{$n :integer} / {$price :currency currency=EUR} / {$share :percent} / {$day :date}';
+    const values = { n: 5, price: 9.5, share: 0.5, day: new Date(0) };
+
+    const nodes = partsToNodes(formatMessageToParts('de', message, values), {});
+
+    expect(nodes.join('')).toBe(compileMessage('de', message)(values));
+  });
+
+  test('renders a number variable inside markup and a plural match', () => {
+    const message = '.input {$count :number}\n.match $count\none {{{#b}{$count}{/b} Ergebnis}}\n* {{{#b}{$count}{/b} Ergebnisse}}';
+
+    const nodes = partsToNodes<Node>(formatMessageToParts('de', message, { count: 78 }), { b: tag('strong') });
+
+    expect(nodes).toEqual([{ tag: 'strong', children: ['78'] }, ' Ergebnisse']);
+  });
+
+  test('stringifies parts carrying a plain value', () => {
+    const parts = [text('count: '), { type: 'unknown', value: 5 } as unknown as Part];
 
     expect(partsToNodes(parts, {})).toEqual(['count: ', '5']);
   });

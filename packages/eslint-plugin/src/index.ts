@@ -11,6 +11,7 @@ import { islandReadonly } from './rules/island-readonly.js';
 import { noAstroDefineAction } from './rules/no-astro-define-action.js';
 import { noClientDirectiveOnAstroComponent } from './rules/no-client-directive-on-astro-component.js';
 import { noExcessJsxProps } from './rules/no-excess-jsx-props.js';
+import { noFrontmatterOnlyPage } from './rules/no-frontmatter-only-page.js';
 import { noHtmlComments } from './rules/no-html-comments.js';
 import { noServerActionCalls } from './rules/no-server-action-calls.js';
 import { preferSsrGuard } from './rules/prefer-ssr-guard.js';
@@ -34,6 +35,7 @@ const plugin: ESLint.Plugin & { configs: Record<string, Linter.Config | Linter.C
     'no-client-directive-on-astro-component': noClientDirectiveOnAstroComponent as unknown as Rule.RuleModule,
     'no-server-action-calls': noServerActionCalls,
     'no-astro-define-action': noAstroDefineAction,
+    'no-frontmatter-only-page': noFrontmatterOnlyPage,
   },
   configs: {},
 };
@@ -63,6 +65,7 @@ plugin.configs.recommended = [
       '@astroscope/island-not-serializable': 'error',
       '@astroscope/no-client-directive-on-astro-component': 'error',
       '@astroscope/no-server-action-calls': 'error',
+      '@astroscope/no-frontmatter-only-page': 'error',
       '@astroscope/no-astro-define-action': 'error',
     },
   },

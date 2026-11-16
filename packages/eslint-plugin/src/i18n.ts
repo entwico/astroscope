@@ -2,10 +2,13 @@ import type { ESLint, Linter } from 'eslint';
 import { noModuleLevelT } from './rules/i18n/no-module-level-t.js';
 import { noRawStringsInJsx } from './rules/i18n/no-raw-strings-in-jsx.js';
 import { noTReassign } from './rules/i18n/no-t-reassign.js';
+import { richMessageComponents } from './rules/i18n/rich-message-components.js';
 import { tImportSource } from './rules/i18n/t-import-source.js';
+import { tMessageValues } from './rules/i18n/t-message-values.js';
 import { tRequiresMeta } from './rules/i18n/t-requires-meta.js';
 import { tStaticKey } from './rules/i18n/t-static-key.js';
 import { tStaticMeta } from './rules/i18n/t-static-meta.js';
+import { tValidMessage } from './rules/i18n/t-valid-message.js';
 
 /**
  * The i18n rules keep their own plugin namespace (`@astroscope/i18n`) so rule
@@ -22,6 +25,9 @@ export const i18nPlugin: ESLint.Plugin = {
     't-static-key': tStaticKey,
     't-static-meta': tStaticMeta,
     't-requires-meta': tRequiresMeta,
+    't-valid-message': tValidMessage,
+    't-message-values': tMessageValues,
+    'rich-message-components': richMessageComponents,
     'no-raw-strings-in-jsx': noRawStringsInJsx,
     'no-t-reassign': noTReassign,
   },
@@ -39,6 +45,9 @@ export const i18nConfigs: Linter.Config[] = [
       '@astroscope/i18n/t-static-key': 'error',
       '@astroscope/i18n/t-static-meta': 'warn',
       '@astroscope/i18n/t-requires-meta': 'warn',
+      '@astroscope/i18n/t-valid-message': 'error',
+      '@astroscope/i18n/t-message-values': 'error',
+      '@astroscope/i18n/rich-message-components': 'error',
       '@astroscope/i18n/no-t-reassign': 'error',
       '@astroscope/i18n/no-raw-strings-in-jsx': 'warn',
     },

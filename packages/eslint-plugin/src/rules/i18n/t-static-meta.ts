@@ -40,7 +40,7 @@ export const tStaticMeta: Rule.RuleModule = {
     },
     messages: {
       dynamicMeta:
-        '`t()` {{ field }} must be a static string literal. String concatenation and template expressions cannot be extracted at build time — use an MF2 template with variables instead, e.g. `t(key, "Hello {name}", { name })`.',
+        '`t()` {{ field }} must be a static string literal. String concatenation and template expressions cannot be extracted at build time — use an MF2 template with variables instead, e.g. `t(key, "Hello {$name}", { name })`.',
       taggedMeta:
         '`t()` {{ field }} must be a plain string literal. A tagged template such as `String.raw` is a call the extractor cannot evaluate at build time — write the escapes in a plain string instead.',
     },

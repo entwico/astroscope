@@ -114,6 +114,7 @@ export default function RichTextDemo() {
           <br />
           <code>{'Text with {#unknown}missing component{/unknown}'}</code>
           <br />→{' '}
+          {/* eslint-disable-next-line @astroscope/i18n/rich-message-components -- shows how a tag without a component renders */}
           {rich('demo.rich.missing', 'Text with {#unknown}missing component{/unknown}', {
             // no 'unknown' component provided - children are rendered without wrapper
           })}

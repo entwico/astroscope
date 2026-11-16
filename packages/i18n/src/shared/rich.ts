@@ -67,6 +67,20 @@ function componentFor<T>(components: RichComponents<T>, name: string): RichCompo
   return Object.hasOwn(components, name) ? components[name] : undefined;
 }
 
+// formatted placeholders (numbers, dates, currencies) carry no `value` of their own,
+// only the Intl sub-parts
+function stringifyPart(part: Part): string | undefined {
+  if ('parts' in part && Array.isArray(part.parts)) {
+    return part.parts.map((subPart) => String(subPart.value)).join('');
+  }
+
+  if ('value' in part && part.value !== undefined && part.value !== null) {
+    return String(part.value);
+  }
+
+  return undefined;
+}
+
 function applyMarkupPart<T>(
   part: MessageMarkupPart,
   stack: StackFrame<T>[],
@@ -149,9 +163,9 @@ export function partsToNodes<T>(parts: Part[], components: RichComponents<T>): (
     } else if (part.type === 'bidiIsolation') {
       // bidi isolation marks are direction control characters, not content
     } else {
-      if ('value' in part && part.value !== undefined && part.value !== null) {
-        const stringValue = String(part.value);
+      const stringValue = stringifyPart(part);
 
+      if (stringValue !== undefined) {
         target.push(stringValue);
       }
     }

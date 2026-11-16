@@ -47,7 +47,8 @@
   },
   "dependencies": {
     "@typescript-eslint/type-utils": "^8.72.1",
-    "@typescript-eslint/utils": "^8.72.1"
+    "@typescript-eslint/utils": "^8.72.1",
+    "messageformat": "^4.1.0"
   },
   "devDependencies": {
     "@types/estree": "^1.0.10",

@@ -72,3 +72,18 @@ export function importExpressionSource(node: Linked): string | null {
 
   return null;
 }
+
+/** Strips the typescript wrappers off an expression, so `{ a } as const` reads like `{ a }`. */
+export function unwrapInward(node: Node): Node {
+  let current = node;
+
+  while (TS_WRAPPERS.has(current.type)) {
+    const inner = (current as { expression?: Node }).expression;
+
+    if (!inner) break;
+
+    current = inner;
+  }
+
+  return current;
+}
