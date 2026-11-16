@@ -1,5 +1,11 @@
 # @astroscope/i18n
 
+## 4.0.1
+
+### Patch Changes
+
+- ad30fda: render numbers, dates and currencies in `rich()`
+
 ## 4.0.0
 
 ### Major Changes

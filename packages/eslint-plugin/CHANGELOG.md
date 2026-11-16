@@ -1,5 +1,12 @@
 # @astroscope/eslint-plugin
 
+## 3.1.0
+
+### Minor Changes
+
+- ad30fda: add `t-valid-message`, `t-message-values` and `rich-message-components` to `configs.i18n`: the fallback is checked as MessageFormat 2 and compared with the values and components passed
+- ad30fda: add `no-frontmatter-only-page` to `configs.recommended`: an `.astro` page without a template should be a `.ts` endpoint
+
 ## 3.0.0
 
 ### Major Changes
