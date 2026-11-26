@@ -1,5 +1,12 @@
 # @astroscope/proxy
 
+## 1.0.1
+
+### Patch Changes
+
+- 3cf97be: trim the readme to the api and document previously missing options and defaults
+- 3cf97be: update dependencies
+
 ## 1.0.0
 
 ### Major Changes

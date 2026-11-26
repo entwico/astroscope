@@ -1,5 +1,15 @@
 # @astroscope/wormhole
 
+## 4.0.1
+
+### Patch Changes
+
+- 3cf97be: trim the readme to the api and document previously missing options and defaults
+- 3cf97be: update dependencies
+- Updated dependencies [3cf97be]
+- Updated dependencies [3cf97be]
+  - @astroscope/node@5.0.2
+
 ## 4.0.0
 
 ### Major Changes

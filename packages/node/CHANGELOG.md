@@ -1,5 +1,12 @@
 # @astroscope/node
 
+## 5.0.2
+
+### Patch Changes
+
+- 3cf97be: trim the readme to the api and document previously missing options and defaults
+- 3cf97be: update dependencies
+
 ## 5.0.1
 
 ### Patch Changes
