@@ -229,7 +229,7 @@ export const noRawStringsInJsx: Rule.RuleModule = {
         if (current.type === 'JSXAttribute') {
           const attrName = getAttributeName(current);
 
-          return attrName ? shouldIgnoreAttribute(attrName) : false;
+          return attrName !== null && shouldIgnoreAttribute(attrName);
         }
 
         current = current.parent;
@@ -290,13 +290,10 @@ export const noRawStringsInJsx: Rule.RuleModule = {
 
         if (!inJsxExpression) return;
 
-        // skip strings inside function calls (e.g. t('key', 'fallback'))
         if (ancestors.some((a: any) => a.type === 'CallExpression')) return;
 
-        // skip strings in comparisons (e.g. value === 'some-string')
         if (node.parent?.type === 'BinaryExpression') return;
 
-        // skip strings in type assertions (e.g. 'some-string' as const)
         if (node.parent?.type === 'TSAsExpression') return;
 
         const text: string = node.value;

@@ -33,7 +33,6 @@ type ReactElementLike = {
 
 /**
  * Duck-type check for React elements without importing React.
- * Uses Symbol.for() which returns the same symbol React uses internally.
  */
 function isReactElement(value: unknown): value is ReactElementLike {
   if (typeof value !== 'object' || value === null || !('$$typeof' in value)) {

@@ -1,5 +1,6 @@
 import type { CapWidget as CapWidgetElement } from 'cap-widget';
-import React, { type CSSProperties, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type React from 'react';
+import { type CSSProperties, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CAP_API_ENDPOINT, type CapSession, createCapSession, registerCapWidget } from '../client/index.js';
 import { CAP_FIELD_NAME } from '../shared.js';
 

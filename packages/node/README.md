@@ -1,24 +1,23 @@
 # @astroscope/node
 
-Opinionated, cloud-friendly Node adapter for Astro: boot lifecycle, health probes, request logging, telemetry, CSRF and static serving run as plain code around `server.listen()`.
+Opinionated, cloud-friendly Node adapter for Astro: boot lifecycle, health probes, request logging, telemetry, CSRF and static serving.
 
 ## What it does
 
 - **Boot lifecycle** — `onStartup` runs before the port opens, `onShutdown` after in-flight requests drain (`src/boot.ts`)
-- **Warmup** — pages, middleware and actions are loaded in parallel with startup and awaited before `listen()`
+- **Warmup** — pages, middleware and actions are loaded before the port opens
 - **Health probes** — Kubernetes-style liveness/readiness on a separate port, with registrable checks
-- **Request logging** — pino at the native handler: real status code, response size, ttfb, aborted connections, static responses included
+- **Request logging** — pino: real status code, response size, ttfb, aborted connections, static responses included
 - **Telemetry** — OpenTelemetry NodeSDK, undici fetch instrumentation, runtime + host metrics, Prometheus reader
 - **CSRF protection** — origin check for unsafe methods, with path exclusions
-- **Path redirects** — duplicate slashes (`//about`) and a trailing slash that contradicts `trailingSlash` (`/about/`) redirect to the canonical URL, in dev as in prod (astro's dev server answers the latter with a 404 page instead)
+- **Path redirects** — duplicate slashes (`//about`) and a trailing slash that contradicts `trailingSlash` (`/about/`) redirect to the canonical URL, in dev as in prod
 - **Platform entry files** — env loading → `src/config.ts` → `src/instrumentation.ts` → `src/log.ts` → boot, each picked up automatically when the file exists
-- **Island preloading** — each island's JS is preloaded in parallel instead of being discovered module by module, removing the hydration request waterfall ([Island preloading](#island-preloading))
+- **Island preloading** — each island's JS is preloaded in parallel ([Island preloading](#island-preloading))
 - **Pre-compressed static serving** — build-time brotli/gzip variants, negotiated per `Accept-Encoding`
 - **Native mounts** — http-native handlers (`oidc-provider`, ACME) mounted on the adapter's server
 - **Build tweaks** — SSR sourcemaps
-- **Image processing off unless configured** — without an explicit `image.service`, any `astro:assets` use fails loudly instead of opening astro's on-demand sharp endpoint ([Image processing](#image-processing))
+- **Image processing off unless configured** — without an explicit `image.service`, any `astro:assets` use fails loudly ([Image processing](#image-processing))
 - **Dev restart machinery** — changes to the boot file or entry seams restart the dev server behind a holding page
-- **Dev island warmup** — `.astro` sources are scanned for `client:*` components; their deps are pre-optimized and their module graphs warmed at server start, preventing "504 Outdated Optimize Dep" hydration failures from vite's lazy dep discovery
 - **HTTPS for development** — `SERVER_CERT_PATH` / `SERVER_KEY_PATH` serve TLS directly for local runs of the built server ([HTTPS](#https)); in production, terminate TLS at the ingress
 
 ## What it does NOT do — beware
@@ -27,10 +26,10 @@ The adapter assumes a container behind a load balancer / reverse proxy (Kubernet
 
 - **Opens `0.0.0.0:9090` in production** — the health probe server. Meant for the kubelet; do not expose it publicly.
 - **Opens `0.0.0.0:9464` in production** — the Prometheus metrics reader. Same: cluster-internal only.
-- **Trusts any `Host` / `X-Forwarded-Host`** — sets `security.allowedDomains: [{}]` unless you set it yourself, because the reverse proxy is expected to control these headers. Without one, host header injection is possible.
-- **Trusts `X-Forwarded-For`** — anything that keys on the client address uses the header as received, because the reverse proxy is expected to set it. Exposed directly, a client can send its own.
-- **Overrides Astro security and config defaults** — `security.checkOrigin: false` (the embedded CSRF middleware replaces it; `csrf: false` restores Astro's check), `build.redirects: false` (redirects handled at runtime), `trailingSlash: 'never'` (only when yours is at the default `'ignore'`), `astro:assets` disabled when `image.service` is at its default ([Image processing](#image-processing)).
-- **Limits request bodies to 1 MiB** — every request astro handles, pages and endpoints included, not only actions as astro does. An upload route needs `bodySizeLimit` raised (native mounts are not covered).
+- **Trusts any `Host` / `X-Forwarded-Host`** — sets `security.allowedDomains: [{}]` unless you set it yourself. Your reverse proxy must control these headers.
+- **Trusts `X-Forwarded-For`** — anything that keys on the client address uses the header as received. Your reverse proxy must set it.
+- **Overrides Astro security and config defaults** — `security.checkOrigin: false` (the embedded CSRF middleware replaces it; `csrf: false` restores Astro's check), `build.redirects: false`, `trailingSlash: 'never'` (only when yours is at the default `'ignore'`), `astro:assets` disabled when `image.service` is at its default ([Image processing](#image-processing)).
+- **Limits request bodies to 1 MiB** — every request astro handles, pages and endpoints included. An upload route needs `bodySizeLimit` raised (native mounts are not covered).
 - **Standalone only.** No middleware mode — the adapter always owns the server.
 - **No session driver.** Astro sessions are unsupported unless you configure `session.driver` yourself.
 - **No health probes in dev.** The health server only exists in production and `astro preview`.
@@ -63,11 +62,9 @@ export async function onShutdown() {
 
 `astro preview` runs the full production path (boot, warmup, health, static serving).
 
-In dev, the boot file and the entry files below run through the adapter's own watch/restart machinery: changes to the boot file, its dependency graph, or the config/log files restart the dev server behind a holding page that releases when the new generation is ready.
-
 ### Boot context access
 
-Anywhere in server code (including libraries), `getBootContext()` returns the running server's `BootContext` — or `undefined` when no @astroscope/node server has booted in the process (unit tests, one-off scripts). Libraries can use it to adapt to dev mode without making consumers thread the flag through:
+Anywhere in server code (including libraries), `getBootContext()` returns the running server's `BootContext` — or `undefined` when no @astroscope/node server has booted in the process (unit tests, one-off scripts):
 
 ```typescript
 import { getBootContext } from '@astroscope/node/boot';
@@ -75,11 +72,9 @@ import { getBootContext } from '@astroscope/node/boot';
 const dev = getBootContext()?.dev ?? false;
 ```
 
-It is stamped before the platform entry files and the boot lifecycle run, in both prod and dev (re-stamped per dev restart generation).
-
 ### Lifecycle events
 
-A library that needs to run at boot or shutdown without a line in the site's `src/boot.ts` listens on `@astroscope/node/events`: `on(event, handler)` and `off(event, handler)` for `beforeOnStartup`, `afterOnStartup`, `beforeOnShutdown` and `afterOnShutdown`. Handlers get the `BootContext`, run in registration order and are awaited one by one; `afterOnShutdown` runs even when `onShutdown` threw.
+A library that needs to run at boot or shutdown without a line in the site's `src/boot.ts` listens on `@astroscope/node/events`: `on(event, handler)` and `off(event, handler)` for `beforeOnStartup`, `afterOnStartup`, `beforeOnShutdown` and `afterOnShutdown`. Handlers get the `BootContext`; `afterOnShutdown` runs even when `onShutdown` threw.
 
 ```typescript
 import { on } from '@astroscope/node/events';
@@ -91,7 +86,7 @@ on('beforeOnShutdown', async () => {
 
 ## Platform entry files
 
-Besides `src/boot.ts`, three more files are picked up automatically when they exist. In production they run in this order inside `startServer()`, before anything else; in dev they re-run per restart generation (instrumentation only once per process):
+Besides `src/boot.ts`, three more files are picked up automatically when they exist. They run in this order:
 
 ```
 env loading → src/config.ts → src/instrumentation.ts → src/log.ts → boot → warmup → listen
@@ -99,7 +94,7 @@ env loading → src/config.ts → src/instrumentation.ts → src/log.ts → boot
 
 **Env loading**: `CONFIG_PATH` env var → `./.env` → none. Existing process env vars win; each outcome is logged.
 
-**`src/config.ts`** — schema + load (e.g. @entwico/zod-conf), nothing else; validation runs at import. On failure: in production the buffered logs are dumped to the console with the error and the process exits 1; in dev the boot gate keeps the holding page up with the error.
+**`src/config.ts`** — schema + load (e.g. @entwico/zod-conf), nothing else; validation runs at import.
 
 ```typescript
 // src/config.ts
@@ -108,7 +103,7 @@ import zc from '@entwico/zod-conf';
 export const config = zc.define({ MONGO_URL: zc.env('MONGO_URL').string() }).load({ env: process.env });
 ```
 
-**`src/instrumentation.ts`** — extra instrumentation only (the standard bundle is a platform default, see Telemetry). Loaded once per process — dev restarts are in-process, so changes here need a full dev-server restart.
+**`src/instrumentation.ts`** — extra instrumentation only (the standard bundle is a platform default, see Telemetry). Loaded once per process: changes here need a full dev-server restart.
 
 ```typescript
 // src/instrumentation.ts
@@ -119,7 +114,7 @@ export function register(ctx: InstrumentationContext) {
 }
 ```
 
-**`src/log.ts`** — pino logger _options_ (a static object or a factory), never a logger instance. The platform constructs the logger itself, after instrumentation, and adds a mixin that stamps `trace_id`/`span_id`/`trace_flags` onto every entry when a span is active. This file runs after env loading and `src/config.ts`, so the options may safely read config.
+**`src/log.ts`** — pino logger _options_ (a static object or a factory), never a logger instance. Entries carry `trace_id`/`span_id`/`trace_flags` when a span is active. The options may read config.
 
 ```typescript
 // src/log.ts
@@ -157,15 +152,15 @@ log.error(err, 'operation failed');
 const dbLog = log.child({ component: 'db' });
 ```
 
-Entries logged before the logger is constructed (env loading, config, instrumentation) are buffered (cap 100) and replayed once construction completes — the original timestamp is kept as a `bufferedTime` field. If startup dies before the logger exists, the buffer is dumped to the console together with the error.
+Entries logged before the logger is constructed (env loading, config, instrumentation) are buffered and replayed once construction completes — the original timestamp is kept as a `bufferedTime` field. If startup dies before the logger exists, the buffer is dumped to the console together with the error.
 
-Request logging happens at the native handler on `finish`/`close`: real status code, response size, `ttfb`, aborted-vs-completed, and the route pattern. An incoming `x-request-id` header is passed through (and echoed on the response); otherwise a short id is generated.
+Request log lines carry the real status code, response size, `ttfb`, aborted-vs-completed, and the route pattern. An incoming `x-request-id` header is passed through (and echoed on the response); otherwise a short id is generated.
 
-Responses the adapter sends itself get a route label of their own: `static` for a file served from the client dir (public assets, prerendered pages, 200 and 304 alike), `duplicate-slashes` and `trailing-slash` for the path redirects, `body-limit` for a refused body, and a native mount's `name` for observability.
+Responses the adapter sends itself get a route label of their own: `static` for a file served from the client dir (public assets, prerendered pages, 200 and 304 alike), `duplicate-slashes` and `trailing-slash` for the path redirects, `body-limit` for a refused body, and a native mount's `name`.
 
 ### Reporting the route yourself
 
-The route comes from the route astro matched, which is wrong for a middleware that serves a request astro has no page for — one that rewrites via `next(url)`, or answers itself. Astro matches `/404` there, so the request is logged and measured as `/404`. `overrideRequestRoute` lets the middleware report what it actually served:
+A middleware that serves a request astro has no page for — one that rewrites via `next(url)`, or answers itself — is logged and measured as `/404`. `overrideRequestRoute` lets it report what it actually served:
 
 ```typescript
 import { overrideRequestRoute } from '@astroscope/node/log';
@@ -182,24 +177,24 @@ export const onRequest: MiddlewareHandler = (ctx, next) => {
 };
 ```
 
-This fixes the log line, the metric and the server span name together. Pass a templated label, not a concrete path, so metric cardinality stays bounded. An overridden route always wins over the one astro matched, regardless of middleware order.
+This fixes the log line, the metric and the server span name together. Pass a templated label, not a concrete path. An overridden route always wins over the one astro matched, regardless of middleware order.
 
 The adapter itself emits exactly one info line on startup — `server ready { host, port, health, bootMs, warmupMs, totalMs }` — and `draining` / `shutdown complete { drainMs }` on the way down. Everything else is debug or error level.
 
 ## Telemetry
 
-`node({ telemetry })` ships the standard bundle: NodeSDK, fetch instrumentation via undici (diagnostics-channel based — no `--import` needed), Node runtime + host metrics, and a Prometheus reader on `0.0.0.0:9464`. **Prod: on by default. Dev: off by default** (opt in with `telemetry: { dev: true }`).
+`node({ telemetry })` ships the standard bundle: NodeSDK, undici fetch instrumentation, Node runtime + host metrics, and a Prometheus reader on `0.0.0.0:9464`. **Prod: on by default. Dev: off by default** (opt in with `telemetry: { dev: true }`).
 
-- server spans start at the native handler with W3C context extraction; the route pattern and span name are enriched by the internal middleware
+- server spans extract W3C trace context and are named after the route pattern
 - `url.query` carries the query string with the values of `redactedQueryParams` replaced by `REDACTED`, by default the signed-url credentials of OpenTelemetry's semantic conventions (exported as `OTEL_REDACTED_QUERY_PARAMS`); an application secret in a query string (an oauth `code`, a reset `token`) needs adding. The same applies to the `query` of extended request logs
 - request metrics: `http.server.request.duration`, `http.server.active_requests`, `astro.action.duration` (`astro.action.name` is the registry name, any other `/_actions/` path counts as `unknown`); fetch metrics come from the undici instrumentation
 - `astro.render.failures` {`http.route`} counts renders that failed after the status went out; the response is truncated on the wire, the request log line reads `request truncated` at error level and the server span carries `astro.response.truncated`
 - the boot lifecycle gets `startup` (with `boot`/`warmup`/`listen` children) and `shutdown` (with `drain`/`onShutdown`) spans
-- trace exporters are driven by the standard `OTEL_*` env vars; without a configured OTLP endpoint, trace exporting defaults to `none` (no failing localhost exports)
+- trace exporters are driven by the standard `OTEL_*` env vars; without a configured OTLP endpoint, trace exporting defaults to `none`
 - `OTEL_SDK_DISABLED=true` turns the SDK off entirely
 - the other astroscope packages record through the same SDK and are no-ops without it — their instruments are documented with them: [`@astroscope/react`](../react/README.md), [`@astroscope/wormhole`](../wormhole/README.md), [`@astroscope/i18n`](../i18n/README.md)
 
-There is no helper for tracing server-render sections: measuring a subtree's render would require buffering it, which disables streaming. Wrap frontmatter awaits with `tracer.startActiveSpan()` from `@opentelemetry/api` instead — that's where the time lives, and it nests under the request span without touching the stream.
+There is no helper for tracing server-render sections: wrap frontmatter awaits with `tracer.startActiveSpan()` from `@opentelemetry/api`.
 
 ## Health checks
 
@@ -215,14 +210,13 @@ export async function onStartup() {
 }
 ```
 
-- probes flip in order: live during startup, ready only after `listen()`, draining begins the moment a shutdown signal arrives
-- a check fails by throwing or returning `{ status: 'unhealthy' }`; failing required checks turn `readyz` unhealthy (`optional: true` checks don't affect it, `timeout` defaults to 5s)
+- a check fails by throwing or returning `{ status: 'unhealthy' }`; failing required checks turn the readiness probe unhealthy (`optional: true` checks don't affect it, `timeout` defaults to 5s)
 - `registerHealthCheck` returns an unregister function, but cleanup is optional: checks still registered after `onShutdown` are removed automatically
 - when no health runtime is active (dev mode, `health: false`), registration is a no-op — no dev/prod branching needed in boot files
 
 ## Native mounts
 
-For Node libraries that need the real `(req, res)` — `oidc-provider`'s `callback()`, ACME challenge handlers — mount them on the adapter's server instead of faking Node objects inside astro middleware:
+For Node libraries that need the real `(req, res)` — `oidc-provider`'s `callback()`, ACME challenge handlers — mount them on the adapter's server:
 
 ```typescript
 // src/boot.ts
@@ -233,17 +227,15 @@ export function onStartup() {
 }
 ```
 
-- the handler owns the response completely: matched requests are dispatched before static serving and never reach astro middleware or rendering, so machine endpoints need no csrf exclusions
-- the handler gets the real request and response: streaming bodies, `socket.remoteAddress`, set-cookie arrays
+- the handler owns the response completely: matched requests never reach astro middleware, so they need no csrf exclusions
 - requests stay inside request logging and tracing; `name` becomes the route label for logs, metrics and span names
 - identical in dev
 - matching: `prefix` (segment-aware, longest wins) or a `match(req)` predicate consulted after prefixes, in registration order
 - returns an unregister function; mounts are cleared automatically after `onShutdown` (and between dev restart generations)
-- handler errors are logged and answered with a 500 (unless the handler already sent headers)
 
 ## Guards
 
-Astro has no route guards: middleware is global and sees only the route pattern, and a page's exports are not loaded before it runs. `@astroscope/node/guards` puts protection where the request lands, with the types to match: a guard either denies or proves something, and what it proves is required on `locals` for the guarded code only. `App.Locals` keeps the honest shape (`user?: User`).
+`@astroscope/node/guards` puts protection where the request lands, with the types to match: a guard either denies or proves something, and what it proves is required on `locals` for the guarded code only. `App.Locals` keeps the honest shape (`user?: User`).
 
 ```typescript
 // src/guards.ts
@@ -285,7 +277,7 @@ export const server = {
 };
 ```
 
-Endpoints wrap the same way. The body is read only when a guard in the list declares `input`, then its fields come from a json or form body:
+Endpoints wrap the same way; fields a guard declares in `input` come from a json or form body:
 
 ```typescript
 import { defineRoute } from '@astroscope/node/guards';
@@ -332,7 +324,7 @@ export const onRequest = sequence(
 );
 ```
 
-Patterns are the exclude-pattern vocabulary (`prefix`, `exact`, `suffix`, `includes`, `pattern`). It is defence in depth, not a replacement for the page-level call: a middleware cannot narrow `locals`, so pages inside the area still call `guard(Astro, [...])` for the typed proofs; a guard that passed runs once per request.
+Patterns are the exclude-pattern vocabulary (`prefix`, `exact`, `suffix`, `includes`, `pattern`). It is defence in depth, not a replacement for the page-level call: a middleware cannot narrow `locals`, so pages inside the area still call `guard(Astro, [...])` for the typed proofs.
 
 A server island renders through astro's own endpoint, outside a prefix rule for the page's path: a component that must not render for everyone calls `guard(Astro, [...])` in its own frontmatter.
 
@@ -344,7 +336,7 @@ The package ships the guards that depend on the request alone; the ones that dep
 
 A fixed window per key, in memory and per process: the `max`-th request within `window` ms still passes, the next one is denied with `TOO_MANY_REQUESTS` (429) until the window ends. The key is the client address by default; `key(ctx)` picks another subject (a user id, a target email) or returns `undefined` to exempt a request. Per process means per replica.
 
-Put it first in a list, so a flood is refused before a guard that costs something runs:
+Put it first in a list:
 
 ```typescript
 import { captcha } from '@astroscope/cap/server';
@@ -355,7 +347,7 @@ guards: [rateLimit({ max: 5, window: 60_000 }), captcha()],
 
 ## Exclude patterns
 
-`@astroscope/node/excludes` ships the shared exclude-pattern vocabulary for middlewares. Matching itself comes from [`@entwico/dash/match`](https://github.com/entwico/dash); `ExcludePattern` is the serializable subset of dash's `StringPattern` (`exact` / `prefix` / `suffix` / `includes` / `pattern`).
+`@astroscope/node/excludes` ships the shared exclude-pattern vocabulary for middlewares. An `ExcludePattern` is one of `exact` / `prefix` / `suffix` / `includes` / `pattern`.
 
 ```typescript
 import { RECOMMENDED_EXCLUDES, shouldExclude, withExcluded } from '@astroscope/node/excludes';
@@ -374,25 +366,23 @@ For hot paths, compile the set once with `createMatcher` from `@entwico/dash/mat
 
 ## Island preloading
 
-Without it, an island's JS loads as a chain: the browser fetches the component module, parses it, discovers its imports, fetches those, and so on. In production the adapter knows each island's chunks from the build and emits preload tags next to the island, so the browser fetches everything in parallel. Deferred islands (`client:visible`, `client:idle`, `client:media`) are preloaded just ahead of their hydration.
-
-Always on in production; `islands: false` disables the preloading only.
+In production each island's JS is preloaded in parallel, deferred islands just ahead of their hydration. Always on in production; `islands: false` disables the preloading only.
 
 ## Pre-compressed static serving
 
-At build time, every compressible file in `dist/client` gets max-quality `.br` (brotli 11) and `.gz` (gzip 9) variants written next to it — variants that don't shrink the file are skipped. At request time the static handler negotiates `Accept-Encoding` and serves the best variant with the original's content-type, `content-encoding`, `vary: accept-encoding` and per-variant etags (304s included).
+At build time compressible files in `dist/client` get `.br` and `.gz` variants; the static handler serves the best one per `Accept-Encoding`.
 
 ## Embedded build tweaks
 
 Always on, no configuration:
 
-- **SSR sourcemaps** — the server bundle gets sourcemaps for readable stack traces; client bundles stay unmapped so browsers can't fetch source
+- **SSR sourcemaps** — the server bundle gets sourcemaps; client bundles stay unmapped
 
 SSR effect stripping for React islands lives in [`@astroscope/react`](../react).
 
 ## Image processing
 
-Astro's default sharp service makes `/_image` an on-demand endpoint anyone can drive, so the adapter keeps image processing off unless you ask for it:
+Image processing is off unless you ask for it:
 
 ```typescript
 node({
@@ -419,8 +409,9 @@ node({
   // Kubernetes-style probes on a separate port. Enabled by default in
   // production (never active in dev); false disables.
   health: {
-    host: '0.0.0.0', // falls back to HEALTH_HOST env, then 0.0.0.0 (kubelet probes hit the pod IP)
+    host: '0.0.0.0', // falls back to HEALTH_HOST env, then 0.0.0.0
     port: 9090, // falls back to HEALTH_PORT env, then 9090
+    paths: { live: '/livez', startup: '/startupz', ready: '/readyz', health: '/healthz' }, // probe endpoints (the defaults)
   },
 
   // CSRF protection (origin check for POST/PUT/PATCH/DELETE with exclusions).
@@ -429,12 +420,12 @@ node({
     exclude: [{ exact: '/api/auth/backchannel-logout' }],
   },
 
-  // request logging at the native handler. Enabled by default in production;
+  // request logging. Enabled by default in production;
   // false disables it (the log proxy keeps working).
   logging: {
     exclude: [{ prefix: '/internal/' }], // replaces RECOMMENDED_EXCLUDES
     extended: false, // query (redacted per redactedQueryParams)/headers/client address (may capture sensitive data)
-    dev: false, // also log requests in dev (astro narrates them already)
+    dev: false, // also log requests in dev
   },
 
   // platform telemetry. Enabled by default in production, off in dev; false disables.
@@ -489,12 +480,7 @@ This only affects the built server. The dev server is Vite's — configure `vite
 
 ## Shutdown sequence
 
-On SIGTERM/SIGINT:
-
-1. readiness probe starts failing, `draining` is logged
-2. the server stops accepting connections and waits up to `shutdownTimeout` for in-flight requests
-3. the `beforeOnShutdown` listeners run, then `onShutdown`, then the `afterOnShutdown` listeners — bounded by `shutdownTimeout`; a hanging phase is logged and left behind
-4. `shutdown complete { drainMs }` is logged, the health server stops, telemetry flushes (bounded the same way), the process exits with code 0
+On SIGTERM/SIGINT the readiness probe fails and `draining` is logged; in-flight requests, the shutdown hooks and the telemetry flush are each bounded by `shutdownTimeout`; `shutdown complete { drainMs }` is logged and the process exits with code 0.
 
 ## License
 

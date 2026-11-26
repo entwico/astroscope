@@ -1,8 +1,5 @@
 import type { APIContext } from 'astro';
 
-/**
- * HTTP client configuration options
- */
 export interface ClientOptions {
   /**
    * Max concurrent requests per origin
@@ -47,18 +44,12 @@ export interface ClientOptions {
   bodyTimeout?: number | undefined;
 }
 
-/**
- * Options for configuring the proxy handler
- */
 export interface ProxyOptions {
   /**
    * Upstream URL to proxy requests to (e.g., "https://legacy.example.com")
    */
   upstream: string;
 
-  /**
-   * HTTP client configuration
-   */
   client?: ClientOptions | undefined;
 
   /**

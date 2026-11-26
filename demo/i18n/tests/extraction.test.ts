@@ -47,7 +47,7 @@ async function fetchText(url: string): Promise<string> {
 
 function extractBadgeCount($: CheerioAPI, label: string): number | null {
   const badge = $(`.collapse-title:contains('${label}')`).find('.badge').text();
-  const match = badge.match(/(\d+)/);
+  const match = /(\d+)/.exec(badge);
 
   return match ? Number(match[1]) : null;
 }

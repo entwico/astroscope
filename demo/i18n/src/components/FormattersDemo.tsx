@@ -1,21 +1,6 @@
 import { t } from '@astroscope/i18n/translate';
 
-/**
- * Demo component showcasing all MF2 formatters.
- *
- * Default functions (always available):
- * - :number - locale-aware number formatting
- * - :integer - integer formatting (no decimals)
- * - :string - string formatting
- *
- * Draft functions (enabled via DraftFunctions):
- * - :currency - currency formatting (requires currency option or wrapped value)
- * - :date - date formatting
- * - :time - time formatting
- * - :datetime - combined date+time formatting
- * - :percent - percentage formatting
- * - :unit - unit formatting (e.g., kilometers, kilograms)
- */
+/** every MF2 formatter, default and draft functions */
 export default function FormattersDemo() {
   // use fixed date to avoid hydration mismatch between SSR and client
   const now = new Date('2026-01-15T14:30:00Z');
@@ -153,14 +138,14 @@ export default function FormattersDemo() {
           </strong>{' '}
           (escaping literal braces)
           <br />
-          {/* eslint-disable-next-line unicorn/prefer-string-raw -- the i18n extractor reads only plain string literals */}
+          { }
           {t('demo.escape_braces', 'Code example: \\{\\{$name\\}\\} outputs {$name}', { name: 'value' })}
         </div>
 
         <div>
           <strong>Escaped in pattern</strong>
           <br />
-          {/* eslint-disable-next-line unicorn/prefer-string-raw -- the i18n extractor reads only plain string literals */}
+          { }
           {t('demo.escape_pattern', 'Use \\| for OR in regex: a\\|b')}
         </div>
       </div>

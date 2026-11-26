@@ -7,7 +7,6 @@ export const TS_EXTENSIONS = ['.ts', '.tsx'] as const;
 /** JSX extensions (need 'jsx' babel plugin) */
 export const JSX_EXTENSIONS = ['.jsx', '.tsx'] as const;
 
-/** Plain JS extensions */
 export const JS_EXTENSIONS = ['.js', '.jsx'] as const;
 
 /**

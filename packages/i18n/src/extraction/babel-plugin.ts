@@ -14,9 +14,6 @@ type PluginState = PluginPass & { opts: I18nExtractPluginOpts };
 
 type ReportFn = (reason: string) => void;
 
-/**
- * Extract string value from AST node
- */
 function getStringValue(t: typeof BabelTypes, node: Node): string | null {
   if (t.isStringLiteral(node)) {
     return node.value;
@@ -94,9 +91,6 @@ function extractMeta(t: typeof BabelTypes, node: Expression, report: ReportFn): 
   return { fallback: '' };
 }
 
-/**
- * Extract variables definition from object expression
- */
 function extractVariables(
   t: typeof BabelTypes,
   obj: ObjectExpression,

@@ -23,7 +23,6 @@ export const tStaticKey: Rule.RuleModule = {
 
         if (firstArg.type === 'Literal' && typeof firstArg.value === 'string') return;
 
-        // allow template literals with no expressions: `checkout.title`
         if (firstArg.type === 'TemplateLiteral' && firstArg.expressions.length === 0) return;
 
         context.report({ node: firstArg, messageId: 'dynamicKey' });

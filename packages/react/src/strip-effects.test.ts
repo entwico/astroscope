@@ -130,7 +130,7 @@ describe('stripSsrEffectsPlugin — replacement behavior', () => {
     expect(transform(code, '/src/Island.tsx', { ssr: true })).toBeNull();
   });
 
-  test('handles react subpath imports (react/jsx-runtime, etc.)', () => {
+  test('stubs effects imported from react subpaths', () => {
     const transform = getTransform();
     const code = [`import { useEffect } from 'react/foo';`, `useEffect(() => { thing(); });`].join('\n');
 

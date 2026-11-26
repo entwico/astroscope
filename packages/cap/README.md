@@ -30,11 +30,11 @@ export default defineConfig({
 | ------ | ---------- | ------------------------------------------------- |
 | `path` | `'/_cap/'` | Prefix the challenge/redeem proxy is served under |
 
-The proxy middleware is injected automatically (`pre` order), so `src/middleware.ts` stays untouched.
+The proxy middleware is injected automatically, so `src/middleware.ts` stays untouched.
 
 ### 2. Configure the service in your boot file
 
-The credentials are runtime secrets, so they never go into `astro.config.ts`:
+The credentials are configured at runtime, in `src/boot.ts`:
 
 ```ts
 // src/boot.ts
@@ -50,7 +50,7 @@ export function onStartup() {
 }
 ```
 
-`baseUrl` is the service's origin with an optional base path. Until `cap.configure()` has run, the proxy answers `503` and the guard denies with `SERVICE_UNAVAILABLE`. A service that cannot be reached answers `502`, one that does not answer within 10 s `504`; redirects from the service are not followed.
+`baseUrl` is the service's origin with an optional base path. Until `cap.configure()` has run, the proxy answers `503` and the guard denies with `SERVICE_UNAVAILABLE`. A service that cannot be reached answers `502`, one that times out `504`.
 
 ### 3. Guard the request
 
@@ -71,7 +71,7 @@ export const server = {
 };
 ```
 
-The guard adds `_cap` to the input schema itself; put `rateLimit` ahead of it, so a flood of invented tokens never reaches siteverify. The same `captcha()` goes into `defineRoute` for endpoints and `guard(Astro, [...])` for pages — see [`@astroscope/node/guards`](../node/README.md#guards) for `rateLimit`, `defineRoute` and `guard`. On a json or form body the token is read from the `_cap` field.
+The guard adds `_cap` to the input schema itself; put `rateLimit` ahead of it. `captcha({ name })` sets the guard's name in denials and logs (default `'captcha'`). The same `captcha()` goes into `defineRoute` for endpoints and `guard(Astro, [...])` for pages — see [`@astroscope/node/guards`](../node/README.md#guards) for `rateLimit`, `defineRoute` and `guard`. On a json or form body the token is read from the `_cap` field.
 
 ### 4. Solve on the client
 
@@ -95,7 +95,7 @@ export function NewsletterForm() {
     const { error } = await actions.subscribe({ email, _cap });
   };
 
-  // prepare on the first field's focus: solving runs while the visitor types, submit finds a token ready
+  // prepare on the first field's focus
   return (
     <form>
       <input type="email" onFocus={cap.prepare} />
@@ -105,7 +105,7 @@ export function NewsletterForm() {
 }
 ```
 
-- `cap.prepare()` starts solving in the background, unless a usable token is already there or on its way. `useCap({ eager: false })` turns it into a no-op, so solving happens only on submit.
+- `cap.prepare()` starts solving in the background. `useCap({ eager: false })` turns it into a no-op, so solving happens only on submit.
 - `await cap.ensure()` resolves the token for the request, solving if needed. Each token is handed out once, so the next `ensure()` solves again.
 
 Without React, `@astroscope/cap/client` exports the same `createCapSession()` and the lower-level `solveCap()`.
@@ -114,6 +114,7 @@ The checkbox widget:
 
 ```tsx
 import { CapWidget, useCapWidget } from '@astroscope/cap/react';
+import { actions } from 'astro:actions';
 
 export function ContactForm() {
   const widget = useCapWidget();
@@ -138,7 +139,7 @@ export function ContactForm() {
 
 `CapWidget` props: `labels` (the widget's texts, camelCase keys of the `data-cap-i18n-*` attributes), `lang`, `required` (unsolved blocks the form's native submit), `workers`, `troubleshootingUrl`, `className`, `style` (`--cap-*` custom properties theme the widget through its shadow root). The widget writes the token into a hidden `_cap` field as well, so a plain `<form method="POST">` to a guarded page or endpoint carries it without any script of yours. It renders empty until the cap client has loaded, so reserve its height (58px).
 
-Hand-written widgets outside React: `registerCapWidget()` from `@astroscope/cap/client` loads the client once, pointed at the bundled solvers; `CAP_API_ENDPOINT` and `CAP_FIELD_NAME` fill `data-cap-api-endpoint` and `data-cap-hidden-field-name`.
+Hand-written widgets outside React: call `registerCapWidget()` from `@astroscope/cap/client` first; `CAP_API_ENDPOINT` and `CAP_FIELD_NAME` fill `data-cap-api-endpoint` and `data-cap-hidden-field-name`.
 
 ### Rejections
 
@@ -148,12 +149,12 @@ Hand-written widgets outside React: `registerCapWidget()` from `@astroscope/cap/
 | token rejected (`success: false` or a 4xx from Cap) | `ActionError` `FORBIDDEN`                      | the page renders with the error as the action result | `403`           |
 | Cap unreachable, 5xx, wrong credentials or not configured | `ActionError` `SERVICE_UNAVAILABLE`            | same, `SERVICE_UNAVAILABLE`                          | `503`           |
 
-Endpoints and pages answer per the request: `{ error: { code, message } }` for an api caller, a plain status page for a browser navigation. A token is verified once per request, however many `captcha()` guards see it.
+Endpoints and pages answer per the request: `{ error: { code, message } }` for an api caller, a plain status page for a browser navigation.
 
 ## Notes
 
 - **Logging**: rejected tokens log at `info`, an unreachable or misconfigured Cap service at `error`.
-- **No third-party requests**: the wasm solvers and the pako fallback are served from your origin, nothing is fetched from a CDN, and the widget's credits link opens without the page url or a referrer. Browsers without WebAssembly or Web Workers can't solve.
+- **No third-party requests**: nothing is fetched from a CDN, and the widget's credits link opens without the page url or a referrer. Browsers without WebAssembly or Web Workers can't solve.
 - **Privacy policy**: two first-party processings to name — the visitor's IP is forwarded to your Cap service for rate limiting, and Cap's instrumentation step runs a bot-detection script from your service in a sandboxed iframe and sends its browser signals back to it.
 - **Content Security Policy**: the solver needs `worker-src blob:` and `'wasm-unsafe-eval'`, and Cap's instrumentation step runs an inline script in a sandboxed `srcdoc` iframe (`window.CAP_SCRIPT_NONCE` passes a nonce through).
 

@@ -40,8 +40,8 @@ export type CaptchaOptions = {
 /**
  * Guard for requests that need a solved captcha: the token arrives in the `_cap` field (an action
  * input key, a form field, a json body key) and is verified with the cap service — one token per
- * request, cap rejects a second use. Denies with `FORBIDDEN` for a missing or rejected token and
- * `SERVICE_UNAVAILABLE` when cap cannot be reached or is not configured.
+ * request, cap rejects a second use. A missing token is an input error (`BAD_REQUEST`), a rejected one
+ * is denied with `FORBIDDEN`, and `SERVICE_UNAVAILABLE` when cap cannot be reached or is not configured.
  */
 // the return type stays inferred: it carries the `_cap` input shape into the action's client type
 export function captcha(options: CaptchaOptions = {}) {

@@ -67,7 +67,7 @@ describe('getManifest', () => {
     expect(getManifest().keys[0]?.files).toEqual(['/somewhere/src/a.ts:3']);
   });
 
-  test('handles locations without a line number', () => {
+  test('relativizes file locations that carry no line number', () => {
     const state = getGlobalState();
 
     state.projectRoot = '/project';

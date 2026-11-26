@@ -17,7 +17,7 @@ export function createHttpAgent(options?: ClientOptions): Agent {
   return new Agent({
     pipelining: config.pipelining,
     allowH2: config.allowH2,
-    maxConcurrentStreams: config.maxConcurrentStreams,
+    h2Options: { maxConcurrentStreams: config.maxConcurrentStreams },
     keepAliveTimeout: config.keepAliveTimeout,
     headersTimeout: config.headersTimeout,
     bodyTimeout: config.bodyTimeout,

@@ -52,7 +52,6 @@ export async function scan(options: ScanOptions): Promise<KeyStore> {
     files.map(async (file) => {
       let code = await fs.promises.readFile(file, 'utf8');
 
-      // quick check: skip files without i18n translate import
       if (!code.includes('@astroscope/i18n/translate')) {
         return { file, keys: null, errors: [] };
       }

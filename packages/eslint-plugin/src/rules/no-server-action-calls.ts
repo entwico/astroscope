@@ -7,17 +7,7 @@ import { type Linked, callOf, memberName, memberOff } from '../utils/ast.js';
  * plain GET page render. Calling an action there executes the mutation on
  * every render, outside the action endpoint's POST-only + origin-checked
  * delivery, and couples the page to the controller: logic needed by both an
- * action and astro code belongs in its own module both can import. A direct
- * `actions.<name>()` call also throws `ActionCalledFromServerError` at
- * runtime; `Astro.callAction()` is Astro's escape hatch around that error and
- * is flagged the same. References that are not calls stay legal: passing
- * `actions.<name>` to a form `action` attribute or to
- * `Astro.getActionResult()` is the intended server-side usage. The registry is
- * followed through its named import and through a namespace import of
- * `astro:actions`; typescript wrappers (`actions.like!()`, `(actions.like as
- * any)()`) and computed members with a static key read like the plain form.
- * `callAction` is reported wherever it is read off `Astro`, a call or not,
- * since any other read (`const { callAction } = Astro`) only serves a call.
+ * action and astro code belongs in its own module both can import.
  */
 
 // climbs a member chain (`actions.blog.comment.like`) to its outermost access

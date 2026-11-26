@@ -16,9 +16,6 @@ function compareKeys(a: string, b: string): number {
   return a < b ? -1 : 1;
 }
 
-/**
- * Compute hash for chunk translations
- */
 export function computeChunkHash(translations: RawTranslations, keys: string[]): string {
   const relevantTranslations: RawTranslations = {};
   const sortedKeys = keys.toSorted(compareKeys);
@@ -32,9 +29,6 @@ export function computeChunkHash(translations: RawTranslations, keys: string[]):
   return hashString(JSON.stringify(relevantTranslations));
 }
 
-/**
- * Compute hashes for all chunks in manifest
- */
 export function computeAllChunkHashes(translations: RawTranslations, manifest: ChunkManifest): Record<string, string> {
   const hashes: Record<string, string> = {};
 

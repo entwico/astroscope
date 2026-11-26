@@ -1,6 +1,3 @@
-/**
- * Circular dependency test: B imports A, A imports B
- */
 import { t } from '@astroscope/i18n/translate';
 import CircularA from './CircularA.js';
 

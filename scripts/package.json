@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "@jridgewell/remapping": "^2.3.5",
-    "monocart-coverage-reports": "^3.2.0"
+    "monocart-coverage-reports": "^3.3.0"
   },
   "devDependencies": {
-    "@types/node": "^26.6.6",
+    "@types/node": "^26.6.10",
     "typescript": "^6.0.3"
   }
 }

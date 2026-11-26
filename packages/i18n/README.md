@@ -2,26 +2,15 @@
 
 i18n for Astro + React islands — automatic tree-shaking, parallel loading, any translation source.
 
-## Why this library?
-
-**SSR-first** — Built for Astro's SSR + islands architecture, where client-only i18n libraries have no server story.
-
-**Automatic tree-shaking** — Only the translations each component actually uses are delivered to the browser. No manual chunk splitting or configuration.
-
-**Parallel loading** — Translation chunks preload alongside component code with plain `client:*` directives (via `@astroscope/node`), so hydration doesn't wait on a separate translation fetch.
-
-**Unified API** — The same `t()` function works in Astro templates and React islands.
-
-**Any translation source** — Fetch translations from any provider: JSON files, database, headless CMS, TMS, or custom API. All are chunked and optimized the same way.
-
 ## Features
 
 - **Per-chunk translation loading** — each island gets only its translations
-- **Unicode MessageFormat 2** (MF2) support via `messageformat` v4
+- **One `t()`** in Astro templates and React islands
+- **Any translation source** — JSON files, database, headless CMS, TMS, or custom API
+- **Unicode MessageFormat 2** (MF2)
 - **Built-in formatters** — `:number`, `:integer`, `:percent`, `:currency`, `:date`, `:time`, `:datetime`, `:unit`
 - **Fallback strings in code** — used during development, stripped from production bundles, available to translators through the manifest
 - **Full TypeScript support**
-- **Tiny client runtime** — ~8KB gzipped for translations
 
 ## Installation
 
@@ -64,7 +53,7 @@ i18n({
 
 #### Middleware
 
-The integration injects two middlewares: one serving the `/_i18n/` translation chunks ahead of your own middleware, and the locale middleware after it, so the locale resolver sees what a session middleware put on `locals`.
+The integration injects its middlewares itself; the locale resolver runs after your own middleware and sees what it put on `locals`.
 
 Both middlewares are injected in the order of your `integrations` array.
 
@@ -138,7 +127,7 @@ export function CheckoutSummary() {
 
 > **Note:** Variables use `{$name}` syntax (with `$` prefix) per MessageFormat 2 specification.
 
-That's it — client delivery is automatic. Use plain `client:*` directives; translations are injected into the page and preloaded per island by `@astroscope/node`.
+That's it — client delivery is automatic with plain `client:*` directives.
 
 ## API
 
@@ -258,47 +247,14 @@ i18n.clear();        // all locales
 i18n.clear('en');    // specific locale
 ```
 
-### Lazy loading with React.lazy()
-
-Translations load automatically for lazy-loaded components.
-
-```tsx
-import { Suspense, lazy } from 'react';
-
-const StatsModal = lazy(() => import('./StatsModal'));
-
-export function App() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <StatsModal />
-    </Suspense>
-  );
-}
-```
-
-## How it works
-
-1. **Build time** — all `t()` calls are extracted, mapped to chunks, and fallbacks are stripped from production bundles
-2. **Manifest** — Extracted keys with fallbacks are written to `i18n-manifest.json`
-3. **SSR** — the locale middleware provides translations to `t()`, merging manifest fallbacks for missing keys
-4. **Client** — each island preloads only the translation chunks its code needs, in parallel with the component code
-
-The same `import { t } from '@astroscope/i18n/translate'` works everywhere — bundler picks the correct implementation via conditional exports (`browser` vs `default`).
-
-### Client bundle
-
-Translation chunks ship as raw MessageFormat 2 strings and are compiled in the browser on first use — the whole client runtime is ~8KB gzipped.
-
-### Telemetry
+## Telemetry
 
 Through the adapter's telemetry (no-op without its SDK):
 
-- `astro.i18n.missing` {`astro.i18n.locale`} — lookups that fell back; the key goes to a debug log line (`missing translation`), never into the label
+- `astro.i18n.missing` {`astro.i18n.locale`} — lookups that fell back; the key goes to a debug log line (`missing translation`)
 - `astro.i18n.translations.age` {`astro.i18n.locale`} — seconds since the locale's last `setTranslations`
 
-A message that fails to format (an unresolved variable, an input a formatter cannot take) renders messageformat's best effort and is logged once (`translation failed to format`).
-
-`/_i18n/` chunk requests are excluded from request logging and telemetry by the adapter's default excludes.
+A message that fails to format is logged as `translation failed to format`.
 
 ## MessageFormat 2 Syntax
 
@@ -381,21 +337,7 @@ For `:currency` and `:unit`, the required option (`currency` or `unit`) can be:
 
 ## ESLint Plugin
 
-Use the `i18n` config set from [`@astroscope/eslint-plugin`](../eslint-plugin) to enforce correct `t()` usage and catch build-time extraction issues:
-
-```bash
-npm install -D @astroscope/eslint-plugin
-```
-
-```js
-// eslint.config.js
-import astroscope from '@astroscope/eslint-plugin';
-
-export default [
-  ...astroscope.configs.recommended,
-  ...astroscope.configs.i18n,
-];
-```
+Use the `i18n` config set from [`@astroscope/eslint-plugin`](../eslint-plugin#i18n-rules-configsi18n) to enforce correct `t()` usage.
 
 ## License
 

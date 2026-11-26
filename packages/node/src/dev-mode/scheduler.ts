@@ -24,7 +24,6 @@ export class RestartScheduler {
   // set while a restart chain is running. the gate probes it (`isRestartPending`)
   // to short-circuit requests, and awaits it (`waitForRestart`) on readiness.
   private _runPromise: Promise<void> | undefined;
-  // set when a restart attempt fails
   private _lastFailure: { message: string } | undefined;
 
   constructor(

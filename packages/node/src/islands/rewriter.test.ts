@@ -122,7 +122,7 @@ describe('createIslandRewriter', () => {
     expect(out.match(/<!--n-->/g)).toHaveLength(2);
   });
 
-  test('handles huge escaped props attributes', () => {
+  test('reads a huge escaped props attribute split across 64-byte chunks and passes it through unchanged', () => {
     const props = `{&quot;items&quot;:[${'&quot;x&quot;,'.repeat(500)}&quot;y&quot;]}`;
     const html = `<astro-island component-url="/_astro/C.js" props="${props}" client="load"></astro-island>`;
     const seen: Record<string, string>[] = [];

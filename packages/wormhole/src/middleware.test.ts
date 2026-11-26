@@ -39,8 +39,10 @@ const island = (fileName: string, ...deps: string[]): RouteIsland => ({
 
 async function load(
   registry: Record<string, object>,
-  manifest: WormholeManifest | null = null,
-  routeIslands: Record<string, RouteIsland[]> = {},
+  {
+    manifest = null,
+    routeIslands = {},
+  }: { manifest?: WormholeManifest | null | undefined; routeIslands?: Record<string, RouteIsland[]> | undefined } = {},
 ) {
   vi.stubGlobal(REGISTRY, []);
   vi.stubGlobal(DOCUMENT_REGISTRY, []);
@@ -294,16 +296,12 @@ describe('route-scoped loading', () => {
       eager: true,
     });
 
-    const { createWormholeMiddleware } = await load(
-      registry,
-      {
-        chunks: { 'Cart.Cabc': ['cart'], 'Lazy.Cddd': ['session'] },
-        scripts: ['stats'],
-        scriptsByRoute: {},
-        routes: { '/page': ['audit', 'stats'], '/plain': [] },
-      },
-      { '/page': [island('_astro/Cart.Cabc.js', '_astro/Lazy.Cddd.js')], '/plain': [] },
-    );
+    const { createWormholeMiddleware } = await load(registry, { manifest: {
+      chunks: { 'Cart.Cabc': ['cart'], 'Lazy.Cddd': ['session'] },
+      scripts: ['stats'],
+      scriptsByRoute: {},
+      routes: { '/page': ['audit', 'stats'], '/plain': [] },
+    }, routeIslands: { '/page': [island('_astro/Cart.Cabc.js', '_astro/Lazy.Cddd.js')], '/plain': [] } });
     const handler = createWormholeMiddleware();
 
     await handler(
@@ -324,11 +322,7 @@ describe('route-scoped loading', () => {
   test('an unknown route loads everything', async () => {
     const { defineWormhole } = await load({});
     const { registry, calls } = countingRegistry(defineWormhole, names);
-    const { createWormholeMiddleware } = await load(
-      registry,
-      { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': [] } },
-      { '/page': [] },
-    );
+    const { createWormholeMiddleware } = await load(registry, { manifest: { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': [] } }, routeIslands: { '/page': [] } });
 
     await createWormholeMiddleware()(
       createCtx('/_server-islands/x', '/_server-islands/[name]'),
@@ -341,7 +335,7 @@ describe('route-scoped loading', () => {
   test('a route the node manifest does not know loads everything', async () => {
     const { defineWormhole } = await load({});
     const { registry, calls } = countingRegistry(defineWormhole, names);
-    const { createWormholeMiddleware } = await load(registry, { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': [] } }, {});
+    const { createWormholeMiddleware } = await load(registry, { manifest: { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': [] } }, routeIslands: {} });
 
     await createWormholeMiddleware()(
       createCtx('/page'),
@@ -354,11 +348,7 @@ describe('route-scoped loading', () => {
   test('dynamic access anywhere on the route degrades to everything', async () => {
     const { defineWormhole } = await load({});
     const { registry, calls } = countingRegistry(defineWormhole, names);
-    const { createWormholeMiddleware } = await load(
-      registry,
-      { chunks: { 'Cart.Cabc': ['*'] }, scripts: [], scriptsByRoute: {}, routes: { '/page': [], '/server': ['*'] } },
-      { '/page': [island('_astro/Cart.Cabc.js')], '/server': [] },
-    );
+    const { createWormholeMiddleware } = await load(registry, { manifest: { chunks: { 'Cart.Cabc': ['*'] }, scripts: [], scriptsByRoute: {}, routes: { '/page': [], '/server': ['*'] } }, routeIslands: { '/page': [island('_astro/Cart.Cabc.js')], '/server': [] } });
     const handler = createWormholeMiddleware();
 
     await handler(
@@ -379,11 +369,7 @@ describe('route-scoped loading', () => {
   test('names outside the registry are ignored', async () => {
     const { defineWormhole } = await load({});
     const { registry, calls } = countingRegistry(defineWormhole, ['cart']);
-    const { createWormholeMiddleware } = await load(
-      registry,
-      { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': ['cart', 'stale'] } },
-      { '/page': [] },
-    );
+    const { createWormholeMiddleware } = await load(registry, { manifest: { chunks: {}, scripts: [], scriptsByRoute: {}, routes: { '/page': ['cart', 'stale'] } }, routeIslands: { '/page': [] } });
 
     await createWormholeMiddleware()(
       createCtx('/page'),

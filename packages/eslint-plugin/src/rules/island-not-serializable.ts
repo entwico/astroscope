@@ -143,7 +143,6 @@ function walk(type: ts.Type, path: string[], { seen, lineage, out, checker, site
     return;
   }
 
-  // arrays and tuples: descend into element types under one '[]' segment
   if (checker.isArrayType(type) || isTupleType(type)) {
     for (const element of checker.getTypeArguments(type as ts.TypeReference)) {
       walk(element, [...path, '[]'], state);
@@ -205,8 +204,8 @@ export const islandNotSerializable = createRule<[], 'notSerializable'>({
         'island <{{comp}}> prop {{names}} {{v}} not directly serializable — only primitives, plain objects, and arrays cross the island boundary intact.',
     },
     schema: [],
+    defaultOptions: [],
   },
-  defaultOptions: [],
   create(context) {
     let services: ReturnType<typeof ESLintUtils.getParserServices>;
 
@@ -236,7 +235,6 @@ export const islandNotSerializable = createRule<[], 'notSerializable'>({
 
         for (const branch of constituents(propsType)) {
           for (const prop of branch.getProperties()) {
-            // children arrive as slots, not serialized props
             if (prop.name === 'children') {
               continue;
             }

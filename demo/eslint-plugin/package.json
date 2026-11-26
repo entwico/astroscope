@@ -10,8 +10,8 @@
   },
   "devDependencies": {
     "@astroscope/eslint-plugin": "workspace:*",
-    "@types/react": "^19.3.0",
-    "@typescript-eslint/parser": "^8.72.1",
+    "@types/react": "^19.3.2",
+    "@typescript-eslint/parser": "^8.74.0",
     "astro-eslint-parser": "^3.2.0",
     "typescript": "^6.0.3"
   }

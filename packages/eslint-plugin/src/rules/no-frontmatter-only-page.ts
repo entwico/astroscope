@@ -10,7 +10,6 @@ type TemplateNode = {
 
 const PAGES_DIR = /[/\\]pages[/\\]/;
 
-// whitespace and comments render nothing a visitor would see
 function rendersNothing(node: TemplateNode): boolean {
   if (node.type === 'JSXText') return (node.value ?? '').trim() === '';
   if (node.type === 'AstroHTMLComment') return true;

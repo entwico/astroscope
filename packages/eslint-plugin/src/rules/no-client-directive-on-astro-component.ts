@@ -19,8 +19,8 @@ export const noClientDirectiveOnAstroComponent = createRule<[], 'astroIsland'>({
         '`{{directive}}` has no effect on the Astro component <{{comp}}> — client directives only hydrate framework (React/Vue/Svelte/…) components.',
     },
     schema: [],
+    defaultOptions: [],
   },
-  defaultOptions: [],
   create(context) {
     // local names imported from a `.astro` module
     const astroComponents = new Set<string>();

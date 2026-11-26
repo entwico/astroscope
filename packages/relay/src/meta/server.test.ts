@@ -4,7 +4,10 @@ import type { ServerEventMeta } from '../runtime.js';
 import { metaConversions } from './server.js';
 import { meta } from './shared.js';
 
-function createMeta(overrides: Partial<ServerEventMeta> = {}, cookies: Record<string, string> = {}): ServerEventMeta {
+function createMeta({
+  cookies = {},
+  ...overrides
+}: Partial<ServerEventMeta> & { cookies?: Record<string, string> | undefined } = {}): ServerEventMeta {
   return {
     id: 'evt-1',
     at: 1_700_000_000_500,
@@ -42,7 +45,7 @@ describe('metaConversions', () => {
 
     const receipt = await conversions.send(
       meta.lead({ content_name: 'contact' }, { email: 'Jane@Example.com', phone: '0171 2345678', city: 'München', country: 'de' }),
-      createMeta({}, { _fbp: 'fb.1.1.browser', _fbc: 'fb.1.1.click' }),
+      createMeta({ cookies: { _fbp: 'fb.1.1.browser', _fbc: 'fb.1.1.click' } }),
     );
 
     expect(receipt).toEqual({ eventsReceived: 1, traceId: 'AbC' });

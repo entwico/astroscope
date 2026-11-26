@@ -71,6 +71,7 @@ declare module '@astroscope/relay' {
   }
 }
 
+/* eslint-disable unicorn/prefer-options-parameter -- public api: the builders take positional (data, user) */
 const standard = (name: MetaStandardEventName, data: MetaCustomData = {}, user?: ConversionUser): MetaEvent => ({
   name,
   custom: false,
@@ -105,3 +106,4 @@ export const meta = {
   schedule: (data?: MetaCustomData, user?: ConversionUser): MetaEvent => standard('Schedule', data, user),
   contact: (data?: MetaCustomData, user?: ConversionUser): MetaEvent => standard('Contact', data, user),
 };
+/* eslint-enable unicorn/prefer-options-parameter */

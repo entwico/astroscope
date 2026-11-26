@@ -19,7 +19,7 @@ npm install @astroscope/components
 | `Seo`              | `<title>`, description, robots, canonical, hreflang alternates                          |
 | `OpenGraph`        | `og:*` and `twitter:*` tags (social sharing, not SEO)                                   |
 | `PageMetadata`     | Composes `Seo` + `OpenGraph` into the full head metadata, with URL absolutization       |
-| `WithNoBfCache`    | Wrapper that opts a document out of the back-forward cache (header + `pageshow` reload) |
+| `WithNoBfCache`    | Wrapper that opts a document out of the back-forward cache                              |
 | `SmoothHashScroll` | Smooth-scroll same-page hash links instead of jumping                                   |
 
 All components are imported from the `/astro` entry:
@@ -36,7 +36,7 @@ The full page document: it owns the `<html>`/`<head>`/`<body>` structure, `chars
 font preloads, the head metadata (`<PageMetadata>`, its fields inlined into the props so
 `title`/`siteName` are required), and an optional back-forward-cache opt-out (`disableBfCache`).
 Everything else project-specific (favicons, consent/analytics, schema) goes through
-the `head` slot and the body, so `<Page>` composes the other parts rather than reimplementing them.
+the `head` slot and the body.
 
 ```astro
 ---
@@ -63,13 +63,13 @@ const metadata: WebpageMetadata = { title: 'Home', description: '…', canonical
 </Page>
 ```
 
-Props: `lang` (required), `htmlClass` (on `<html>`), `bodyClass` (on `<body>`), `fonts`
+Props: `lang` (required), `charset` (default `utf-8`), `viewport` (default
+`width=device-width, initial-scale=1`), `htmlClass` (on `<html>`), `bodyClass` (on `<body>`), `fonts`
 (`(string | { url, type })[]`), plus all `PageMetadataProps` fields inlined (`title`, `siteName`,
 `description`, `og*`, …) — spread your `WebpageMetadata` and add `siteName`. Slots: `head-early`
 (right after `<meta charset>` — for `preconnect`/`dns-prefetch` or `<base>`), `head` (the rest of
 your head tags), and the default body slot. Pass `disableBfCache` to opt the page out of the
-back-forward cache (checkout / auth pages) — `Page` sets the header in time from its own
-frontmatter, so no wrapper is needed.
+back-forward cache (checkout / auth pages).
 
 ### `<PreloadFont>` — preload one font file
 
@@ -113,7 +113,7 @@ const metadata: WebpageMetadata = {
 </head>
 ```
 
-`<PageMetadata>` emits title, description, `robots`, an absolutized `<link rel="canonical">` (only when `index`), the full `og:*` set **including `og:url`**, a `twitter:card`, and `<link rel="alternate" hreflang>` for every `alternates` entry. Relative `canonical` / `ogImage` values are absolutized against the request origin, which is whatever `Host` the request named: in production pass `origin` from your config, or set astro's `security.allowedDomains`.
+`<PageMetadata>` emits title, description, `robots`, an absolutized `<link rel="canonical">` (only when `index`), the full `og:*` set **including `og:url`**, a `twitter:card`, and `<link rel="alternate" hreflang>` for every `alternates` entry. Relative `canonical` / `ogImage` values are absolutized against the request origin: in production pass `origin` from your config, or set astro's `security.allowedDomains`.
 
 For an article page, pass `article` and `maxImagePreview`:
 
@@ -126,11 +126,11 @@ For an article page, pass `article` and `maxImagePreview`:
 />
 ```
 
-`article` renders the `article:*` tags and makes `og:type` default to `article`; `maxImagePreview` adds the `max-image-preview` directive to `robots` on an indexable page (`large` is what Google Discover needs for its large cards).
+`article` renders the `article:*` tags and makes `og:type` default to `article`; `maxImagePreview` adds the `max-image-preview` directive to `robots` on an indexable page.
 
-Everything `<PageMetadata>` renders belongs in `<head>`. JSON-LD is intentionally **not** included — it's valid in `<head>` or at the end of `<body>`, so place `<JsonLd>` separately wherever you prefer.
+Everything `<PageMetadata>` renders belongs in `<head>`. JSON-LD is not included: place `<JsonLd>` in `<head>` or at the end of `<body>`.
 
-Need only a piece? Use `<Seo>` (search metadata) or `<OpenGraph>` (social) directly — each resolves its own URLs (canonical / `og:url` absolutization), so they work standalone. `<PageMetadata>` is just a distributor that splits the props across the two.
+Need only a piece? `<Seo>` (search metadata) and `<OpenGraph>` (social) work standalone.
 
 ### `<JsonLd>` — safe schema.org
 
@@ -146,7 +146,7 @@ const org: Organization = { '@type': 'Organization', name: 'Example', url: 'http
 <JsonLd content={org} />
 ```
 
-Pass one object or an array — they're wrapped in `{ "@context": "https://schema.org", "@graph": [...] }`. `content` is typed `unknown`, so the package adds no dependency; bring [`schema-dts`](https://github.com/google/schema-dts) yourself if you want typed builders.
+Pass one object or an array — they're wrapped in `{ "@context": "https://schema.org", "@graph": [...] }`. Bring [`schema-dts`](https://github.com/google/schema-dts) yourself if you want typed builders.
 
 ### `<JsonScript>` — any inline JSON data block
 
@@ -158,23 +158,12 @@ import { JsonScript } from '@astroscope/components/astro';
 <JsonScript type="application/json" id="bootstrap" data={{ featureFlags: { beta: true } }} />
 ```
 
-The data is `JSON.stringify`'d with `<` escaped, so a value containing `</script>` cannot break out of the tag.
-
-`type` defaults to `application/json`. Use it for any non-executable JSON data block the browser reads but never runs — a client-side script reads it via `JSON.parse(el.textContent)`:
-
-- **hydration / state islands** (the `__NEXT_DATA__` pattern — server state for the client)
-- **speculation rules** (`type="speculationrules"`)
-- **import maps** (`type="importmap"`)
-- **config for a web component or widget**
-
-`<JsonLd>` is just `<JsonScript>` with `type="application/ld+json"` and the schema.org envelope.
+`type` defaults to `application/json`.
 
 ### `<WithNoBfCache>` — for checkout / auth pages
 
 Using `<Page>`? Just pass `disableBfCache` instead — it does the same thing without a wrapper. This
-standalone wrapper is for when you keep your own skeleton. Wrap your **top-level layout / document**
-so a back-button navigation re-fetches the page instead of restoring a stale snapshot (old cart
-totals, expired sessions):
+standalone wrapper is for when you keep your own skeleton. Wrap your **top-level layout / document**:
 
 ```astro
 ---
@@ -189,7 +178,7 @@ import { WithNoBfCache } from '@astroscope/components/astro';
 </WithNoBfCache>
 ```
 
-It sets a `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` response header **and** registers a `pageshow` handler that reloads a page restored from the cache.
+It sets a `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` response header.
 
 ### `<SmoothHashScroll>`
 
@@ -201,7 +190,7 @@ import { SmoothHashScroll } from '@astroscope/components/astro';
 <SmoothHashScroll />
 ```
 
-Delegates a single click listener on `document` (place it in `<head>` or `<body>`) that smooth-scrolls same-document `#anchor` links and updates the URL hash for deep-linking. Links that open elsewhere (`target`, `download`, another path or query), modified clicks and links to a missing id are left to the browser.
+Smooth-scrolls same-document `#anchor` links and updates the URL hash. Place it once, in `<head>` or `<body>`.
 
 ## License
 

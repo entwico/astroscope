@@ -173,7 +173,9 @@ function findDiscriminant(union: ts.UnionType, checker: ts.TypeChecker, site: ts
     const allHaveLiteral = union.types.every((member) => {
       const memberProp = member.getProperty(prop.name);
 
-      return memberProp ? isLiteralOrUnionOfLiterals(checker.getTypeOfSymbolAtLocation(memberProp, site)) : false;
+      return (
+        memberProp !== undefined && isLiteralOrUnionOfLiterals(checker.getTypeOfSymbolAtLocation(memberProp, site))
+      );
     });
 
     if (allHaveLiteral) return prop.name;
@@ -279,7 +281,6 @@ function walkExcess(
 
   if (isOpaque(expected, checker)) return;
 
-  // identity short-circuit: same type object → shapes identical, no excess possible
   if (expected === actual) return;
 
   // pair-based cycle guard: stop only when the same (expected, actual) pair reappears
@@ -288,7 +289,6 @@ function walkExcess(
   markSeen(seen, expected, actual);
 
   try {
-    // arrays: descend into element types, under one '[]' path segment
     const expectedElement = getDeclaredElementType(expected, checker);
 
     if (expectedElement) {
@@ -313,7 +313,6 @@ function walkExcess(
 
       for (const prop of actualConstituent.getProperties()) {
         if (!allowed.has(prop.name)) {
-          // skip TS-synthesized placeholders: `prop?: undefined` / `prop?: never` fillers
           const propType = checker.getTypeOfSymbolAtLocation(prop, site);
           const onlyUndefinedOrNever =
             (propType.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Never)) !== 0 && !propType.isUnion();
@@ -369,8 +368,8 @@ export const noExcessJsxProps = createRule({
         'excess propert{{s}} {{names}} flow{{v}} into <{{comp}}> — declared prop type does not include {{them}}',
     },
     schema: [],
+    defaultOptions: [],
   },
-  defaultOptions: [],
   create(context) {
     let services: ReturnType<typeof ESLintUtils.getParserServices>;
 

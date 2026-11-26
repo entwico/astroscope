@@ -109,6 +109,7 @@ export type OpenAiCustom = OpenAiPlan & {
   contentType?: string | undefined;
 };
 
+/* eslint-disable unicorn/prefer-options-parameter -- public api: the builders take positional (user, money) */
 /**
  * The openai builders: every event openai has a name for, and `custom(name)`. What an event
  * definition puts under `openai`.
@@ -123,11 +124,11 @@ export const openai = {
     name: 'page_viewed',
     data: { type: 'contents', contents: [{ id: page.id, name: page.name, content_type: 'page' }] },
   }),
-  leadCreated: (user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent => actionEvent('lead_created', user, money),
+  leadCreated: (user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent => actionEvent('lead_created', { user, money }),
   registrationCompleted: (user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent =>
-    actionEvent('registration_completed', user, money),
+    actionEvent('registration_completed', { user, money }),
   appointmentScheduled: (user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent =>
-    actionEvent('appointment_scheduled', user, money),
+    actionEvent('appointment_scheduled', { user, money }),
   subscriptionCreated: (plan: OpenAiPlan = {}): OpenAiEvent => planEvent('subscription_created', plan),
   trialStarted: (plan: OpenAiPlan = {}): OpenAiEvent => planEvent('trial_started', plan),
   /** a custom event: any name openai has no standard event for; throws for a name outside openai's rule */
@@ -138,6 +139,7 @@ export const openai = {
     user,
   }),
 };
+/* eslint-enable unicorn/prefer-options-parameter */
 
 function contentsEvent(name: OpenAiContentsEventName, { items, currency, value, contentType = 'product', user }: OpenAiContents): OpenAiEvent {
   const total = value ?? items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -149,7 +151,10 @@ function contentsEvent(name: OpenAiContentsEventName, { items, currency, value, 
   };
 }
 
-function actionEvent(name: OpenAiCustomerActionEventName, user?: ConversionUser, money?: OpenAiMoney): OpenAiEvent {
+function actionEvent(
+  name: OpenAiCustomerActionEventName,
+  { user, money }: { user?: ConversionUser | undefined; money?: OpenAiMoney | undefined },
+): OpenAiEvent {
   return { name, data: { type: 'customer_action', ...toMoneyData(money) }, user };
 }
 

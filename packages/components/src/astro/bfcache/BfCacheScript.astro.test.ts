@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 
 import BfCacheScript from './BfCacheScript.astro';
 
-const scriptBody = (html: string) => html.match(/<script[^>]*>(.*)<\/script>/s)?.[1] ?? '';
+const scriptBody = (html: string) => /<script[^>]*>(.*)<\/script>/s.exec(html)?.[1] ?? '';
 
 describe('BfCacheScript', () => {
   let container: Awaited<ReturnType<typeof AstroContainer.create>>;

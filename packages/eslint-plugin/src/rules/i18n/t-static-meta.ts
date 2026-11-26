@@ -75,7 +75,6 @@ export const tStaticMeta: Rule.RuleModule = {
 
         if (meta.type !== 'ObjectExpression') return;
 
-        // top-level fallback / description
         checkField(meta, 'fallback');
         checkField(meta, 'description');
 

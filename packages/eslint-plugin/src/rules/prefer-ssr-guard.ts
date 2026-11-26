@@ -68,13 +68,12 @@ export const preferSsrGuard = createRule<[{ globals?: string[] }?], 'preferSsrGu
         },
       },
     ],
+    defaultOptions: [{}],
   },
-  defaultOptions: [{}],
   create(context, [options]) {
     const globals = new Set(options?.globals ?? DEFAULT_GLOBALS);
     const fixable = !isCommonJs(context.filename, context.languageOptions.sourceType);
 
-    // a parameter or local named like the global is a plain value, not the browser check
     const isShadowed = (identifier: TSESTree.Identifier): boolean => {
       const variable = ASTUtils.findVariable(context.sourceCode.getScope(identifier), identifier);
 

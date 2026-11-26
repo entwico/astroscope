@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 
 import JsonLd from './JsonLd.astro';
 
-const scriptBody = (html: string) => html.match(/<script[^>]*>(.*)<\/script>/s)?.[1] ?? '';
+const scriptBody = (html: string) => /<script[^>]*>(.*)<\/script>/s.exec(html)?.[1] ?? '';
 
 describe('JsonLd', () => {
   let container: Awaited<ReturnType<typeof AstroContainer.create>>;

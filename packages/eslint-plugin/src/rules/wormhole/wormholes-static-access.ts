@@ -23,7 +23,6 @@ export const wormholesStaticAccess: Rule.RuleModule = {
     schema: [],
   },
   create(context) {
-    // .astro code is server-rendered and never enters the client chunk graph
     if (context.filename.endsWith('.astro')) return {};
 
     const specifiers: Node[] = [];

@@ -21,8 +21,8 @@ export const islandReadonly = createRule<[], 'mutable'>({
         'island <{{comp}}> has mutable props — declare them deeply `readonly` so it cannot mutate server data (a renderer that mutates the server cache can poison it).',
     },
     schema: [],
+    defaultOptions: [],
   },
-  defaultOptions: [],
   create(context) {
     let services: ReturnType<typeof ESLintUtils.getParserServices>;
 

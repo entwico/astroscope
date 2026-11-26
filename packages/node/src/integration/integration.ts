@@ -324,6 +324,7 @@ export default function node(options: NodeOptions = {}): AstroIntegration {
 
         setAdapter({
           name: '@astroscope/node',
+          // eslint-disable-next-line @typescript-eslint/no-deprecated -- astro's @deprecated is about 'explicit', 'auto' is the recommended value
           entrypointResolution: 'auto',
           serverEntrypoint: '@astroscope/node/server',
           previewEntrypoint: '@astroscope/node/preview',

@@ -19,7 +19,6 @@ export type ComponentTag = TSESTree.JSXIdentifier | TSESTree.JSXMemberExpression
 
 /** Whether a JSX tag names a component: a capitalized name, or a member expression ending in one. */
 export function isComponentTag(tag: TSESTree.JSXTagNameExpression): tag is ComponentTag {
-  // lowercase → intrinsic HTML element, not a component
   if (tag.type === 'JSXIdentifier') {
     return !/^[a-z]/.test(tag.name);
   }

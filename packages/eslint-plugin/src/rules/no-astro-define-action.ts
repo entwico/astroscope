@@ -19,10 +19,6 @@ type Options = [{ source?: string | undefined }?];
  * unguarded by construction and nothing in the type system says so. The platform's
  * `defineAction` takes `guards` and narrows `locals` for the handler; every action goes through
  * it, guarded or not, so the only difference between the two is whether protection is possible.
- * The other `astro:actions` exports (`ActionError`, `getActionContext`, `actions`) stay legal, and
- * so are type-only imports — a type cannot define an action. Besides the named import the rule
- * sees the module's `defineAction` reached through a namespace import, a dynamic `import()` and a
- * re-export (which hands the unguarded one to every importer); only the named import is fixed.
  */
 export const noAstroDefineAction: Rule.RuleModule = {
   meta: {

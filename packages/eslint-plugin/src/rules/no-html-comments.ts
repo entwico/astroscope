@@ -34,8 +34,8 @@ export const noHtmlComments = createRule({
     },
     fixable: 'code',
     schema: [],
+    defaultOptions: [],
   },
-  defaultOptions: [],
   create(context) {
     return {
       AstroHTMLComment(rawNode: unknown) {
@@ -44,8 +44,6 @@ export const noHtmlComments = createRule({
         const [start, end] = rawNode.range;
         const { value } = rawNode;
 
-        // JSX block comments terminate at `*/`, so if the HTML comment body
-        // contains `*/` we can't safely rewrite it. report without a fix.
         const canAutofix = !value.includes('*/');
 
         context.report({

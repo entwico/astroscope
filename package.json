@@ -2,7 +2,7 @@
   "name": "astroscope",
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@12.16.1",
+  "packageManager": "pnpm@12.23.0",
   "scripts": {
     "build": "turbo run build",
     "lint": "turbo run lint",
@@ -21,17 +21,17 @@
   "devDependencies": {
     "@astroscope/eslint-plugin": "workspace:*",
     "@changesets/cli": "^3.0.3",
-    "@entwico/eslint-config": "^6.0.0",
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "^5.0.5",
-    "astro": "^7.4.4",
-    "daisyui": "^5.7.50",
-    "eslint": "^10.13.0",
-    "tailwindcss": "^4.3.3",
-    "tsdown": "^0.23.4",
-    "turbo": "^2.11.10",
+    "@entwico/eslint-config": "^8.0.1",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^26.6.10",
+    "@vitest/coverage-v8": "^5.1.1",
+    "astro": "^7.4.13",
+    "daisyui": "^5.8.2",
+    "eslint": "^10.15.0",
+    "tailwindcss": "^4.3.5",
+    "tsdown": "^0.23.7",
+    "turbo": "^2.11.13",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.1"
   }
 }

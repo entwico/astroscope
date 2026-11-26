@@ -40,9 +40,6 @@ export type ExtractedKey = {
  */
 export type ChunkManifest = Record<string, string[]>;
 
-/**
- * Full extraction manifest
- */
 export type ExtractionManifest = {
   keys: ExtractedKey[];
   chunks: ChunkManifest;

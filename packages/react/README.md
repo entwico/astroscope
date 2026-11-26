@@ -2,10 +2,10 @@
 
 React for Astro islands, tuned for the server. A thin wrapper around [`@astrojs/react`](https://docs.astro.build/en/guides/integrations-guide/react/) that owns everything React-SSR-specific in astroscope:
 
-- **Synchronous island rendering** — `renderToString` per island, about 3x cheaper than upstream's stream-and-drain.
-- **Automatic streaming fallback** — an island that suspends on the server is re-rendered with `renderToReadableStream`, streamed from then on, and logged once with its component url.
-- **SSR effect stripping** — effect callbacks are emptied in the SSR bundle, so client-only dynamic imports (maplibre-gl, hls.js, …) drop out of the server build.
-- **Render telemetry** — `astro.island.render.duration` per island (component name, render mode `string` or `stream`), `astro.island.check.duration` for astro's per-render detection probe, and `astro.island.render.failures` (`root`: no html, `boundary`: a suspense boundary left to the client, logged with the component).
+- **Synchronous island rendering** — `renderToString` per island.
+- **Automatic streaming fallback** — an island that suspends on the server is streamed, and logged once with its component url.
+- **SSR effect stripping** — effect callbacks are emptied in the SSR bundle.
+- **Render telemetry** — `astro.island.render.duration` per island (component name, render mode `string` or `stream`), `astro.island.check.duration`, and `astro.island.render.failures` (`root`: no html, `boundary`: a suspense boundary left to the client, logged with the component).
 
 ## Examples
 
@@ -32,7 +32,7 @@ export default defineConfig({
 });
 ```
 
-Requires `@astroscope/node` (for the `log` proxy) and React 19.
+Requires `@astroscope/node` and React 19.
 
 ## Options
 

@@ -1,8 +1,5 @@
 import type { CompiledTranslations, RawTranslations, TranslationMeta } from '../shared/types.js';
 
-/**
- * Fallback behavior when translation is missing
- */
 export type FallbackBehavior =
   'key' | 'fallback' | 'throw' | ((key: string, meta?: TranslationMeta | undefined) => string);
 

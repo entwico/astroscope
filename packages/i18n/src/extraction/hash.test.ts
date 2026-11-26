@@ -52,7 +52,7 @@ describe('computeChunkHash', () => {
     expect(a).toBe(b);
   });
 
-  test('handles empty keys', () => {
+  test('an empty key list hashes like an empty translation set', () => {
     const hash = computeChunkHash(translations, []);
 
     expect(hash).toMatch(/^[0-9a-f]{8}$/);

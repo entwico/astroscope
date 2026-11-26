@@ -22,7 +22,9 @@ type Internal = Wormhole<unknown> & { [ASSIGN](next: string): void; [SOURCE]?: W
  * `assignWormholeNames()`).
  *
  * **Security:** wormhole data is serialized into the HTML and sent to the browser.
- * Never store secrets (tokens, API keys, credentials) in a wormhole.
+ * Never store secrets (tokens, API keys, credentials) in a wormhole. Per-island
+ * slicing is an optimization, not a security boundary: in dev every open wormhole
+ * ships with every page.
  *
  * @example
  * ```typescript

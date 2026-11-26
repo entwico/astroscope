@@ -20,9 +20,6 @@ export type TranslationMeta = {
  */
 export type CompiledTranslation = (values?: Record<string, unknown> | undefined) => string;
 
-/**
- * Map of translation keys to compiled functions
- */
 export type CompiledTranslations = Record<string, CompiledTranslation>;
 
 /**

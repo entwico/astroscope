@@ -7,12 +7,10 @@ HTTP proxy for Astro — strangler fig migrations and API gateway. Gradually mig
 - [demo/proxy](../../demo/proxy) - API proxy to JSONPlaceholder
 - [demo/proxy-migration](../../demo/proxy-migration) - Strangler fig migration pattern
 
-## Why?
+## Patterns
 
-Astro has no built-in proxy support ([roadmap discussion #665](https://github.com/withastro/roadmap/discussions/665)). This package adds it, for two patterns:
-
-- **Strangler fig migration** - Gradually migrate any website to Astro - WordPress, Rails, Django, .NET, PHP, or anything else. New Astro pages take precedence while unhandled requests fall through to your existing site.
-- **Standalone gateway** - Run Astro in standalone mode while proxying to your backend APIs. No need to embed Astro as middleware in Express/Fastify just because you need features like startup hooks or API proxying - use [`@astroscope/node`](../node) for lifecycle and this package for proxying.
+- **Strangler fig migration** - New Astro pages take precedence while unhandled requests fall through to your existing site.
+- **Standalone gateway** - Astro proxies selected paths to your backend APIs.
 
 ## Installation
 
@@ -34,13 +32,6 @@ export const ALL = createProxyHandler({
   upstream: process.env.LEGACY_BACKEND!,
 });
 ```
-
-The `ALL` export handles all HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD).
-
-With this setup:
-- `src/pages/index.astro` → handled by Astro
-- `src/pages/about.astro` → handled by Astro
-- `/old-page` (no Astro file) → proxied to legacy backend
 
 ### API Proxy
 
@@ -175,18 +166,9 @@ The upstream receives `x-forwarded-for` (`context.clientAddress` appended to an 
 
 A `location` or `content-location` under the upstream url is rewritten to the site's origin, and a `set-cookie` with a `Domain` naming the upstream host loses that attribute. A different mapping is an `onResponse` header change.
 
-## Features
-
-- HTTP/2 support with connection pooling (via undici)
-- `x-forwarded-for` / `-host` / `-proto` towards the upstream
-- Upstream redirects and cookie domains mapped to the site
-- Proper stream handling for large responses
-- Request cancellation support
-- Handles 204/304 responses correctly
-
 ## Requirements
 
-- Node.js runtime (required by undici)
+- Node.js runtime
 - Astro 7.x with SSR output mode
 
 ## License

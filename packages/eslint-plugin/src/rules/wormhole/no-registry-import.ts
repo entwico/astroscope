@@ -6,9 +6,7 @@ import { type Linked, type WithExportKind, type WithImportKind, importExpression
  * project's server code. Client-side modules read wormholes through the
  * `wormholes` proxy from the package; a registry import there fails the client
  * build, this rule says so at lint time. Scoped to `.tsx`/`.jsx` (island code) —
- * a `.ts` file may legitimately be server code that uses the registry. Every
- * form that loads the module counts: a value import, a bare side-effect
- * import, a re-export and a dynamic `import()`; type-only ones are erased.
+ * a `.ts` file may legitimately be server code that uses the registry.
  */
 const REGISTRY_SOURCE = /(^|\/)wormholes(\/index)?(\.[cm]?[jt]sx?)?$/;
 
@@ -40,7 +38,6 @@ export const noRegistryImport: Rule.RuleModule = {
           (specifier) => specifier.type !== 'ImportSpecifier' || (specifier as WithImportKind).importKind !== 'type',
         );
 
-        // a bare `import '../wormholes'` loads the module like any other value import
         if (node.specifiers.length > 0 && valueSpecifiers.length === 0) return;
 
         context.report({ node, messageId: 'registryImport' });

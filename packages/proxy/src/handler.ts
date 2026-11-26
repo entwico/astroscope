@@ -103,7 +103,7 @@ async function proxyRequest(
     upstreamResponse = await undiciRequest(targetUrl, {
       method,
       headers: Object.fromEntries(headers.entries()),
-      body: method !== 'GET' && method !== 'HEAD' ? (body as never) : null,
+      body: method === 'GET' || method === 'HEAD' ? null : (body as never),
       dispatcher: httpAgent,
       signal: request.signal,
     });

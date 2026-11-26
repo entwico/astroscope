@@ -16,7 +16,7 @@ describe('componentUrlToChunkName', () => {
     expect(componentUrlToChunkName('/_astro/Cart.C_sxtxbl.js')).toBe('Cart.C_sxtxbl');
   });
 
-  test('handles path without prefix', () => {
+  test('strips only the .js extension from a path without the _astro/ prefix', () => {
     expect(componentUrlToChunkName('/Cart.C_sxtxbl.js')).toBe('/Cart.C_sxtxbl');
   });
 });

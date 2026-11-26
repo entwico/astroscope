@@ -29,7 +29,7 @@ describe('partsToNodes', () => {
     expect(result).toEqual(['Read our ', { tag: 'a', children: ['Terms'] }]);
   });
 
-  test('handles nested markup', () => {
+  test('nests the components of nested markup tags', () => {
     const parts = [open('outer'), text('a'), open('inner'), text('b'), close('inner'), text('c'), close('outer')];
 
     const result = partsToNodes<Node>(parts, { outer: tag('div'), inner: tag('em') });

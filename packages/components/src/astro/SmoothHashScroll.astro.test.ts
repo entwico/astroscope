@@ -45,7 +45,7 @@ function install(script: string, { url, withBody = true }: { url: string; withBo
   return { click, scrollIntoView, pushState };
 }
 
-const inlineScript = (html: string) => html.match(/<script>(.*)<\/script>/s)?.[1] ?? '';
+const inlineScript = (html: string) => /<script>(.*)<\/script>/s.exec(html)?.[1] ?? '';
 
 describe('SmoothHashScroll', () => {
   let container: Awaited<ReturnType<typeof AstroContainer.create>>;

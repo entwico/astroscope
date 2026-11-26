@@ -1,13 +1,6 @@
 import { rich } from '@astroscope/i18n/translate';
 
-/**
- * Demo component showcasing the rich() function for MF2 markup.
- *
- * MF2 markup syntax:
- * - {#tagName}content{/tagName} - paired tags
- * - {#tagName/} - standalone (self-closing) tags
- * - Supports nesting, variables, and all MF2 features
- */
+/** rich() with MF2 markup */
 export default function RichTextDemo() {
   return (
     <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '8px' }}>

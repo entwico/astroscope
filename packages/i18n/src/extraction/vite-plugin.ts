@@ -193,7 +193,6 @@ export function getManifest() { return _getManifest(); }
         return null;
       }
 
-      // quick check: skip files without i18n translate import
       if (!code.includes('@astroscope/i18n/translate')) {
         return null;
       }

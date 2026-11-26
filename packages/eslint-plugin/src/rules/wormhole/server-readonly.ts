@@ -6,9 +6,6 @@ import { type Linked, callOf, memberName, memberOff } from '../../utils/ast.js';
  * Astro files are server code (frontmatter and template expressions run during
  * render) — wormhole values there are request-scoped and read-only. `set()`
  * throws at runtime and `subscribe()` is an inert no-op; both are client-only.
- * Covers both the `wormholes` proxy and a registry imported under that name,
- * reached directly or through a namespace import (`W.wormholes`); computed
- * members with a static key and typescript wrappers read like the plain form.
  */
 export const serverReadonly: Rule.RuleModule = {
   meta: {

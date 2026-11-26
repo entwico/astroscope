@@ -25,6 +25,7 @@ export function getLocale(): string {
  */
 export const t: TranslateFunction = ((
   key: string,
+  // eslint-disable-next-line unicorn/prefer-options-parameter -- public api: extraction and the t-* lint rules parse t(key, meta, values)
   meta?: TranslationMeta | string,
   values?: Record<string, unknown>,
 ): string => {
@@ -82,6 +83,7 @@ export const t: TranslateFunction = ((
  */
 export function rich<T = unknown>(
   key: string,
+  // eslint-disable-next-line unicorn/prefer-options-parameter -- public api: extraction and the t-* lint rules parse rich(key, meta, components, values)
   meta?: TranslationMeta | string | undefined,
   components?: RichComponents<T> | undefined,
   values?: Record<string, unknown> | undefined,

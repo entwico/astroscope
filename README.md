@@ -11,7 +11,7 @@ Node.js is the only supported runtime. Other runtimes (Bun, Deno, Cloudflare Wor
 | [@astroscope/cap](./packages/cap)                     | Cap captcha — invisible or widget, verified by a guard on actions, endpoints and pages                                                                                  |
 | [@astroscope/eslint-plugin](./packages/eslint-plugin) | Additional ESLint rules for Astro projects. Plays well with `eslint-plugin-astro`.                                                                                      |
 | [@astroscope/i18n](./packages/i18n)                   | i18n for Astro + React islands — dynamic translations from any source, auto-split per component, parallel loading                                                       |
-| [@astroscope/node](./packages/node)                   | Opinionated, cloud-friendly Node adapter: boot lifecycle, health probes, request logging, telemetry, CSRF and static serving run as plain code around `server.listen()` |
+| [@astroscope/node](./packages/node)                   | Opinionated, cloud-friendly Node adapter: boot lifecycle, health probes, request logging, telemetry, CSRF and static serving |
 | [@astroscope/relay](./packages/relay)                 | Consent-aware event relay            |
 | [@astroscope/react](./packages/react)                 | React for Astro islands, tuned for the server                                                                                                                           |
 | [@astroscope/proxy](./packages/proxy)                 | HTTP proxy for strangler fig migrations and API gateways                                                                                                                |

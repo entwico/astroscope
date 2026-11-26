@@ -38,9 +38,6 @@ export class KeyStore {
     private readonly consistency: ConsistencyCheckLevel = 'error',
   ) {}
 
-  /**
-   * Check new keys for inconsistencies with existing occurrences.
-   */
   private checkConsistency(newKeys: ExtractedKeyOccurrence[]): void {
     const existingByKey = new Map<string, ExtractedKeyOccurrence>();
 
@@ -63,9 +60,6 @@ export class KeyStore {
     }
   }
 
-  /**
-   * Compare two occurrences and find any metadata inconsistencies.
-   */
   private findInconsistencies(a: ExtractedKeyOccurrence, b: ExtractedKeyOccurrence): KeyInconsistency[] {
     const result: KeyInconsistency[] = [];
     const locA = `${a.file}:${a.line}`;
@@ -104,9 +98,6 @@ export class KeyStore {
     return result;
   }
 
-  /**
-   * Serialize variables for comparison.
-   */
   private serializeVariables(meta: TranslationMeta): string {
     if (!meta.variables) return '';
 
@@ -121,9 +112,6 @@ export class KeyStore {
     return JSON.stringify(sorted);
   }
 
-  /**
-   * Report an inconsistency via logger.
-   */
   private reportInconsistency(inc: KeyInconsistency): void {
     // keyed on key+field, not locations — one report per inconsistent key
     const incKey = `${inc.key}:${inc.field}`;
@@ -179,7 +167,6 @@ export class KeyStore {
 
     this.filesWithI18n.add(filename);
 
-    // check for inconsistencies before adding new keys
     if (this.consistency !== 'off') {
       this.checkConsistency(keys);
     }
@@ -249,16 +236,10 @@ export class KeyStore {
     return keyMap.values().toArray();
   }
 
-  /**
-   * Get count of unique keys.
-   */
   get uniqueKeyCount(): number {
     return new Set(this.occurrences.map((k) => k.key)).size;
   }
 
-  /**
-   * Merge another store's data into this one.
-   */
   merge(other: KeyStore): void {
     for (const [file, keys] of other.fileToKeys) {
       this.fileToKeys.set(file, keys);
