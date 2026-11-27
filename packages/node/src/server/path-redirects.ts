@@ -79,32 +79,12 @@ function applyTrailingSlash(pathname: string, trailingSlash: TrailingSlash): str
   return pathname;
 }
 
-// astro's internal urls (`/_astro/`, `/@vite/`, `/.well-known/`) are left as they are; a leading
-// `//` or `/\` counts too unless the path is nothing but slashes
+const INTERNAL_PREFIXES = new Set(['_', '@', '.']);
+
+// astro's internal urls (`/_astro/`, `/@vite/`, `/.well-known/`) are left as they are. astro counts
+// a leading `//` or `/\` too: neither gets here, duplicates are collapsed and `/\` returned early
 function isInternalPath(pathname: string): boolean {
-  switch (pathname.charAt(1)) {
-    case '_':
-    case '@':
-    case '.': {
-      return true;
-    }
-    case '/':
-    case '\\': {
-      return !isJustSlashes(pathname);
-    }
-    default: {
-      return false;
-    }
-  }
-}
-
-function isJustSlashes(pathname: string): boolean {
-  for (let i = 0; i < pathname.length; i++) {
-    // eslint-disable-next-line unicorn/prefer-code-point -- hot path ascii check
-    if (pathname.charCodeAt(i) !== 47) return false;
-  }
-
-  return true;
+  return INTERNAL_PREFIXES.has(pathname.charAt(1));
 }
 
 /**

@@ -156,7 +156,7 @@ Endpoints and pages answer per the request: `{ error: { code, message } }` for a
 - **Logging**: rejected tokens log at `info`, an unreachable or misconfigured Cap service at `error`.
 - **No third-party requests**: nothing is fetched from a CDN, and the widget's credits link opens without the page url or a referrer. Browsers without WebAssembly or Web Workers can't solve.
 - **Privacy policy**: two first-party processings to name — the visitor's IP is forwarded to your Cap service for rate limiting, and Cap's instrumentation step runs a bot-detection script from your service in a sandboxed iframe and sends its browser signals back to it.
-- **Content Security Policy**: the solver needs `worker-src blob:` and `'wasm-unsafe-eval'`, and Cap's instrumentation step runs an inline script in a sandboxed `srcdoc` iframe (`window.CAP_SCRIPT_NONCE` passes a nonce through).
+- **Content Security Policy**: solving needs `worker-src blob:`; add `'wasm-unsafe-eval'` to `script-src` for the WebAssembly solver, without it Cap falls back to a slower JavaScript one. The visible widget paints its background from a `data:` image (`img-src data:`), and Cap's instrumentation step runs an inline script in a sandboxed `srcdoc` iframe (`window.CAP_SCRIPT_NONCE` passes a nonce through).
 
 ## License
 

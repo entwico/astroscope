@@ -228,7 +228,39 @@ describe('track on the server', () => {
       return Promise.resolve(new Response('ok'));
     });
 
+    await flush();
+
     expect(id).toEqual(expect.any(String));
+    expect(a.sent[0]?.meta.request.clientAddress).toBeUndefined();
+  });
+
+  test('an id that is not usable is logged and replaced by a fresh one', () => {
+    const purchase = defineEvent('purchase', (order: string) => ({ id: order, a: 'purchase' }));
+
+    const id = track(purchase('not valid!'));
+
+    expect(id).not.toBe('not valid!');
+    expect(log.error).toHaveBeenCalledWith({ key: 'purchase', id }, expect.stringContaining('"not valid!" is not usable'));
+  });
+
+  test('a prerendered page reports nothing, whatever the destinations need', async () => {
+    const free = createDestination('free');
+    const middleware = createRelayMiddleware();
+
+    configure({ destinations: { free: free.destination }, consent: { free: false } });
+
+    let id: string | undefined;
+
+    await middleware({ ...createContext(), isPrerendered: true }, () => {
+      id = track({ free: 'x' });
+
+      return Promise.resolve(new Response('ok'));
+    });
+    await flush();
+
+    expect(id).toEqual(expect.any(String));
+    expect(free.sent).toEqual([]);
+    expect(log.debug).toHaveBeenCalledWith({ key: undefined, id }, 'tracked while prerendering, nothing reported');
   });
 
   test('the consent of the request is readable where the server destinations are written', async () => {

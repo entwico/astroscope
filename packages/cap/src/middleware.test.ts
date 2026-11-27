@@ -139,6 +139,25 @@ describe('proxy', () => {
     expect(((await middleware(ctx, next)) as Response).status).toBe(502);
   });
 
+  test('forwards without a client address when astro has none for the request', async () => {
+    const fetchMock = mockFetch(Response.json({ challenge: {} }));
+    const ctx = Object.defineProperty(
+      createApiContext('https://example.com/_cap/challenge', { method: 'POST', body: '{}' }),
+      'clientAddress',
+      {
+        get() {
+          throw new Error('clientAddress is not available');
+        },
+      },
+    );
+
+    const response = (await middleware(ctx, next)) as Response;
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+
+    expect(response.status).toBe(200);
+    expect((init.headers as Headers).has('x-forwarded-for')).toBe(false);
+  });
+
   test('leaves other requests to the next handler', async () => {
     expect(await middleware(createApiContext('https://example.com/page'), next)).toBe(passed);
   });

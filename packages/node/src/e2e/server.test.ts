@@ -397,11 +397,13 @@ describe.skipIf(skip)('e2e — built server runtime', () => {
 
       expect(body.match(/lazy content rendered on the server/g)).toHaveLength(2);
 
-      const fallbacks = logLines(stdout).filter((line) =>
-        String(line['msg']).includes('react island suspended during server render'));
+      const fallbacks = () =>
+        logLines(stdout).filter((line) => String(line['msg']).includes('react island suspended during server render'));
 
-      expect(fallbacks).toHaveLength(1);
-      expect(String(fallbacks[0]?.['componentUrl'])).toContain('SuspendingIsland');
+      // the log line travels the server's stdout pipe, on its own schedule next to the response
+      await expect.poll(fallbacks).toHaveLength(1);
+
+      expect(String(fallbacks()[0]?.['componentUrl'])).toContain('SuspendingIsland');
     });
   });
 

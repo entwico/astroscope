@@ -47,6 +47,24 @@ tester.run('island-readonly', islandReadonly, {
       filename,
       code: `export const v = <div class="x" />;`,
     },
+    // a namespaced tag names an element, never a component
+    {
+      filename,
+      code: `export const v = <svg:path client:load d="M0 0" />;`,
+    },
+    // a tag that resolves to nothing has no props to judge
+    {
+      filename,
+      code: `export const v = <Missing client:load name="x" />;`,
+    },
+    // a component that takes no props has nothing to mutate
+    {
+      filename,
+      code: `
+        function C() { return null as any; }
+        export const v = <C client:load />;
+      `,
+    },
   ],
   invalid: [
     // mutable top-level prop
@@ -80,4 +98,20 @@ tester.run('island-readonly', islandReadonly, {
       errors: [{ messageId: 'mutable', data: { comp: 'UI.C' } }],
     },
   ],
+});
+
+// without type information (a file outside the typed project) the rule stays silent instead of failing the lint run
+new RuleTester().run('island-readonly without type information', islandReadonly, {
+  valid: [
+    {
+      filename,
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+      code: `
+        interface Props { name: string }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load name="x" />;
+      `,
+    },
+  ],
+  invalid: [],
 });

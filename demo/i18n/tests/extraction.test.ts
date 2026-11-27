@@ -89,6 +89,8 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(() => {
+  // astro dev daemonizes under @astroscope/node — killing the wrapper is not enough
+  spawn('npx', ['astro', 'dev', 'stop'], { cwd: new URL('..', import.meta.url).pathname, stdio: 'ignore' });
   devServer?.kill();
   prodServer?.kill();
 });

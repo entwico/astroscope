@@ -1,7 +1,7 @@
 import type { IntegrationResolvedRoute } from 'astro';
 import type { Rolldown } from 'vite';
 import { describe, expect, test } from 'vitest';
-import { type ModuleGraph, collectRouteIslands, routeEntrypoints, stripQuery } from './route-islands';
+import { type ModuleGraph, collectRouteIslands, isScriptEntry, routeEntrypoints, stripQuery } from './route-islands';
 
 type Module = {
   imports?: string[];
@@ -121,6 +121,28 @@ describe('collectRouteIslands', () => {
 
     expect([...routes.get('/')!]).toEqual(['/src/Island.tsx']);
   });
+
+  test('walks through modules astro\'s compiler left no metadata on', async () => {
+    const graph = createGraph({
+      '/src/pages/index.astro': { imports: ['/src/lib/widgets.ts'] },
+      '/src/components/Chart.astro': { hydrated: ['/src/components/Chart.tsx'] },
+    });
+    const plain = { id: '/src/lib/widgets.ts', importedIds: ['/src/components/Chart.astro'], dynamicallyImportedIds: [], meta: {} };
+    const withPlainModule: ModuleGraph = {
+      ...graph,
+      getModuleIds: () => [...graph.getModuleIds(), plain.id][Symbol.iterator](),
+      getModuleInfo: (id) => (id === plain.id ? (plain as unknown as Rolldown.ModuleInfo) : graph.getModuleInfo(id)),
+    };
+
+    const { routes, patternsByModule } = await collectRouteIslands(
+      withPlainModule,
+      new Map([['/src/pages/index.astro', ['/']]]),
+    );
+
+    expect([...routes.get('/')!]).toEqual(['/src/components/Chart.tsx']);
+    expect([...patternsByModule.get('/src/lib/widgets.ts')!]).toEqual(['/']);
+  });
+
   test('the walk stops at astro\'s application manifest, which imports every page', async () => {
     const graph = createGraph({
       '\0virtual:astro:actions/entrypoint': { imports: ['/src/actions/index.ts'] },
@@ -173,5 +195,16 @@ describe('stripQuery', () => {
   test('drops vite queries, keeps plain ids', () => {
     expect(stripQuery('/src/a.astro?astro&type=script&index=0&lang.ts')).toBe('/src/a.astro');
     expect(stripQuery('/src/a.tsx')).toBe('/src/a.tsx');
+  });
+});
+
+describe('isScriptEntry', () => {
+  test('tells astro script facades and the injected page script from island components', () => {
+    expect(isScriptEntry('/src/pages/index.astro?astro&type=script&index=0&lang.ts')).toBe(true);
+    expect(isScriptEntry('astro:scripts/page.js')).toBe(true);
+    expect(isScriptEntry('/src/components/Cart.tsx')).toBe(false);
+    expect(isScriptEntry('/src/components/Card.astro?astro&type=style&index=0&lang.css')).toBe(false);
+    expect(isScriptEntry(null)).toBe(false);
+    expect(isScriptEntry(undefined)).toBe(false);
   });
 });

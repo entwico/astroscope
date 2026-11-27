@@ -30,6 +30,17 @@ describe('openai builders', () => {
     expect(event.user).toBeUndefined();
   });
 
+  test('each contents builder goes by the name openai has for it', () => {
+    const contents = { items: [{ id: 'a', name: 'A', price: 10, quantity: 1 }], currency: 'EUR' };
+
+    expect([
+      openai.contentsViewed(contents),
+      openai.itemsAdded(contents),
+      openai.checkoutStarted(contents),
+      openai.orderCreated(contents),
+    ].map(({ name }) => name)).toEqual(['contents_viewed', 'items_added', 'checkout_started', 'order_created']);
+  });
+
   test('a lead carries no contents', () => {
     expect(openai.leadCreated({ phone: '0171' })).toEqual({ name: 'lead_created', data: { type: 'customer_action' }, user: { phone: '0171' } });
   });

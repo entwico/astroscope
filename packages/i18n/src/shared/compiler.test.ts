@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { compileMessage, compileTranslations } from './compiler.js';
+import { compileMessage, compileTranslations, formatMessageToParts } from './compiler.js';
 
 describe('compileMessage', () => {
   test('compiles simple text', () => {
@@ -39,6 +39,14 @@ one {{{$count} item}}
     const fn2 = compileMessage('en', 'test');
 
     expect(fn1()).toBe(fn2());
+  });
+});
+
+describe('formatMessageToParts', () => {
+  test('returns the raw message as one literal part on a parse error', () => {
+    expect(formatMessageToParts('en', 'Invalid {{{syntax', { name: 'World' })).toEqual([
+      { type: 'literal', value: 'Invalid {{{syntax' },
+    ]);
   });
 });
 

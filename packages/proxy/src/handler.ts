@@ -134,10 +134,10 @@ async function proxyRequest(
 
     response = new Response(stream, { status: statusCode, headers: responseHeaders });
   } catch (error) {
-    // a status the web Response refuses: release the upstream connection before failing
+    // a status the web Response refuses is the upstream's failure: release its connection and say so
     safeDestroyBody(resBody);
 
-    throw error;
+    throw upstreamError(error);
   }
 
   return maybeTransformResponse(context, response, targetUrl, options, resBody);

@@ -101,6 +101,26 @@ describe('metaConversions', () => {
     expect(calls[0]?.body.data[0]?.user_data).not.toHaveProperty('fbp');
   });
 
+  test('an answer that is not json is kept as the receipt, cut to its start', async () => {
+    const conversions = metaConversions({
+      accessToken: 't',
+      pixelId: '123',
+      fetch: (() => Promise.resolve(new Response('x'.repeat(500), { status: 200 }))) as unknown as typeof fetch,
+    });
+
+    expect(await conversions.send(meta.lead(), createMeta())).toEqual({ body: 'x'.repeat(200) });
+  });
+
+  test('a page url that cannot be parsed yields no click id and is reported as it came', async () => {
+    const { calls, fetch } = createFetch();
+    const conversions = metaConversions({ accessToken: 't', pixelId: '123', fetch });
+
+    await conversions.send(meta.lead(), createMeta({ request: { ...createMeta().request, sourceUrl: 'not a url?fbclid=abc' } }));
+
+    expect(calls[0]?.body).toMatchObject({ data: [{ event_source_url: 'not a url?fbclid=abc' }] });
+    expect(calls[0]?.body.data[0]?.user_data).not.toHaveProperty('fbc');
+  });
+
   test('a failing response is an error for track() to log', async () => {
     const conversions = metaConversions({
       accessToken: 't',

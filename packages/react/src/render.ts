@@ -81,6 +81,11 @@ async function classifyUnfinishedBoundary(
 }
 
 function streamFromNowOn(Component: WeakKey, metadata?: AstroComponentMetadata): void {
+  // two instances on one page classify their unfinished boundary side by side
+  if (streamed.has(Component)) {
+    return;
+  }
+
   streamed.add(Component);
 
   log.error(

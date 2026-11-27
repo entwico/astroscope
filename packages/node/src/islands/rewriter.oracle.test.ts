@@ -17,14 +17,12 @@ const DEVIATIONS = new Set([
   'self-closing template still opens template content',
   'cdata ends only at ]]>',
   // islands in foreign content are foreign elements the scanner skips; parse5's feedback simulator
-  // reports every start tag, enters foreign content on a self-closing `<svg/>` too and leaves one
-  // level per html start tag
+  // reports every start tag and leaves one level per html start tag
   'island inside svg is a foreign element',
   'island inside math is a foreign element',
   'script inside svg is markup, the island a foreign element',
   'font without attributes stays foreign',
   'nested svg closes one level',
-  'self-closing svg does not open foreign content',
   'island after an integration point closes is foreign',
   'self-closing foreignObject opens no html content',
   'annotation-xml without an html encoding is foreign',

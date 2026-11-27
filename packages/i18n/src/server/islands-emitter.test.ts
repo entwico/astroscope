@@ -162,7 +162,36 @@ describe('i18n islands emitter', () => {
   });
 });
 
+describe('registerI18nEmitters', () => {
+  test('registers once, the first chunk prefix stays', async () => {
+    const { emitter, setRequestLocale } = await setup(undefined, '/docs/_i18n/');
+    const { registerI18nEmitters } = await import('./islands-emitter');
+
+    registerI18nEmitters({ chunkPrefix: '/other/_i18n/' });
+
+    const context = createApiContext();
+
+    setRequestLocale(context, 'en');
+
+    expect((globalThis as Record<symbol, unknown>)[REGISTRY]).toHaveLength(1);
+    expect((globalThis as Record<symbol, unknown>)[DOCUMENT_REGISTRY]).toHaveLength(1);
+    expect(emitter(createIsland(), context)?.links?.[0]).toMatch(/^\/docs\/_i18n\/en\//);
+  });
+});
+
 describe('createI18nDocumentEmitter', () => {
+  test('contributes nothing while i18n is not configured', async () => {
+    vi.resetModules();
+
+    const { createI18nDocumentEmitter, setRequestLocale } = await import('./islands-emitter');
+    const context = createApiContext();
+
+    setRequestLocale(context, 'en');
+
+    expect(createI18nDocumentEmitter(true)(context)).toBeNull();
+    expect(createI18nDocumentEmitter(false)(context)).toBeNull();
+  });
+
   test('dev delivers the full state as head content', async () => {
     const { createI18nDocumentEmitter, setRequestLocale } = await setup();
     const context = createApiContext();

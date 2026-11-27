@@ -163,6 +163,14 @@ export function createAppHandler(app: BaseApp, options: RuntimeOptions, client: 
       : options.bodySizeLimit;
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    // methods a web Request cannot carry, and none a route could answer
+    if (req.method === 'TRACE' || req.method === 'TRACK') {
+      res.writeHead(405, { 'content-type': 'text/plain' });
+      res.end('Method Not Allowed');
+
+      return;
+    }
+
     let request: Request;
 
     try {

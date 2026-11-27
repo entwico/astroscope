@@ -24,6 +24,22 @@ const filename = 'test.tsx';
 
 tester.run('island-not-serializable', islandNotSerializable, {
   valid: [
+    // tuples are plain arrays, template-literal and mapped strings are strings, void is an absent value
+    {
+      filename,
+      code: `
+        interface Props {
+          pair: [string, number];
+          fixed: readonly [number, number];
+          rows: { range: [number, number] }[];
+          id: \`id-\${string}\`;
+          code: Uppercase<string>;
+          note: string | void;
+        }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load {...(null as any)} />;
+      `,
+    },
     // plain JSON-ish data
     {
       filename,
@@ -85,8 +101,51 @@ tester.run('island-not-serializable', islandNotSerializable, {
         export const v = <C client:load a={{ value: 'x' }} b={{ value: 1 }} />;
       `,
     },
+    // a type that says nothing about the value cannot be decided
+    {
+      filename,
+      code: `
+        interface Props { a: any; b: unknown; c: never }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load a={1} b={2} c={null as never} />;
+      `,
+    },
+    // neither can an unconstrained type parameter
+    {
+      filename,
+      code: `
+        function C<T>(p: { value: T }) { return null as any; }
+        export const v = <C client:load value="x" />;
+      `,
+    },
+    // a type parameter is judged by its constraint
+    {
+      filename,
+      code: `
+        function C<T extends { id: string }>(p: { value: T }) { return null as any; }
+        export const v = <C client:load value={{ id: 'a' }} />;
+      `,
+    },
+    // a component that takes no props has nothing to serialize
+    {
+      filename,
+      code: `
+        function C() { return null as any; }
+        export const v = <C client:load />;
+      `,
+    },
   ],
   invalid: [
+    // a tuple is judged by its elements
+    {
+      filename,
+      code: `
+        interface Props { pair: [string, Date] }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load {...(null as any)} />;
+      `,
+      errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'pair[]'`, v: 'is' } }],
+    },
     // function prop
     {
       filename,
@@ -171,5 +230,50 @@ tester.run('island-not-serializable', islandNotSerializable, {
       `,
       errors: [{ messageId: 'notSerializable', data: { comp: 'UI.C', names: `'onSelect'`, v: 'is' } }],
     },
+    // primitives json has no representation for, listed together
+    {
+      filename,
+      code: `
+        interface Props { big: bigint; sym: symbol; n: number }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load big={1n} sym={Symbol()} n={1} />;
+      `,
+      errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'big', 'sym'`, v: 'are' } }],
+    },
+    // the values of an index signature are checked like array elements
+    {
+      filename,
+      code: `
+        interface Props { byId: Record<string, Date> }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load byId={{}} />;
+      `,
+      errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'byId[]'`, v: 'is' } }],
+    },
+    // a type parameter constrained to a non-serializable type is reported through its constraint
+    {
+      filename,
+      code: `
+        function C<T extends () => void>(p: { cb: T }) { return null as any; }
+        export const v = <C client:load cb={() => {}} />;
+      `,
+      errors: [{ messageId: 'notSerializable', data: { comp: 'C', names: `'cb'`, v: 'is' } }],
+    },
   ],
+});
+
+// without type information (a file outside the typed project) the rule stays silent instead of failing the lint run
+new RuleTester().run('island-not-serializable without type information', islandNotSerializable, {
+  valid: [
+    {
+      filename,
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+      code: `
+        interface Props { onClick: () => void }
+        function C(p: Props) { return null as any; }
+        export const v = <C client:load onClick={() => {}} />;
+      `,
+    },
+  ],
+  invalid: [],
 });

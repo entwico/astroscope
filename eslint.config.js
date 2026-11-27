@@ -39,6 +39,13 @@ export default defineConfig({
         '@astroscope/i18n/no-raw-strings-in-jsx': 'off',
       },
     },
+    // `page.evaluate()` callbacks run in the browser: these are the globals they may reach for
+    {
+      files: within('browser-e2e'),
+      languageOptions: {
+        globals: { window: 'readonly', document: 'readonly', performance: 'readonly', URL: 'readonly' },
+      },
+    },
     {
       files: within('demo/wormhole'),
       plugins: { '@astroscope/wormhole': wormholePlugin },

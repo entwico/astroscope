@@ -13,12 +13,15 @@ const SERIALIZABLE_PRIMITIVE_FLAGS =
   | ts.TypeFlags.Number
   | ts.TypeFlags.Boolean
   | ts.TypeFlags.StringLiteral
+  | ts.TypeFlags.TemplateLiteral
+  | ts.TypeFlags.StringMapping
   | ts.TypeFlags.NumberLiteral
   | ts.TypeFlags.BooleanLiteral
   | ts.TypeFlags.EnumLiteral
   | ts.TypeFlags.Enum
   | ts.TypeFlags.Null
-  | ts.TypeFlags.Undefined;
+  | ts.TypeFlags.Undefined
+  | ts.TypeFlags.Void;
 
 // can't be decided — skip rather than risk a false positive
 const UNDECIDABLE_FLAGS = ts.TypeFlags.Any | ts.TypeFlags.Unknown;
@@ -34,10 +37,6 @@ const NON_SERIALIZABLE_PRIMITIVE_FLAGS =
 
 function constituents(type: ts.Type): ts.Type[] {
   return type.isUnion() ? type.types.flatMap((member) => constituents(member)) : [type];
-}
-
-function isTupleType(type: ts.Type): boolean {
-  return (type.flags & ts.TypeFlags.Object) !== 0 && ((type as ts.ObjectType).objectFlags & ts.ObjectFlags.Tuple) !== 0;
 }
 
 function resolveTypeParameter(type: ts.Type, checker: ts.TypeChecker): ts.Type | null {
@@ -143,7 +142,7 @@ function walk(type: ts.Type, path: string[], { seen, lineage, out, checker, site
     return;
   }
 
-  if (checker.isArrayType(type) || isTupleType(type)) {
+  if (checker.isArrayType(type) || checker.isTupleType(type)) {
     for (const element of checker.getTypeArguments(type as ts.TypeReference)) {
       walk(element, [...path, '[]'], state);
     }

@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "lib": ["ES2025", "DOM", "DOM.Iterable"],
+    "types": ["@types/node"]
+  },
+  "include": ["*.ts"]
+}

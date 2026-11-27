@@ -118,6 +118,15 @@ describe('configure', () => {
     expect(i18n.getConfig().locale).toBe(locale);
   });
 
+  test('reconfiguring replaces the config and keeps the manifest', async () => {
+    const i18n = await createConfiguredI18n({ chunks: { 'Cart.Cabc': ['cart.title'] } });
+
+    await i18n.configure({ locales: ['fr', 'it'], defaultLocale: 'it', fallback: 'key' });
+
+    expect(i18n.getConfig()).toMatchObject({ locales: ['fr', 'it'], defaultLocale: 'it', fallback: 'key' });
+    expect(i18n.getManifest().chunks).toEqual({ 'Cart.Cabc': ['cart.title'] });
+  });
+
   test('isConfigured reflects configuration state', async () => {
     const i18n = await createI18n();
 
@@ -396,6 +405,27 @@ describe('clear', () => {
 
     expect(i18n.getTranslations('en')).toEqual({});
     expect(i18n.getTranslations('de')).toEqual({});
+  });
+
+  test('drops the served chunk bodies of the cleared locale only', async () => {
+    const i18n = await createConfiguredI18n({
+      keys: [{ key: 'cart.title', meta: { fallback: 'Cart' }, files: [] }],
+      chunks: { 'Cart.Cabc': ['cart.title'] },
+    });
+
+    i18n.setTranslations('en', { 'cart.title': 'Basket' });
+    i18n.setTranslations('de', { 'cart.title': 'Warenkorb' });
+
+    const english = i18n.getChunkBody('en', 'Cart.Cabc');
+    const german = i18n.getChunkBody('de', 'Cart.Cabc');
+
+    i18n.clear('en');
+
+    const cleared = new TextDecoder().decode(i18n.getChunkBody('en', 'Cart.Cabc'));
+
+    expect(cleared).not.toBe(new TextDecoder().decode(english));
+    expect(cleared).toContain('{"cart.title":"Cart"}');
+    expect(i18n.getChunkBody('de', 'Cart.Cabc')).toBe(german);
   });
 
   test('cleared locale falls back to manifest fallbacks again', async () => {

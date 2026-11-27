@@ -302,6 +302,37 @@ tester.run('no-excess-jsx-props', noExcessJsxProps, {
         export const v = <C client:load shape={shape} />;
       `,
     },
+    // a discriminant widened to a non-literal picks no branch — every branch's keys are allowed
+    {
+      filename,
+      code: `
+        type Shape = { kind: 'circle'; radius: number } | { kind: 'rect'; width: number };
+        interface Props { shape: Shape; }
+        function C(p: Props) { return null as any; }
+        declare const shape: { kind: string; radius: number; width: number };
+        export const v = <C client:load shape={shape} />;
+      `,
+    },
+    // a union arm with an index signature allows every key
+    {
+      filename,
+      code: `
+        interface Props { data: { id: string } | Record<string, unknown>; }
+        function C(p: Props) { return null as any; }
+        const data = { id: 'a', extra: 1 };
+        export const v = <C client:load data={data} />;
+      `,
+    },
+    // an attribute the props do not declare is typescript's to report
+    {
+      filename,
+      code: `
+        interface Props { name: string; }
+        function C(p: Props) { return null as any; }
+        const other = { a: 1 };
+        export const v = <C client:load name="x" other={other} />;
+      `,
+    },
     // non-discriminated union — variant-specific keys are permissive (union-of-all-branches)
     {
       filename,
@@ -560,6 +591,18 @@ tester.run('no-excess-jsx-props', noExcessJsxProps, {
       `,
       errors: [err('C', ['shape.width'])],
     },
+    // a widened discriminant still flags a key no branch declares
+    {
+      filename,
+      code: `
+        type Shape = { kind: 'circle'; radius: number } | { kind: 'rect'; width: number };
+        interface Props { shape: Shape; }
+        function C(p: Props) { return null as any; }
+        declare const shape: { kind: string; radius: number; secret: string };
+        export const v = <C client:load shape={shape} />;
+      `,
+      errors: [err('C', ['shape.secret'])],
+    },
     // discriminated union inside array — per-element narrowing finds cross-branch foreign key
     {
       filename,
@@ -684,4 +727,21 @@ tester.run('no-excess-jsx-props', noExcessJsxProps, {
       errors: [err('UI.C', ['passwordHash'])],
     },
   ],
+});
+
+// without type information (a file outside the typed project) the rule stays silent instead of failing the lint run
+new RuleTester().run('no-excess-jsx-props without type information', noExcessJsxProps, {
+  valid: [
+    {
+      filename,
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+      code: `
+        interface Props { name: string; }
+        function C(p: Props) { return null as any; }
+        const user = { name: 'x', passwordHash: 'h' };
+        export const v = <C client:load {...user} />;
+      `,
+    },
+  ],
+  invalid: [],
 });

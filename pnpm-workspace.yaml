@@ -2,6 +2,7 @@ packages:
   - packages/*
   - demo/*
   - benchmarks
+  - browser-e2e
   - scripts
 
 overrides:

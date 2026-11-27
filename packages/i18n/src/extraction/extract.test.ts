@@ -324,6 +324,34 @@ describe('extractKeysFromFile', () => {
       expect(result.errors[0]?.reason).toContain('variable "name.fallback" is not a static string');
     });
 
+    test('reports a non-static description and keeps the static fallback', async () => {
+      const result = await extract('const x = t("greeting", { fallback: "Hello", description: describe() });');
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.reason).toContain('description is not a static string');
+      expect(result.keys[0]?.meta).toEqual({ fallback: 'Hello' });
+    });
+
+    test('reports a spread in the variables object and keeps the static variables', async () => {
+      const result = await extract(
+        'const x = t("greeting", { fallback: "Hi {$name}", variables: { ...shared, name: { fallback: "you" } } });',
+      );
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.reason).toContain('variables object contains a spread element');
+      expect(result.keys[0]?.meta.variables).toEqual({ name: { fallback: 'you' } });
+    });
+
+    test('reports a spread inside a variable definition, naming the variable', async () => {
+      const result = await extract(
+        'const x = t("greeting", { fallback: "Hi {$name}", variables: { name: { ...base, description: "who" } } });',
+      );
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.reason).toContain('variable "name" contains a spread element');
+      expect(result.keys[0]?.meta.variables).toEqual({ name: { description: 'who' } });
+    });
+
     test('carries the file and reports each offending call separately', async () => {
       const result = await extract(`
         const a = t('one', \`a \${x}\`);

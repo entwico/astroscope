@@ -62,6 +62,19 @@ describe('renderIsland', () => {
     expect(logError.mock.calls[0]?.[0]).toEqual({ componentUrl: '/src/Boundary.tsx' });
   });
 
+  test('instances rendered side by side report the suspension once', async () => {
+    const Lazy = createLazy();
+    const Boundary = () => React.createElement(Suspense, { fallback: 'loading' }, React.createElement(Lazy));
+
+    const rendered = await Promise.all([
+      renderIsland(Boundary, React.createElement(Boundary), options),
+      renderIsland(Boundary, React.createElement(Boundary), options),
+    ]);
+
+    expect(rendered.every((html) => html.includes('lazy content'))).toBe(true);
+    expect(logError).toHaveBeenCalledTimes(1);
+  });
+
   test('falls back to streaming when the root suspends outside any boundary', async () => {
     const Lazy = createLazy();
     const Root = () => React.createElement(Lazy);

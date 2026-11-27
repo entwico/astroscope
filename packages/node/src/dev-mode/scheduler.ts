@@ -72,6 +72,12 @@ export class RestartScheduler {
         } catch (error) {
           this.logger.error(`error during dev server restart: ${serializeError(error)}`);
         }
+
+        // vite logs a restart that failed and keeps the previous server running: its open pages
+        // reload into the holding page, which shows the failure and comes back once a boot succeeds
+        if (this._lastFailure) {
+          server.ws.send({ type: 'full-reload' });
+        }
       } while (this._pending);
     } finally {
       this._inFlight = false;
@@ -133,13 +139,21 @@ export class RestartScheduler {
   }
 
   /**
-   * Resolves when no restart is running. Loops to handle back-to-back restarts
-   * (e.g. one chain ends and a queued debounce timer immediately fires a new
-   * one). Never rejects, so a failed restart still releases the gate — caller
-   * proceeds against the broken state rather than hanging forever.
+   * Resolves when no restart is running or queued. Loops to handle back-to-back
+   * restarts (e.g. one chain ends and a queued debounce timer immediately fires a
+   * new one) and sits out the debounce window, where the gate already holds
+   * requests but no run exists yet — a holding page released there would only be
+   * sent back to the gate. Never rejects, so a failed restart still releases the
+   * gate — caller proceeds against the broken state rather than hanging forever.
    */
   async waitForRestart(): Promise<void> {
-    while (this._runPromise) {
+    while (this._runPromise || this._debounceTimer) {
+      if (!this._runPromise) {
+        await new Promise((resolve) => setTimeout(resolve, this.debounceMs));
+
+        continue;
+      }
+
       try {
         await this._runPromise;
       } catch {

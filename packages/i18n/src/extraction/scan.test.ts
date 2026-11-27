@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { AstroIntegrationLogger } from 'astro';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { scan } from './scan';
 
 const mockLogger = {
@@ -87,6 +87,36 @@ const title = t('page.title', 'Welcome');
 
     expect(store.extractedKeys.map((k) => k.key)).toEqual(['page.title']);
     expect(store.extractedKeys[0]?.meta.fallback).toBe('Welcome');
+  });
+
+  test('skips an .astro file its compiler rejects and still scans the rest', async () => {
+    const root = await createProject({
+      'src/pages/index.astro': `---
+import { t } from '@astroscope/i18n/translate';
+
+const title = t('page.title', 'Welcome');
+---
+<h1>{title}</h1>
+`,
+      'src/a.ts': tsSource('hello', 'Hello World'),
+    });
+
+    vi.resetModules();
+    vi.doMock('@astrojs/compiler', () => ({
+      transform: () => Promise.reject(new Error('compiler crashed')),
+    }));
+
+    try {
+      const { scan: scanWithBrokenCompiler } = await import('./scan');
+      const store = await scanWithBrokenCompiler({ projectRoot: root, logger: mockLogger, consistency: 'error' });
+
+      expect(store.extractedKeys.map((k) => k.key)).toEqual(['hello']);
+      expect(store.filesWithI18n.has(path.resolve(root, 'src/pages/index.astro'))).toBe(false);
+      expect(store.extractionErrors).toEqual([]);
+    } finally {
+      vi.doUnmock('@astrojs/compiler');
+      vi.resetModules();
+    }
   });
 
   test('skips files without the translate import', async () => {

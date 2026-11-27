@@ -73,6 +73,30 @@ describe('relay integration', () => {
     await expect(load('/site/src/relay/server.ts?url')).rejects.toThrow('server-only');
   });
 
+  test('reports once which halves the site has', async () => {
+    const updateConfig = vi.fn();
+    const info = vi.fn();
+    const hook = relayIntegration().hooks['astro:config:setup'] as (params: unknown) => void;
+    const root = createSite(['src/relay/client.ts']);
+
+    hook({
+      addMiddleware: vi.fn(),
+      config: { root, srcDir: new URL('src/', root) },
+      injectScript: vi.fn(),
+      logger: { info },
+      updateConfig,
+    });
+
+    const [plugin] = updateConfig.mock.calls[0]?.[0].vite.plugins as { buildStart: () => Promise<void> }[];
+    // vite resolves what exists; the plugin runs once per environment
+    const context = { resolve: (id: string) => Promise.resolve(id.endsWith('client.ts') ? { id } : null) };
+
+    await plugin!.buildStart.call(context);
+    await plugin!.buildStart.call(context);
+
+    expect(info).toHaveBeenCalledExactlyOnceWith('browser bus from /src/relay/client.ts, no server destinations');
+  });
+
   test('finds the client module under a custom srcDir', () => {
     const root = createSite(['app/relay/client.ts']);
     const { injectScript } = setup(root, new URL('app/', root));

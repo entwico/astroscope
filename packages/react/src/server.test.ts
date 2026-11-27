@@ -52,6 +52,51 @@ describe('renderToStaticMarkup', () => {
     expect(rendered.html).toContain(slot);
   });
 
+  test('hands a named slot to the component as a camel-cased prop holding the slot html', async () => {
+    function Card({ cardFooter, children }: { cardFooter?: React.ReactNode; children?: React.ReactNode }) {
+      return React.createElement('section', null, children, React.createElement('footer', null, cardFooter));
+    }
+
+    const rendered = await renderer.renderToStaticMarkup.call(
+      undefined as never,
+      Card,
+      {},
+      { default: '<p>body</p>', 'card-footer': '<em>foot</em>' },
+    );
+
+    expect(rendered.html).toBe(
+      '<section><astro-slot><p>body</p></astro-slot>' +
+      '<footer><astro-slot name="cardFooter"><em>foot</em></astro-slot></footer></section>',
+    );
+  });
+
+  test('renders slots of an island that never hydrates as static slots', async () => {
+    const metadata = { astroStaticSlot: true as const, displayName: 'Wrapper', hydrateArgs: undefined };
+    const rendered = await renderer.renderToStaticMarkup.call(
+      undefined as never,
+      Wrapper,
+      {},
+      { default: '<p>slot</p>' },
+      metadata,
+    );
+
+    expect(rendered.html).toBe('<div><astro-static-slot><p>slot</p></astro-static-slot></div>');
+  });
+
+  test('renders nothing for a slot that holds only whitespace', async () => {
+    const rendered = await renderer.renderToStaticMarkup.call(undefined as never, Wrapper, {}, { default: ' \n ' });
+
+    expect(rendered.html).toBe('<div></div>');
+  });
+
+  test('does not put the slots on the props astro serializes for hydration', async () => {
+    const props = { title: 'x' };
+
+    await renderer.renderToStaticMarkup.call(undefined as never, Wrapper, props, { default: '<p>a</p>', side: 'b' });
+
+    expect(props).toEqual({ title: 'x' });
+  });
+
   test('reads the form body once per request, whatever the island count', async () => {
     const request = new Request('http://localhost/?_action=/_actions/like', {
       method: 'POST',

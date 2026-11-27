@@ -106,6 +106,23 @@ function resolveFile(client: string, pathname: string, extensions: string[]): st
   return extensions.map((extension) => `${pathname}.${extension}`).find((file) => statWithin(client, file)?.isFile());
 }
 
+type SendError = NodeJS.ErrnoException & {
+  statusCode?: number | undefined;
+  /** what the error answer needs, e.g. `Content-Range` on a 416 */
+  headers?: Record<string, string> | undefined;
+};
+
+const FILE_HEADERS = [
+  'Accept-Ranges',
+  'Cache-Control',
+  'Content-Encoding',
+  'Content-Length',
+  'Content-Range',
+  'Content-Type',
+  'ETag',
+  'Last-Modified',
+];
+
 /**
  * Serve files from the client build directory, falling through to `ssr` when
  * no file matches, and mark hashed assets as immutable. Directories are served
@@ -158,7 +175,7 @@ export function createStaticHandler(app: BaseApp, client: string) {
 
     let forwardError = false;
 
-    stream.on('error', (err: NodeJS.ErrnoException & { statusCode?: number }) => {
+    stream.on('error', (err: SendError) => {
       if (forwardError) {
         const status = err.statusCode ?? 500;
 
@@ -166,7 +183,19 @@ export function createStaticHandler(app: BaseApp, client: string) {
           console.error(err.toString());
         }
 
-        res.writeHead(status);
+        // the body is under way: the status line is out, only the connection can still say it failed
+        if (res.headersSent) {
+          res.destroy();
+
+          return;
+        }
+
+        // what send() and the `headers` listener set describes the file, not this answer
+        for (const name of FILE_HEADERS) {
+          res.removeHeader(name);
+        }
+
+        res.writeHead(status, err.headers);
         res.end(status >= 500 ? 'Internal server error' : '');
 
         return;

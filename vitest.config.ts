@@ -42,7 +42,8 @@ export default defineConfig({
     server: { deps: { inline: ['@astrojs/react'] } },
     // astro component tests (`*.astro.test.ts`) need the astro vite plugin — they run from
     // packages/components/vitest.config.ts (its own `pnpm test`), not this node-environment config.
-    exclude: [...configDefaults.exclude, 'deprecated/**', '**/*.astro.test.ts'],
+    // the browser suite needs chromium and runs on its own (`pnpm test:browser`)
+    exclude: [...configDefaults.exclude, 'deprecated/**', '**/*.astro.test.ts', 'browser-e2e/**'],
     benchmark: {
       // the benches run package source through vite's module runner, where every
       // cross-module binding is an export getter; the code under test (not the

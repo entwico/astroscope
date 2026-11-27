@@ -128,6 +128,16 @@ describe('dispatchNativeMount routing', () => {
     expect(await fetchRawPath(url, '/oidc/../admin')).toBe('fallthrough');
   });
 
+  test('a request target that is no url is matched as sent, without its query', async () => {
+    mountNativeHandler({ prefix: '//[oidc' }, (req, res) => void res.end(`raw:${req.url ?? ''}`));
+
+    const url = await startServer();
+
+    expect(await fetchRawPath(url, '//[oidc?client_id=1')).toBe('raw://[oidc?client_id=1');
+    expect(await fetchRawPath(url, '//[oidc/cb')).toBe('raw://[oidc/cb');
+    expect(await fetchRawPath(url, '//[other')).toBe('fallthrough');
+  });
+
   test('the longest matching prefix wins regardless of registration order', async () => {
     mountNativeHandler({ prefix: '/api' }, (_req, res) => void res.end('short'));
     mountNativeHandler({ prefix: '/api/v2' }, (_req, res) => void res.end('long'));

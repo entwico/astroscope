@@ -111,8 +111,13 @@ function rawGetPath(base: string, requestPath: string): Promise<RawResponse> {
 
   return new Promise((resolve, reject) => {
     const req = http.get({ hostname, port, path: requestPath }, (res) => {
-      res.resume();
-      res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: '' }));
+      const chunks: Buffer[] = [];
+
+      res.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+      res.on('end', () =>
+        resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks).toString() }));
     });
 
     req.on('error', reject);
@@ -154,6 +159,22 @@ describe('basic serving', () => {
     expect(res.body).toBe('identity content');
   });
 
+  test('ignores a fragment sent in the request target', async () => {
+    const url = await startServer(createApp());
+    const res = await rawGetPath(url, '/hello.txt#section?x=1');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toBe('identity content');
+  });
+
+  test('leaves a malformed percent-encoding to ssr', async () => {
+    const url = await startServer(createApp());
+    const res = await rawGetPath(url, '/hello%E0%A4%A.txt');
+
+    expect(res.status).toBe(555);
+    expect(res.body).toBe('ssr-fallback');
+  });
+
   test('strips the base via app.removeBase', async () => {
     const url = await startServer(
       createApp({ removeBase: (pathname) => (pathname.startsWith('/base') ? pathname.slice(5) : pathname) }),
@@ -162,6 +183,60 @@ describe('basic serving', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toBe('identity content');
+  });
+});
+
+describe('errors on a matched file', () => {
+  test('answers an unsatisfiable range itself instead of falling through to ssr', async () => {
+    const url = await startServer(createApp());
+    const res = await rawGet(`${url}/hello.txt`, { range: 'bytes=9999-' });
+
+    expect(res.status).toBe(416);
+    expect(res.body).toBe('');
+  });
+
+  test('an error answer carries its own headers, none of the file\'s', async () => {
+    const url = await startServer(createApp());
+    const res = await rawGet(`${url}/_astro/app.css`, { range: 'bytes=9999-' });
+
+    expect(res.status).toBe(416);
+    expect(res.headers['content-range']).toBe('bytes */7');
+
+    for (const name of ['cache-control', 'etag', 'last-modified', 'content-encoding', 'content-type']) {
+      expect(res.headers[name], name).toBeUndefined();
+    }
+  });
+
+  // root reads a file whatever its mode
+  test.skipIf(os.userInfo().uid === 0)('a variant that cannot be read answers a well-formed 500', async () => {
+    const variant = path.join(client, '_astro', 'unreadable.css.br');
+
+    fs.writeFileSync(path.join(client, '_astro', 'unreadable.css'), 'body {}');
+    fs.writeFileSync(variant, 'br');
+    fs.chmodSync(variant, 0o000);
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const url = await startServer(createApp());
+      const res = await rawGet(`${url}/_astro/unreadable.css`, { 'accept-encoding': 'br' });
+
+      expect(res.status).toBe(500);
+      expect(res.body).toBe('Internal server error');
+      expect(res.headers['content-encoding']).toBeUndefined();
+      expect(res.headers['cache-control']).toBeUndefined();
+    } finally {
+      vi.restoreAllMocks();
+      fs.rmSync(variant, { force: true });
+    }
+  });
+
+  test('answers a failed precondition itself instead of falling through to ssr', async () => {
+    const url = await startServer(createApp());
+    const res = await rawGet(`${url}/hello.txt`, { 'if-match': '"another-etag"' });
+
+    expect(res.status).toBe(412);
+    expect(res.body).toBe('');
   });
 });
 

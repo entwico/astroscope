@@ -154,4 +154,34 @@ describe('solveCap', () => {
     expect(tokens).toEqual([expect.any(String), expect.any(String)]);
     expect(tokens[0]).not.toBe(tokens[1]);
   });
+
+  test('a solve that throws resolves null and does not hold up the solves queued behind it', async () => {
+    const answers: (() => Promise<unknown>)[] = [
+      () => Promise.reject(new Error('worker crashed')),
+      () => Promise.resolve({ success: false, token: 'unused' }),
+      () => Promise.resolve({ success: true, token: 'token' }),
+    ];
+
+    class FailingCap {
+      solve() {
+        return answers.shift()!();
+      }
+    }
+
+    vi.stubGlobal('window', { Cap: FailingCap });
+    vi.resetModules();
+
+    const fresh = await import('./index');
+
+    expect(await Promise.all([fresh.solveCap(), fresh.solveCap(), fresh.solveCap()])).toEqual([null, null, 'token']);
+  });
+
+  test('resolves null when the cap client cannot be loaded', async () => {
+    vi.stubGlobal('customElements', { whenDefined: () => Promise.reject(new Error('chunk failed to load')) });
+    vi.resetModules();
+
+    const fresh = await import('./index');
+
+    expect(await fresh.solveCap()).toBeNull();
+  });
 });

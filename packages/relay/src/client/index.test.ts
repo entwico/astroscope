@@ -79,6 +79,24 @@ describe('install', () => {
   });
 });
 
+describe('notifyRelay', () => {
+  test('delivers what waited for a choice the cmp has made since', async () => {
+    const { configureRelay, notifyRelay, track } = await installRelay();
+    const a = createDestination();
+    const choice: { a?: boolean } = {};
+
+    configureRelay({ destinations: { a: a.destination }, consent: testConsent(['a'], (name) => choice[name]) });
+    track({ a: 'waiting' });
+
+    expect(a.payloads).toEqual([]);
+
+    choice.a = true;
+    notifyRelay();
+
+    expect(a.payloads).toEqual(['waiting']);
+  });
+});
+
 describe('requests', () => {
   test('a same-origin fetch carries the consented destination names, a cross-origin one and nothing-consented do not', async () => {
     const calls: { input: RequestInfo | URL; init: RequestInit | undefined }[] = [];
@@ -112,6 +130,20 @@ describe('requests', () => {
     expect(new Headers(calls[1]?.init?.headers).get('accept')).toBe('application/json');
     expect(calls[2]?.init).toBeUndefined();
     expect(calls[3]?.init).toBeUndefined();
+  });
+
+  test('a request whose url cannot be parsed goes out untouched, for fetch itself to reject', async () => {
+    const original = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) => Promise.resolve(new Response('ok')));
+
+    vi.stubGlobal('fetch', original);
+
+    const { configureRelay } = await installRelay();
+
+    configureRelay({ destinations: { a: createDestination().destination }, consent: testConsent(['a']) });
+
+    await fetch('http://[');
+
+    expect(original).toHaveBeenCalledExactlyOnceWith('http://[', undefined);
   });
 
   test('a second module instance does not wrap the wrapper', async () => {

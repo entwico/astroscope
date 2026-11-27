@@ -31,6 +31,8 @@ tester.run('no-astro-define-action', noAstroDefineAction, {
     `const { actions } = await import('astro:actions');`,
     `const m = await import('astro:actions');\nm.actions.like();`,
     `const m = await import(name);\nm.defineAction({});`,
+    // a computed key is only followed when it is static
+    `import * as astroActions from 'astro:actions';\nexport const picked = astroActions[name];`,
   ],
   invalid: [
     {
@@ -71,6 +73,16 @@ tester.run('no-astro-define-action', noAstroDefineAction, {
     },
     {
       code: `import * as astroActions from 'astro:actions';\nexport const like = astroActions['defineAction']({ handler: () => null });`,
+      errors: [{ messageId: 'astroDefineAction' }],
+    },
+    {
+      code: 'import * as astroActions from \'astro:actions\';\nexport const like = astroActions[`defineAction`]({ handler: () => null });',
+      errors: [{ messageId: 'astroDefineAction' }],
+    },
+    // next to a default specifier there is no braces-only import to rewrite to, so it is reported without a fix
+    {
+      code: `import astroActions, { defineAction } from 'astro:actions';`,
+      output: null,
       errors: [{ messageId: 'astroDefineAction' }],
     },
     // re-exports hand the unguarded defineAction to every importer

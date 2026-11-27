@@ -162,6 +162,65 @@ describe('stripSsrEffectsPlugin — replacement behavior', () => {
     expect(out?.code ?? code).toContain('useEffect(() => compute())');
   });
 
+  test.each([
+    ['a variable', `const useEffect = schedule;`],
+    ['an object pattern', `const { useEffect } = hooks;`],
+    ['a renamed object pattern property', `const { effect: useEffect } = hooks;`],
+    ['an object pattern default', `const { useEffect = schedule } = hooks;`],
+    ['an object pattern rest', `const { other, ...useEffect } = hooks;`],
+    ['an array pattern', `const [, useEffect] = hooks;`],
+    ['an array pattern rest', `const [first, ...useEffect] = hooks;`],
+    ['a nested pattern', `const { hooks: [{ useEffect }] } = lib;`],
+    ['a parameter default', `function outer(useEffect = schedule) {}`],
+    ['a catch parameter', `try { load(); } catch (useEffect) {}`],
+    ['a destructured catch parameter', `try { load(); } catch ({ useEffect }) {}`],
+    ['a class declaration', `class useEffect {}`],
+    ['a class expression', `const Hook = class useEffect {};`],
+    ['a function declaration', `function useEffect() {}`],
+    ['an import from another package', `import { useEffect } from 'preact/hooks';`],
+  ])('leaves a hook name alone that %s declares somewhere in the file', (_label, declaration) => {
+    const transform = getTransform();
+    const code = [
+      `import { useEffect as reactEffect, useLayoutEffect } from 'react';`,
+      declaration,
+      `export function C() {`,
+      `  useEffect(() => compute());`,
+      `  useLayoutEffect(() => measure());`,
+      `  return null;`,
+      `}`,
+    ].join('\n');
+
+    const out = transform(code, '/src/Island.tsx', { ssr: true })!;
+
+    expect(out.code).toContain('useEffect(() => compute())');
+    expect(out.code).toContain('useLayoutEffect((()=>{}))');
+  });
+
+  test('leaves member calls alone when the react namespace name is declared again', () => {
+    const transform = getTransform();
+    const code = [
+      `import React from 'react';`,
+      `export function run({ React }) {`,
+      `  return React.useEffect(() => compute());`,
+      `}`,
+    ].join('\n');
+
+    expect(transform(code, '/src/run.ts', { ssr: true })).toBeNull();
+  });
+
+  test('a catch without a binding shadows nothing', () => {
+    const transform = getTransform();
+    const code = [
+      `import { useEffect } from 'react';`,
+      `export function C() {`,
+      `  try { load(); } catch {}`,
+      `  useEffect(() => compute());`,
+      `}`,
+    ].join('\n');
+
+    expect(transform(code, '/src/Island.tsx', { ssr: true })!.code).toContain('useEffect((()=>{}))');
+  });
+
   test('keeps a first argument that is evaluated during render, not a callback literal', () => {
     const transform = getTransform();
     const code = [

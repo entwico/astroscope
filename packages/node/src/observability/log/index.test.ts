@@ -114,6 +114,21 @@ describe('log proxy routing', () => {
     expect(logLines[1]).toMatchObject({ level: 50, msg: 'bound entry', component: 'db' });
   });
 
+  test('every level reaches the pino method of the same name', async () => {
+    const { log } = await freshLogModule();
+
+    getLogStore().root = pino({ base: null, timestamp: false, level: 'trace' }, sink);
+
+    const levels = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const;
+
+    for (const level of levels) {
+      log[level](level);
+    }
+
+    expect(logLines.map((line) => line['level'])).toEqual([10, 20, 30, 40, 50, 60]);
+    expect(logLines.map((line) => line['msg'])).toEqual([...levels]);
+  });
+
   test('prefers the request-scoped logger over the root logger', async () => {
     const { log } = await freshLogModule();
     const store = getLogStore();

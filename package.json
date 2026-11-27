@@ -9,6 +9,7 @@
     "lint:fix": "turbo run lint:fix",
     "typecheck": "turbo run typecheck",
     "test": "vitest run",
+    "test:browser": "pnpm --filter browser-e2e test:browser",
     "test:coverage": "rm -rf .coverage/v8 && E2E_COVERAGE=1 vitest run --coverage; status=$?; pnpm coverage; exit $status",
     "coverage": "pnpm --filter scripts coverage",
     "bench": "pnpm --filter benchmarks micro",

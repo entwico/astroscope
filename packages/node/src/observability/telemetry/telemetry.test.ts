@@ -134,6 +134,19 @@ describe('instruments', () => {
     expect(point?.attributes).toEqual({ locale: 'en' });
   });
 
+  test('a gauge stays parked across a bind attempt that finds no meter provider', async () => {
+    createObservableGauge('test.parked', {}, (result) => result.observe(3));
+
+    bindGauges();
+
+    registerMeterProvider();
+    bindGauges();
+
+    const sample = await collect('test.parked');
+
+    expect(sample?.metric.dataPoints[0]?.value).toBe(3);
+  });
+
   test('an observable gauge created after the sdk started binds immediately', async () => {
     registerMeterProvider();
     bindGauges();

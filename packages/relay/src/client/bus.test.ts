@@ -167,6 +167,40 @@ describe('delivery', () => {
     vi.restoreAllMocks();
   });
 
+  test('a console that fails while printing the debug log never breaks track', () => {
+    const bus = createTestBus();
+    const a = createDestination('a');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const groupEnd = vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+
+    vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {
+      throw new Error('no console');
+    });
+    bus.configure({ destinations: { a: a.destination }, consent: given, debug: () => true });
+
+    expect(bus.track({ a: 'x' })).toEqual(expect.any(String));
+    expect(a.payloads()).toEqual(['x']);
+    expect(error).toHaveBeenCalledWith('relay: failed printing the debug log', expect.any(Error));
+    expect(groupEnd).toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  test('a destination registered late gets the newest events the buffer holds, the older ones are gone', () => {
+    const bus = createTestBus();
+    const a = createDestination('a');
+    const late = createDestination('b');
+    const tracked = Array.from({ length: 205 }, (_, index) => `event ${index}`);
+
+    bus.configure({ destinations: { a: a.destination }, consent: given });
+
+    for (const payload of tracked) bus.track({ a: payload, b: payload });
+
+    bus.configure({ destinations: { a: a.destination, b: late.destination }, consent: given });
+
+    expect(a.payloads()).toEqual(tracked);
+    expect(late.payloads()).toEqual(tracked.slice(-200));
+  });
+
   test('configuring again delivers nothing a destination already got', () => {
     const bus = createTestBus();
     const a = createDestination('a');
@@ -270,6 +304,29 @@ describe('readiness', () => {
     runScheduled();
     expect(a.payloads()).toEqual(['x']);
     expect(scheduled).toEqual([]);
+  });
+
+  test('without an injected scheduler the poll runs on timers', () => {
+    vi.useFakeTimers();
+
+    try {
+      const bus = createBus();
+      let loaded = false;
+      const a = createDestination('a', { ready: () => loaded });
+
+      bus.configure({ destinations: { a: a.destination }, consent: given });
+      bus.track({ a: 'x' });
+      loaded = true;
+
+      expect(a.payloads()).toEqual([]);
+
+      vi.runOnlyPendingTimers();
+
+      expect(a.payloads()).toEqual(['x']);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('the poll gives up after the attempts and resumes on the next event or notify', () => {

@@ -9,6 +9,7 @@ function createMockServer(opts?: { root?: string }) {
   return {
     config: { root: opts?.root ?? '/project' },
     restart: vi.fn(async () => {}),
+    ws: { send: vi.fn() },
   };
 }
 
@@ -313,6 +314,53 @@ describe('RestartScheduler', () => {
       expect(link3).not.toMatch(/a\d|b\d/);
     });
 
+    test('a restart that failed in the boot reloads the open pages, into the holding page', async () => {
+      const server = createMockServer();
+      const scheduler = new RestartScheduler(0, logger);
+
+      // vite swallows the failed startup of the next server: restart() resolves
+      server.restart.mockImplementationOnce(() => {
+        scheduler.recordFailure('boot broke');
+
+        return Promise.resolve();
+      });
+
+      scheduler.schedule(server as never, '/project/src/boot.ts');
+
+      await vi.waitFor(() => expect(server.ws.send).toHaveBeenCalledWith({ type: 'full-reload' }));
+
+      expect(scheduler.isRestartPending()).toBe(true);
+    });
+
+    test('a restart that failed without a boot failure leaves the open pages alone', async () => {
+      const server = createMockServer();
+
+      server.restart.mockRejectedValueOnce(new Error('boom'));
+
+      const scheduler = new RestartScheduler(0, logger);
+
+      scheduler.schedule(server as never, '/project/src/a.ts');
+
+      await vi.waitFor(() => expect(logger.error).toHaveBeenCalled());
+      await scheduler.waitForRestart();
+
+      expect(server.ws.send).not.toHaveBeenCalled();
+    });
+
+    test('waitForRestart() sits out the debounce window of a queued change', async () => {
+      const server = createMockServer();
+      const scheduler = new RestartScheduler(30, logger);
+
+      scheduler.schedule(server as never, '/project/src/a.ts');
+
+      expect(server.restart).not.toHaveBeenCalled();
+
+      await scheduler.waitForRestart();
+
+      expect(server.restart).toHaveBeenCalledTimes(1);
+      expect(scheduler.isRestartPending()).toBe(false);
+    });
+
     test('logs and continues when server.restart() rejects', async () => {
       const server = createMockServer();
 
@@ -563,6 +611,52 @@ describe('RestartScheduler', () => {
       second.resolve();
 
       await vi.waitFor(() => expect(released).toBe(true));
+    });
+  });
+
+  describe('isRestartPending', () => {
+    test('is true from the moment a change is queued until the restart completed', async () => {
+      vi.useFakeTimers();
+
+      const restart = createDeferred();
+      const server = createMockServer();
+
+      server.restart.mockImplementationOnce(() => restart.promise);
+
+      const scheduler = new RestartScheduler(100, logger);
+
+      expect(scheduler.isRestartPending()).toBe(false);
+
+      scheduler.schedule(server as never, '/project/src/a.ts');
+
+      // the debounce window counts: a request must not slip past the gate before the restart starts
+      expect(scheduler.isRestartPending()).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(110);
+
+      expect(server.restart).toHaveBeenCalledTimes(1);
+      expect(scheduler.isRestartPending()).toBe(true);
+
+      restart.resolve();
+      await scheduler.waitForRestart();
+
+      expect(scheduler.isRestartPending()).toBe(false);
+    });
+
+    test('stays true after a recorded failure until it is cleared', () => {
+      const scheduler = new RestartScheduler(100, logger);
+
+      expect(scheduler.getLastFailure()).toBeUndefined();
+
+      scheduler.recordFailure('startup failed: boom');
+
+      expect(scheduler.isRestartPending()).toBe(true);
+      expect(scheduler.getLastFailure()).toEqual({ message: 'startup failed: boom' });
+
+      scheduler.clearFailure();
+
+      expect(scheduler.isRestartPending()).toBe(false);
+      expect(scheduler.getLastFailure()).toBeUndefined();
     });
   });
 });

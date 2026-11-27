@@ -167,6 +167,168 @@ describe('createProxyHandler', () => {
     await expect.poll(() => closed.length).toBe(1);
   });
 
+  test('answers with the response of onRequest without asking the upstream', async () => {
+    const { upstream, received } = await startEchoUpstream();
+
+    const response = await proxy(
+      { upstream, onRequest: () => new Response('blocked', { status: 403 }) },
+      new Request('http://site.test/admin'),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe('blocked');
+    expect(received).toHaveLength(0);
+  });
+
+  test('forwards the request onRequest returns, to the target url and not to its own', async () => {
+    const { upstream, received } = await startEchoUpstream();
+
+    const response = await proxy(
+      {
+        upstream,
+        onRequest: (context) =>
+          new Request('http://elsewhere.test/ignored', {
+            method: 'PUT',
+            headers: { ...Object.fromEntries(context.request.headers), 'x-added': 'yes' },
+            body: 'replaced',
+          }),
+      },
+      new Request('http://site.test/orders/1', { method: 'POST', headers: { 'x-original': 'kept' }, body: 'payload' }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({ method: 'PUT', url: '/orders/1', body: 'replaced' });
+    expect(received[0]?.headers).toMatchObject({ 'x-added': 'yes', 'x-original': 'kept' });
+    expect(received[0]?.headers.host).toBe(new URL(upstream).host);
+  });
+
+  test('sends the request where onRequest moved the target url', async () => {
+    const { upstream, received } = await startEchoUpstream();
+
+    await proxy(
+      {
+        upstream,
+        onRequest: (_context, targetUrl) => {
+          targetUrl.pathname = `/v2${targetUrl.pathname}`;
+          targetUrl.searchParams.set('via', 'proxy');
+        },
+      },
+      new Request('http://site.test/orders?page=2', { method: 'POST', body: 'payload' }),
+    );
+
+    expect(received[0]).toMatchObject({ method: 'POST', url: '/v2/orders?page=2&via=proxy', body: 'payload' });
+  });
+
+  test('an onRequest that throws answers 500 without asking the upstream', async () => {
+    const { upstream, received } = await startEchoUpstream();
+
+    const response = await proxy(
+      {
+        upstream,
+        onRequest: () => {
+          throw new Error('hook broke');
+        },
+      },
+      new Request('http://site.test/'),
+    );
+
+    expect(response.status).toBe(500);
+    expect(received).toHaveLength(0);
+  });
+
+  test('answers with the response of onError, which gets the failure and the target url', async () => {
+    const seen: { message: string; target: string }[] = [];
+
+    const response = await proxy(
+      {
+        upstream: 'http://127.0.0.1:1/base',
+        onError: (_context, error, targetUrl) => {
+          seen.push({ message: error.message, target: targetUrl.href });
+
+          return new Response('maintenance', { status: 503 });
+        },
+      },
+      new Request('http://site.test/page?x=1'),
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe('maintenance');
+    expect(seen).toEqual([{ message: expect.any(String), target: 'http://127.0.0.1:1/base/page?x=1' }]);
+  });
+
+  test('onError gets what a hook threw as an error, and its void keeps the default answer', async () => {
+    const { upstream } = await startEchoUpstream();
+    const errors: Error[] = [];
+
+    const response = await proxy(
+      {
+        upstream,
+        onRequest: () => {
+          throw 'not an error';
+        },
+        onError: (_context, error) => {
+          errors.push(error);
+        },
+      },
+      new Request('http://site.test/'),
+    );
+
+    expect(response.status).toBe(500);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toBeInstanceOf(Error);
+    expect(errors[0]?.message).toBe('not an error');
+  });
+
+  test('answers with the response onResponse returns, and with the upstream one for void', async () => {
+    const { upstream } = await startEchoUpstream();
+
+    const replaced = await proxy(
+      {
+        upstream,
+        onResponse: async (_context, response) =>
+          new Response(`${await response.text()} (rewritten)`, { status: 202, headers: { 'x-rewritten': 'yes' } }),
+      },
+      new Request('http://site.test/'),
+    );
+
+    expect(replaced.status).toBe(202);
+    expect(replaced.headers.get('x-rewritten')).toBe('yes');
+    expect(await replaced.text()).toBe('ok (rewritten)');
+
+    const statuses: number[] = [];
+    const kept = await proxy(
+      {
+        upstream,
+        onResponse: (_context, response) => {
+          statuses.push(response.status);
+        },
+      },
+      new Request('http://site.test/'),
+    );
+
+    expect(statuses).toEqual([200]);
+    expect(await kept.text()).toBe('ok');
+  });
+
+  test('an upstream status no response can carry is the upstream\'s failure, and its connection is released', async () => {
+    const closed: boolean[] = [];
+    const upstream = await startUpstream((_req, res) => {
+      res.once('close', () => {
+        closed.push(true);
+      });
+      res.writeHead(700);
+      res.write('partial');
+    });
+
+    const response = await proxy({ upstream }, new Request('http://site.test/'));
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe('Upstream is down');
+
+    await expect.poll(() => closed.length).toBe(1);
+  });
+
   test('keeps the path of the upstream url as a prefix', async () => {
     const { upstream, received } = await startEchoUpstream();
 

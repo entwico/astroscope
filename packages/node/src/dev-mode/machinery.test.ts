@@ -22,6 +22,7 @@ vi.mock('./watch.js', () => ({
 
 const { createDevMachinery } = await import('./machinery');
 const { ssrImport } = await import('./vite-env.js');
+const { installBootGate, installGenStamp } = await import('./watch.js');
 const { runStartup, runShutdown } = await import('../lifecycle/lifecycle.js');
 
 const mockedSsrImport = vi.mocked(ssrImport);
@@ -71,6 +72,25 @@ function createMockServer() {
 }
 
 type ConfigureServer = (server: ReturnType<typeof createMockServer>) => Promise<void>;
+
+type Scheduler = { getLastFailure(): { message: string } | undefined; isRestartPending(): boolean };
+
+function getGatePlugin(options: MachineryOptions = {}): Plugin {
+  const plugins = createDevMachinery({
+    entry: 'src/boot.ts',
+    watch: true,
+    watchEntries: [],
+    prepare: async () => {},
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    getConfig: () => null,
+    ...options,
+  });
+  const plugin = plugins.find((p) => p.name === '@astroscope/node/dev-gate');
+
+  if (!plugin) throw new Error('gate plugin not registered');
+
+  return plugin;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -333,5 +353,146 @@ describe('dev machinery configureServer', () => {
       ['src/boot.ts', 'src/config.ts'],
       expect.objectContaining({ schedule: expect.any(Function) }),
     );
+  });
+});
+
+describe('dev machinery boot context', () => {
+  async function bootContext(address: unknown, config: unknown = null) {
+    const { plugin } = getStartupPlugin({ entry: undefined, getConfig: () => config as never });
+    const server = createMockServer();
+
+    server.httpServer.address = () => address;
+
+    await (plugin.configureServer as never as ConfigureServer)(server);
+
+    return mockedRunStartup.mock.lastCall![1];
+  }
+
+  test('is the address the server listens on', async () => {
+    expect(await bootContext({ address: '192.168.0.10', port: 5000 })).toEqual({
+      dev: true,
+      host: '192.168.0.10',
+      port: 5000,
+    });
+  });
+
+  test.each(['::', '0.0.0.0'])('names a server listening on the wildcard address %s localhost', async (address) => {
+    expect(await bootContext({ address, port: 4321 })).toEqual({ dev: true, host: 'localhost', port: 4321 });
+  });
+
+  test.each([
+    ['the configured host and port', { server: { host: 'dev.local', port: 3000 } }, { host: 'dev.local', port: 3000 }],
+    ['every interface for `host: true`', { server: { host: true, port: 3000 } }, { host: '0.0.0.0', port: 3000 }],
+    ['localhost for `host: false`', { server: { host: false } }, { host: 'localhost', port: 4321 }],
+    ['astro\'s defaults without a config', null, { host: 'localhost', port: 4321 }],
+  ])('falls back to %s while the server is not listening', async (_name, config, expected) => {
+    expect(await bootContext(null, config)).toEqual({ dev: true, ...expected });
+  });
+
+  test('falls back to the config for a server listening on a pipe', async () => {
+    expect(await bootContext('/tmp/dev.sock', { server: { port: 3000 } })).toEqual({
+      dev: true,
+      host: 'localhost',
+      port: 3000,
+    });
+  });
+});
+
+describe('dev machinery gate', () => {
+  test('installs the boot gate, then the generation stamp, from the post hook', () => {
+    const order: string[] = [];
+
+    vi.mocked(installBootGate).mockImplementationOnce(() => void order.push('gate'));
+    vi.mocked(installGenStamp).mockImplementationOnce(() => void order.push('stamp'));
+
+    const server = createMockServer();
+    const install = (getGatePlugin().configureServer as never as (server: unknown) => () => void)(server);
+
+    expect(order).toEqual([]);
+
+    install();
+
+    // each one unshifts itself: the stamp, installed last, sees every request first
+    expect(order).toEqual(['gate', 'stamp']);
+    expect(installBootGate).toHaveBeenCalledWith(
+      server,
+      expect.objectContaining({ waitForRestart: expect.any(Function) }),
+    );
+    expect(installGenStamp).toHaveBeenCalledWith(server);
+  });
+
+  test('installs nothing when watching is off', () => {
+    const plugin = getGatePlugin({ watch: false });
+    const install = (plugin.configureServer as never as (server: unknown) => unknown)(createMockServer());
+
+    expect(install).toBeUndefined();
+    expect(installBootGate).not.toHaveBeenCalled();
+    expect(installGenStamp).not.toHaveBeenCalled();
+  });
+
+  test('holds requests behind a failed restart until a later one succeeds', async () => {
+    const plugins = createDevMachinery({
+      entry: undefined,
+      watch: true,
+      watchEntries: [],
+      prepare: async () => {},
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      getConfig: () => null,
+    });
+    const [gate, startup] = plugins as [Plugin, Plugin];
+    const server = createMockServer();
+
+    (gate.configureServer as never as (server: unknown) => () => void)(server)();
+
+    const scheduler = vi.mocked(installBootGate).mock.lastCall![1] as unknown as Scheduler;
+
+    mockedRunStartup
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(undefined);
+
+    await (startup.configureServer as never as ConfigureServer)(server);
+
+    expect(scheduler.isRestartPending()).toBe(false);
+
+    await expect((startup.configureServer as never as ConfigureServer)(server)).rejects.toThrow('boom');
+
+    expect(scheduler.getLastFailure()?.message).toContain('boom');
+    expect(scheduler.isRestartPending()).toBe(true);
+
+    await (startup.configureServer as never as ConfigureServer)(server);
+
+    expect(scheduler.getLastFailure()).toBeUndefined();
+    expect(scheduler.isRestartPending()).toBe(false);
+  });
+});
+
+describe('dev machinery initial startup failure', () => {
+  test('exits the process instead of serving without a booted app', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const mod: BootModule = { onStartup: vi.fn(), onShutdown: vi.fn() };
+
+    mockedSsrImport.mockResolvedValueOnce(mod);
+    mockedRunStartup.mockRejectedValueOnce(new Error('database unreachable'));
+
+    const { plugin, logger } = getStartupPlugin();
+
+    await (plugin.configureServer as never as ConfigureServer)(createMockServer());
+
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('database unreachable'));
+    // whatever the half-started module claimed is released before the exit
+    expect(mockedRunShutdown).toHaveBeenCalledWith(mod, expect.objectContaining({ dev: true }));
+  });
+
+  test('exits when the platform seams fail before any boot module was loaded', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
+    const { plugin } = getStartupPlugin({ prepare: () => Promise.reject(new Error('config invalid')) });
+
+    await (plugin.configureServer as never as ConfigureServer)(createMockServer());
+
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(mockedSsrImport).not.toHaveBeenCalled();
+    expect(mockedRunShutdown).not.toHaveBeenCalled();
   });
 });

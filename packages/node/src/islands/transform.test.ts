@@ -98,6 +98,17 @@ describe('createIslandsTransformer', () => {
     expect(apply(html)).toBe(html);
   });
 
+  test('leaves an island without a component url untouched and asks no emitter about it', () => {
+    const emitter = vi.fn(() => ({ html: '<script>/* data */</script>' }));
+
+    registerIslandEmitter(emitter);
+
+    const html = '<astro-island client="visible" opts="{}"></astro-island><astro-island component-url=""></astro-island>';
+
+    expect(apply(html)).toBe(html);
+    expect(emitter).not.toHaveBeenCalled();
+  });
+
   test('merges links from registered emitters', () => {
     registerIslandEmitter((info) => ({
       links: [`/_i18n/de/${info.componentUrl.split('/').pop()}`],

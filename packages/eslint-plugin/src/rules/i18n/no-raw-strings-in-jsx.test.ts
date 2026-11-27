@@ -91,6 +91,8 @@ tester.run('no-raw-strings-in-jsx', noRawStringsInJsx, {
     { code: `<div>{'href' in obj && <span />}</div>;` },
     // ternary inside ignored attribute
     { code: `<a target={openInNewTab ? '_blank' : undefined} />;` },
+    // a namespaced attribute is ignored by its full name
+    { code: `<div class:list={active ? 'flex' : 'hidden'} />;` },
     // aria state / relationship attributes
     { code: '<div aria-modal="true" />;' },
     { code: '<div aria-hidden="true" />;' },
@@ -133,6 +135,11 @@ tester.run('no-raw-strings-in-jsx', noRawStringsInJsx, {
     },
     {
       code: '<div aria-roledescription="slide" />;',
+      errors: [{ messageId: 'rawString' }],
+    },
+    // a namespaced attribute that is not ignored is checked like any other
+    {
+      code: `<a xlink:title={title ?? 'Read more'} />;`,
       errors: [{ messageId: 'rawString' }],
     },
     // text that merely starts with a brace

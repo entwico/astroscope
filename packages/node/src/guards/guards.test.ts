@@ -153,6 +153,12 @@ describe('defineAction', () => {
     expect(() => defineAction({ accept: 'form', guards: [secret], handler: () => {} })).toThrow('form action');
   });
 
+  test('rejects guard input on an action whose schema is not an object', () => {
+    expect(() => defineAction({ input: z.string(), guards: [secret], handler: () => {} })).toThrow(
+      'object input schema',
+    );
+  });
+
   test('extended guards run their parent first and both proofs land on locals', async () => {
     const seen: string[] = [];
     const action = defineAction({
@@ -409,5 +415,147 @@ describe('per-request memo', () => {
     const { user } = await guard(ctx, [authenticated]);
 
     expect(user?.id).toBe('u1');
+  });
+});
+
+describe('guard input from a request body', () => {
+  async function readInput<Shape extends z.ZodRawShape>(shape: Shape, init: RequestInit) {
+    const seen = vi.fn();
+    const probe = defineGuard({
+      name: 'probe',
+      input: shape,
+      check: (_ctx, input) => {
+        seen(input);
+      },
+    });
+    const { denied } = await guard(createApiContext({}, { method: 'POST', ...init }), [probe]);
+
+    return { denied, input: seen.mock.calls[0]?.[0] as unknown };
+  }
+
+  function form(fields: [name: string, value: string][]): RequestInit {
+    return { body: new URLSearchParams(fields) };
+  }
+
+  test('answers 400 for a body that does not parse as its content type', async () => {
+    const { denied, input } = await readInput(
+      { name: z.string() },
+      { headers: { 'content-type': 'application/json' }, body: '{"name":' },
+    );
+
+    expect(denied?.status).toBe(400);
+    expect(await denied?.json()).toEqual({ error: { code: 'BAD_REQUEST', message: 'unreadable request body' } });
+    expect(input).toBeUndefined();
+  });
+
+  test('reads a form boolean from true/false or from the presence of the field', async () => {
+    const shape = { yes: z.boolean(), no: z.boolean(), checked: z.boolean(), absent: z.boolean() };
+    const { input } = await readInput(
+      shape,
+      form([
+        ['yes', 'true'],
+        ['no', 'false'],
+        ['checked', 'on'],
+      ]),
+    );
+
+    expect(input).toEqual({ yes: true, no: false, checked: true, absent: false });
+  });
+
+  test('reads every value of a repeated form field for an array schema, coerced per element', async () => {
+    const shape = { tags: z.array(z.string()), ids: z.array(z.number()), flags: z.array(z.boolean()) };
+    const { input } = await readInput(
+      shape,
+      form([
+        ['tags', 'a'],
+        ['tags', 'b'],
+        ['ids', '1'],
+        ['ids', '2'],
+        ['flags', 'true'],
+        ['flags', 'false'],
+        ['flags', 'on'],
+      ]),
+    );
+
+    expect(input).toEqual({ tags: ['a', 'b'], ids: [1, 2], flags: [true, false, true] });
+  });
+
+  test('an array field missing from the form is an empty list', async () => {
+    const { input } = await readInput({ tags: z.array(z.string()) }, form([]));
+
+    expect(input).toEqual({ tags: [] });
+  });
+
+  test('coerces by the schema behind optional, nullable, default and transform wrappers', async () => {
+    const shape = {
+      count: z.number().optional(),
+      page: z.number().default(1),
+      doubled: z.number().transform((value) => value * 2),
+      agreed: z.boolean().nullable(),
+    };
+    const { input } = await readInput(
+      shape,
+      form([
+        ['count', '3'],
+        ['page', '2'],
+        ['doubled', '21'],
+        ['agreed', 'on'],
+      ]),
+    );
+
+    expect(input).toEqual({ count: 3, page: 2, doubled: 42, agreed: true });
+  });
+
+  test('a missing form field takes its default, stays undefined when optional and is null otherwise', async () => {
+    const shape = {
+      page: z.number().default(1),
+      enabled: z.boolean().default(true),
+      note: z.string().optional(),
+      name: z.string().nullable(),
+    };
+    const { input } = await readInput(shape, form([]));
+
+    expect(input).toEqual({ page: 1, enabled: true, note: undefined, name: null });
+  });
+
+  test('reads the declared fields of a multipart body', async () => {
+    const body = new FormData();
+
+    body.set('projectId', 'p1');
+    body.set('upload', new Blob(['x']), 'x.txt');
+
+    const { input } = await readInput({ projectId: z.string() }, { body });
+
+    expect(input).toEqual({ projectId: 'p1' });
+  });
+});
+
+describe('per-request memo keys', () => {
+  test('a guard reading several fields passed only for that combination of values', async () => {
+    const check = vi.fn();
+    const scoped = defineGuard({ name: 'scoped', input: { tenant: z.string(), project: z.string() }, check });
+    const action = defineAction({ guards: [scoped], handler: () => {} }) as unknown as Action;
+    const ctx = createApiContext();
+
+    await action({ tenant: 't1', project: 'p1' }, ctx);
+    await action({ project: 'p1', tenant: 't1' }, ctx);
+
+    expect(check).toHaveBeenCalledTimes(1);
+
+    await action({ tenant: 't1', project: 'p2' }, ctx);
+
+    expect(check).toHaveBeenCalledTimes(2);
+  });
+
+  test('a guard whose input cannot be serialized runs every time', async () => {
+    const check = vi.fn();
+    const sized = defineGuard({ name: 'sized', input: { size: z.bigint() }, check });
+    const action = defineAction({ guards: [sized], handler: () => {} }) as unknown as Action;
+    const ctx = createApiContext();
+
+    await action({ size: 1n }, ctx);
+    await action({ size: 1n }, ctx);
+
+    expect(check).toHaveBeenCalledTimes(2);
   });
 });
