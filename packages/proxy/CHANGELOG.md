@@ -1,5 +1,11 @@
 # @astroscope/proxy
 
+## 1.0.2
+
+### Patch Changes
+
+- fc8799b: an upstream status outside 200–599 is a `502` upstream failure reaching `onError`, not a `500`
+
 ## 1.0.1
 
 ### Patch Changes

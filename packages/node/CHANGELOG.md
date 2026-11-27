@@ -1,5 +1,13 @@
 # @astroscope/node
 
+## 5.0.3
+
+### Patch Changes
+
+- fc8799b: dev: a boot that fails turns open pages into the holding page with the error, and the holding page no longer reloads in a loop while a change is debounced
+- fc8799b: error answers for static files (`416`, `412`, `500`) no longer carry the file's `Content-Length`, `Content-Encoding`, `ETag` and immutable `Cache-Control`, and a `416` has its `Content-Range`
+- fc8799b: `TRACE` and `TRACK` requests are answered with `405` instead of `500`
+
 ## 5.0.2
 
 ### Patch Changes

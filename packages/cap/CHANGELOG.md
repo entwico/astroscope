@@ -1,5 +1,15 @@
 # @astroscope/cap
 
+## 2.0.2
+
+### Patch Changes
+
+- fc8799b: readme: the Content Security Policy needs `worker-src blob:`, `'wasm-unsafe-eval'` only selects the faster solver, and the visible widget needs `img-src data:`
+- Updated dependencies [fc8799b]
+- Updated dependencies [fc8799b]
+- Updated dependencies [fc8799b]
+  - @astroscope/node@5.0.3
+
 ## 2.0.1
 
 ### Patch Changes

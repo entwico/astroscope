@@ -1,5 +1,15 @@
 # @astroscope/react
 
+## 3.0.2
+
+### Patch Changes
+
+- fc8799b: a suspending island rendered several times on one page logs "react island suspended during server render" once
+- Updated dependencies [fc8799b]
+- Updated dependencies [fc8799b]
+- Updated dependencies [fc8799b]
+  - @astroscope/node@5.0.3
+
 ## 3.0.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @astroscope/eslint-plugin
 
+## 3.1.2
+
+### Patch Changes
+
+- fc8799b: `island-not-serializable` no longer reports tuples of serializable elements, template-literal and `Uppercase<…>` string types, and `void` in a union
+
 ## 3.1.1
 
 ### Patch Changes
